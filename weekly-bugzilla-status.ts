@@ -608,9 +608,11 @@ Return a strict JSON object with:
     );
 
     // Print final markdown
+    console.log();
     console.log(output);
     console.log();
     console.log(`(${link})`);
+    console.log();
 
     log("Done.");
   } catch (err: any) {
