@@ -194,14 +194,20 @@ function buildBugzillaSearchURL(
 
 async function bugzillaGet(
   path: string,
-  params: Record<string, string | number | boolean | undefined> = {}
+  params: Record<string, string | number | boolean | string[] | undefined> = {}
 ) {
   const url = new URL(`${BUGZILLA_HOST}/rest${path}`);
   for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined) url.searchParams.set(k, String(v));
+    if (v === undefined) continue;
+    if (Array.isArray(v)) {
+      for (const item of v) url.searchParams.append(k, String(item));
+    } else {
+      url.searchParams.set(k, String(v));
+    }
   }
   url.searchParams.set("api_key", BUGZILLA_API_KEY!);
 
+  debug(`Fetching ${url.toString()}`);
   const res = await fetch(url.toString());
   const text = await res.text();
 
@@ -261,9 +267,8 @@ async function fetchComponentBugs(
     const payload = (await bugzillaGet(`/bug`, {
       product: pc.product,
       component: pc.component,
-      status: "RESOLVED",
+      status: ["RESOLVED", "VERIFIED", "CLOSED"],
       status_type: "anyexact", // allow multiple status params
-      status_1: "VERIFIED",
       resolution: "FIXED",
       last_change_time: sinceISO,
       include_fields: BUG_FIELDS.join(","),
@@ -283,10 +288,8 @@ async function fetchWhiteboardBugs(tags: string[]): Promise<Bug[]> {
   for (const tag of tags) {
     const payload = (await bugzillaGet(`/bug`, {
       // Status set: done states
-      status: "RESOLVED",
+      status: ["RESOLVED", "VERIFIED", "CLOSED"],
       status_type: "anyexact",
-      status_1: "VERIFIED",
-      status_2: "CLOSED",
       resolution: "FIXED",
 
       // Status Whiteboard contains the tag
