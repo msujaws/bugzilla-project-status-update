@@ -22,8 +22,7 @@ Node 18+ (for global fetch). TypeScript.
 ```bash
 npm i -D ts-node typescript
 npm i openai yargs
-# Node 18+ provides fetch; if on older Node, also:
-npm i undici
+# Node 18+ provides fetch; if on older Node, also: npm i undici
 ```
 
 ## Run
