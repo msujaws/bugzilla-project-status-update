@@ -577,10 +577,7 @@ async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
 
     // Gather from components / metabug children / whiteboard tags
     const [componentBugs, specificBugs, wbBugs] = await Promise.all([
-      fetchComponentBugs(
-        pairs,
-        sinceISO
-      ),
+      fetchComponentBugs(pairs, sinceISO),
       fetchSpecificBugs(metabugChildren, sinceISO),
       fetchWhiteboardBugs(wbTags),
     ]);
@@ -668,7 +665,9 @@ async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
       const header = output.match(/(^|\n)##?\s+Demo suggestions/i)
         ? ""
         : `\n\n## Demo suggestions\n`;
-      const lines = demoItems.map((d) => `- Bug ${d.id}: ${d.text}`);
+      const lines = demoItems.map((d) => {
+        return `- [Bug ${d.id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${d.id}): ${d.text}`;
+      });
       output = output + header + (header ? lines.join("\n") : "");
     }
 
