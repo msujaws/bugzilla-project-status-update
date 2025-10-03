@@ -462,7 +462,6 @@ async function assessImpactAndSummarize(
     "Goal: Emphasize *user impact* only. If a change has no obvious user impact, omit it.",
     "Keep it concise, conversational, and human. Prefer plain language over Bugzilla jargon.",
     `Hard limit: about ${modelCfg.maxOutputWords} words total.`,
-    "If there are impactful items, include a short 'Demo suggestions' section when appropriate.",
     "Output must be valid Markdown only.",
   ].join("\n");
 
@@ -580,7 +579,7 @@ async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
     const [componentBugs, specificBugs, wbBugs] = await Promise.all([
       fetchComponentBugs(
         pairs,
-        /*sinceISO no longer required here if you removed last_change_time*/ sinceISO
+        sinceISO
       ),
       fetchSpecificBugs(metabugChildren, sinceISO),
       fetchWhiteboardBugs(wbTags),
@@ -680,6 +679,7 @@ async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
       sinceISO,
       wbTags
     );
+    log("Done. Status update below:");
 
     // Print final markdown
     console.log();
@@ -687,8 +687,6 @@ async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
     console.log();
     console.log(`(${link})`);
     console.log();
-
-    log("Done.");
   } catch (err: any) {
     console.error("[ERROR]", err?.message || err);
     process.exit(1);
