@@ -24,7 +24,7 @@
  *   # Node 18+ provides fetch; if on older Node, also: npm i undici
  *
  * Run:
- *   node weekly-bugzilla-status.ts \
+ *   npm run status -- \
  *     --component "Firefox:General" \
  *     --component "Fenix:Toolbar" \
  *     --metabug 1880000 \
