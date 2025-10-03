@@ -190,12 +190,35 @@ async function bugzillaGet(
     if (v !== undefined) url.searchParams.set(k, String(v));
   }
   url.searchParams.set("api_key", BUGZILLA_API_KEY!);
+
   const res = await fetch(url.toString());
+  const text = await res.text();
+
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Bugzilla error ${res.status}: ${text}`);
+    let json: any = null;
+    try {
+      json = JSON.parse(text);
+    } catch {}
+    const err: any = new Error(
+      `Bugzilla ${res.status}${json?.code ? ` code=${json.code}` : ""}: ${
+        json?.message || text
+      }`
+    );
+    err.status = res.status;
+    err.code = json?.code;
+    err.body = json || text;
+    err.url = url.toString();
+    throw err;
   }
-  return res.json();
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    const err: any = new Error(`Failed to parse JSON from Bugzilla`);
+    err.body = text.slice(0, 500);
+    err.url = url.toString();
+    throw err;
+  }
 }
 
 async function fetchMetabugChildren(metabugIds: number[]): Promise<number[]> {
@@ -272,8 +295,9 @@ async function fetchSpecificBugs(
 async function fetchHistories(ids: number[]): Promise<BugHistory["bugs"]> {
   if (!ids.length) return [];
   log(`Fetching histories for ${ids.length} bugs`);
-  const chunkSize = 200;
+
   const histories: BugHistory["bugs"] = [];
+  let chunkSize = 200;
 
   const fetchChunk = async (chunk: number[]) => {
     try {
@@ -281,14 +305,18 @@ async function fetchHistories(ids: number[]): Promise<BugHistory["bugs"]> {
         `/bug/${chunk.join(",")}/history`
       )) as BugHistory;
       histories.push(...payload.bugs);
+      return;
     } catch (e: any) {
-      // If any bug in the chunk is not found or restricted, Bugzilla returns 400/code=100 for the entire chunk.
-      const msg = e?.message || "";
-      const maybeIds = msg.match(/\d+(?:,\d+)*/)?.[0] || chunk.join(",");
+      // 400 usually means one or more IDs in the chunk are invalid/restricted.
+      const head = chunk.slice(0, 10).join(",");
+      const tail = chunk.length > 10 ? `… (total ${chunk.length})` : "";
       console.error(
-        `[WARN] Batch history fetch failed (will retry individually): ${maybeIds}`
+        `[WARN] Batch history fetch failed ${e.status || ""}${
+          e.code ? ` code=${e.code}` : ""
+        }. Retrying individually. IDs: [${head}] ${tail}`
       );
-      // Retry one-by-one, skipping those still failing
+
+      // Retry individually; skip the offenders.
       for (const id of chunk) {
         try {
           const payload = (await bugzillaGet(
@@ -296,8 +324,11 @@ async function fetchHistories(ids: number[]): Promise<BugHistory["bugs"]> {
           )) as BugHistory;
           histories.push(...payload.bugs);
         } catch (e2: any) {
+          // Most common: 400 code=100 "can't find" or 102 "access denied"
           console.error(
-            `[WARN] Skipping history for #${id}: ${e2?.message || e2}`
+            `[WARN] Skipping history for #${id}: ${e2.status || ""}${
+              e2.code ? ` code=${e2.code}` : ""
+            } ${e2.message}`
           );
         }
       }
@@ -305,9 +336,9 @@ async function fetchHistories(ids: number[]): Promise<BugHistory["bugs"]> {
   };
 
   for (let i = 0; i < ids.length; i += chunkSize) {
-    const chunk = ids.slice(i, i + chunkSize);
-    await fetchChunk(chunk);
+    await fetchChunk(ids.slice(i, i + chunkSize));
   }
+
   return histories;
 }
 
@@ -487,6 +518,18 @@ Return a strict JSON object with:
       "Candidate IDs:",
       candidates.map((b) => b.id)
     );
+
+    candidates = candidates.filter((b) => Number.isFinite(Number(b.id)));
+    if (argv.debug) {
+      const nonNumeric = candidates.filter(
+        (b) => !Number.isFinite(Number(b.id))
+      );
+      if (nonNumeric.length)
+        console.error(
+          "[WARN] Dropping non-numeric IDs:",
+          nonNumeric.map((b) => b.id)
+        );
+    }
 
     // Verify transition via history
     const histories = await fetchHistories(candidates.map((b) => b.id));
