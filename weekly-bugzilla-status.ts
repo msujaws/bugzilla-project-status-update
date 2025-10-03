@@ -480,6 +480,28 @@ Return a strict JSON object with:
   return { summaryMd: parsed.summary_md || content, assessments };
 }
 
+async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  process.stderr.write(`[INFO] ${label} `);
+  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  let i = 0;
+  const timer = setInterval(() => {
+    process.stderr.write(
+      `\r[INFO] ${label} ${frames[(i = ++i % frames.length)]}`
+    );
+  }, 120);
+
+  try {
+    const result = await fn();
+    clearInterval(timer);
+    process.stderr.write(`\r[INFO] ${label} ✅\n`);
+    return result;
+  } catch (err) {
+    clearInterval(timer);
+    process.stderr.write(`\r[INFO] ${label} ❌\n`);
+    throw err;
+  }
+}
+
 (async () => {
   try {
     const sinceISO = isoDaysAgo(argv.days);
@@ -560,13 +582,9 @@ Return a strict JSON object with:
 
     // Ask OpenAI to score & summarize
     const modelCfg: ModelConfig = { model: argv.model, maxOutputWords: 170 }; // ~60s cap
-    log(
-      `Assessing user impact and generating summary via OpenAI (${modelCfg.model})`
-    );
-    const { summaryMd, assessments } = await assessImpactAndSummarize(
-      finalBugs,
-      modelCfg,
-      argv.days
+    const { summaryMd, assessments } = await withSpinner(
+      `Assessing user impact and generating summary via OpenAI (${modelCfg.model})`,
+      () => assessImpactAndSummarize(finalBugs, modelCfg, argv.days)
     );
 
     // Debug log the impact rankings
