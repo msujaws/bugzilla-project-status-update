@@ -116,6 +116,11 @@ const argv = yargs(hideBin(process.argv))
     type: "boolean",
     default: false,
   })
+  .option("whiteboard", {
+    describe: 'Status Whiteboard tag to match (repeatable), e.g. "[fx-vpn]"',
+    type: "string",
+    array: true,
+  })
   .strict()
   .help()
   .parseSync();
@@ -153,29 +158,35 @@ function isSecurityRestricted(groups?: string[]): boolean {
 function buildBugzillaSearchURL(
   bugIds: number[],
   pairs: Array<{ product: string; component: string }>,
-  sinceISO: string
+  sinceISO: string,
+  whiteboards: string[] = []
 ): string {
   const url = new URL(`${BUGZILLA_HOST}/buglist.cgi`);
 
-  // Status: RESOLVED or VERIFIED
-  url.searchParams.set("bug_status", "RESOLVED,VERIFIED");
-
-  // Resolution: FIXED
+  // Status & resolution
+  url.searchParams.set("bug_status", "RESOLVED,VERIFIED,CLOSED");
   url.searchParams.set("resolution", "FIXED");
 
-  // Time window
+  // Time window (Bugzilla UI params)
   url.searchParams.set("chfieldfrom", sinceISO);
   url.searchParams.set("chfieldto", "Now");
 
-  // Explicit IDs
+  // IDs (optional)
   if (bugIds.length) {
     url.searchParams.set("bug_id", bugIds.join(","));
   }
 
-  // Product/component pairs
+  // Product/components (optional; repeatable)
   for (const pc of pairs) {
     url.searchParams.append("product", pc.product);
     url.searchParams.append("component", pc.component);
+  }
+
+  // Status Whiteboard tags (optional; repeatable)
+  for (const tag of whiteboards) {
+    url.searchParams.append("status_whiteboard", tag);
+    // classic UI uses *_type selectors; allwordssubstr = AND across words, substring works well too.
+    url.searchParams.append("status_whiteboard_type", "substring");
   }
 
   return url.toString();
@@ -258,6 +269,35 @@ async function fetchComponentBugs(
       include_fields: BUG_FIELDS.join(","),
     })) as { bugs: Bug[] };
     results.push(...payload.bugs);
+  }
+  return results;
+}
+
+async function fetchWhiteboardBugs(tags: string[]): Promise<Bug[]> {
+  if (!tags?.length) return [];
+  log(
+    `Querying whiteboard tags (${tags.length}) for RESOLVED/VERIFIED/CLOSED FIXED`
+  );
+  const results: Bug[] = [];
+
+  for (const tag of tags) {
+    const payload = (await bugzillaGet(`/bug`, {
+      // Status set: done states
+      status: "RESOLVED",
+      status_type: "anyexact",
+      status_1: "VERIFIED",
+      status_2: "CLOSED",
+      resolution: "FIXED",
+
+      // Status Whiteboard contains the tag
+      whiteboard: tag,
+      whiteboard_type: "substring",
+
+      include_fields: BUG_FIELDS.join(","),
+    })) as { bugs: Bug[] };
+
+    results.push(...payload.bugs);
+    debug(`Whiteboard "${tag}" matched ${payload.bugs.length} bugs`);
   }
   return results;
 }
@@ -414,7 +454,7 @@ async function assessImpactAndSummarize(
   windowDays: number
 ): Promise<{ summaryMd: string; assessments: ImpactAssessment[] }> {
   const system = [
-    "You are an expert release PM creating a spoken, 60-second weekly update for a team meeting.",
+    "You are an expert release PM creating a spoken, 60-second update for a team meeting.",
     "Audience: cross-functional engineers and managers.",
     "Goal: Emphasize *user impact* only. If a change has no obvious user impact, omit it.",
     "Keep it concise, conversational, and human. Prefer plain language over Bugzilla jargon.",
@@ -520,21 +560,33 @@ async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
       pairs.push({ product: product.trim(), component: component.trim() });
     }
 
-    // Expand metabugs to child IDs
+    // Parse whiteboard tags
+    const wbTags = (argv.whiteboard || [])
+      .map(String)
+      .filter((s) => s.trim().length);
+    if (wbTags.length) {
+      log(`Whiteboard filters: ${wbTags.join(", ")}`);
+    }
+
+    // Expand metabugs to children (existing)
     const metabugChildren = await fetchMetabugChildren(
       (argv.metabug || []).map(Number)
     );
 
-    // Gather candidate bugs from components + specific children
-    const [componentBugs, specificBugs] = await Promise.all([
-      fetchComponentBugs(pairs, sinceISO),
+    // Gather from components / metabug children / whiteboard tags
+    const [componentBugs, specificBugs, wbBugs] = await Promise.all([
+      fetchComponentBugs(
+        pairs,
+        /*sinceISO no longer required here if you removed last_change_time*/ sinceISO
+      ),
       fetchSpecificBugs(metabugChildren, sinceISO),
+      fetchWhiteboardBugs(wbTags),
     ]);
 
-    let candidates = dedupeById([...componentBugs, ...specificBugs]);
+    let candidates = dedupeById([...componentBugs, ...specificBugs, ...wbBugs]);
+
     // Exclude security-restricted
     candidates = candidates.filter((b) => !isSecurityRestricted(b.groups));
-
     log(`Candidates after initial query: ${candidates.length}`);
     debug(
       "Candidate IDs:",
@@ -569,7 +621,7 @@ async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
 
     if (!finalBugs.length) {
       console.log(
-        `# Weekly Project Update\n\n_No user-impacting changes in the last ${
+        `# Project Update\n\n_No user-impacting changes in the last ${
           argv.days
         } days._\n\n(${buildBugzillaSearchURL(
           metabugChildren,
@@ -622,7 +674,8 @@ async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
     const link = buildBugzillaSearchURL(
       finalBugs.map((b) => b.id),
       pairs,
-      sinceISO
+      sinceISO,
+      wbTags
     );
 
     // Print final markdown
