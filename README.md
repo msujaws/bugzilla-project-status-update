@@ -21,15 +21,13 @@ Node 18+ (for global fetch). TypeScript.
 ## Install
 
 ```bash
-npm i -D ts-node typescript
-npm i openai yargs
-# Node 18+ provides fetch; if on older Node, also: npm i undici
+npm i
 ```
 
 ## Run
 
 ```bash
-node weekly-bugzilla-status.ts \
+npm run status -- \
   --component "Firefox:General" \
   --component "Fenix:Toolbar" \
   --metabug 1880000 \
