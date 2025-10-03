@@ -6,6 +6,7 @@ Node 18+ (for global fetch). TypeScript.
 
 - **Inputs:**
   - `--component "Product:Component"` (repeatable)  
+  - `--whiteboard "[fx-vpn]"` (repeatable)
   - `--metabug 12345` (repeatable)  
   - `--days 8` (default 8)  
   - `--model gpt-5` (default)  
