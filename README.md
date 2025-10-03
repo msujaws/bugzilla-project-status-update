@@ -28,7 +28,7 @@ npm i openai yargs
 ## Run
 
 ```bash
-ts-node weekly-bugzilla-status.ts \
+node weekly-bugzilla-status.ts \
   --component "Firefox:General" \
   --component "Fenix:Toolbar" \
   --metabug 1880000 \
