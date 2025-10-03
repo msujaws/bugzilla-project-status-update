@@ -480,7 +480,7 @@ ${JSON.stringify(bugPayload, null, 2)}
 Tasks:
 1) For each bug, assign a *user impact score* 1–10 (1 = none, 10 = major, obvious user impact) and a one-line reason.
 2) For bugs with score ≥ 6, propose a brief "demo suggestion" (one sentence).
-3) Write a single, 60-second, meeting-ready Markdown summary focusing only on the items with clear user impact. Use bullets. Avoid internal bug jargon. Be concise.
+3) Write a short, meeting-ready summary in clear, natural language that can be read aloud in under 60 seconds. Combine related points into a smooth narrative instead of listing them. Focus only on changes with clear user impact. Keep it concise, engaging, and free of technical or internal jargon.
 
 Return a strict JSON object with:
 {
