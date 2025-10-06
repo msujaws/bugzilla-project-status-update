@@ -121,12 +121,6 @@ const argv = yargs(hideBin(process.argv))
     type: "string",
     array: true,
   })
-  .option("format", {
-    describe: "Output format: 'md' (default) or 'html' for Google Docs paste",
-    choices: ["md", "html"],
-    default: "md",
-  })
-
   .strict()
   .help()
   .parseSync();
@@ -147,25 +141,6 @@ const debug = (...args: any[]) => {
   if (argv.debug) console.error("[DEBUG]", ...args);
 };
 const log = (...args: any[]) => console.error("[INFO]", ...args);
-
-function markdownToHTML(md: string): string {
-  return (
-    md
-      // Headings
-      .replace(/^### (.*$)/gim, "<h3>$1</h3>")
-      .replace(/^## (.*$)/gim, "<h2>$1</h2>")
-      .replace(/^# (.*$)/gim, "<h1>$1</h1>")
-      // Bold / Italic
-      .replace(/\*\*(.*?)\*\*/gim, "<b>$1</b>")
-      .replace(/\*(.*?)\*/gim, "<i>$1</i>")
-      // Links
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2">$1</a>')
-      // Lists
-      .replace(/^- (.*)$/gim, "<ul><li>$1</li></ul>")
-      // Line breaks
-      .replace(/\n{2,}/gim, "<br/><br/>")
-  );
-}
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
@@ -704,11 +679,6 @@ async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
       wbTags
     );
     log("Done. Status update below:");
-
-    let rendered = output;
-    if (argv.format === "html") {
-      rendered = markdownToHTML(output);
-    }
 
     // Print final markdown
     console.log();
