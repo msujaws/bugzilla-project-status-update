@@ -684,7 +684,7 @@ async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
     console.log();
     console.log(output);
     console.log();
-    console.log(`(${link})`);
+    console.log(`[View bugs in Bugzilla](${link})`);
     console.log();
   } catch (err: any) {
     console.error("[ERROR]", err?.message || err);
