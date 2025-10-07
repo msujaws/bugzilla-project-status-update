@@ -182,8 +182,8 @@ function buildBugzillaSearchURL(
   // f1=OP, j1=OR, (f2..fN rows), f{N+1}=CP
   if (whiteboards.length) {
     let idx = 1;
-    url.searchParams.set(`f${idx}`, "OP");  // open group
-    url.searchParams.set(`j${idx}`, "OR");  // join with OR
+    url.searchParams.set(`f${idx}`, "OP"); // open group
+    url.searchParams.set(`j${idx}`, "OR"); // join with OR
     idx++;
 
     for (const tag of whiteboards) {
@@ -344,10 +344,10 @@ async function fetchSpecificBugs(
 
 async function fetchHistories(ids: number[]): Promise<BugHistory["bugs"]> {
   if (!ids.length) return [];
-  log(`Fetching histories for ${ids.length} bugs`);
+  const progress = createProgress(`Fetching bug histories`, ids.length);
 
   const histories: BugHistory["bugs"] = [];
-  let chunkSize = 200;
+  const chunkSize = 200;
 
   const fetchChunk = async (chunk: number[]) => {
     try {
@@ -355,18 +355,15 @@ async function fetchHistories(ids: number[]): Promise<BugHistory["bugs"]> {
         `/bug/${chunk.join(",")}/history`
       )) as BugHistory;
       histories.push(...payload.bugs);
-      return;
+      progress.tick(chunk.length);
     } catch (e: any) {
-      // 400 usually means one or more IDs in the chunk are invalid/restricted.
-      const head = chunk.slice(0, 10).join(",");
-      const tail = chunk.length > 10 ? `… (total ${chunk.length})` : "";
+      const head = chunk.slice(0, 8).join(",");
+      const more = chunk.length > 8 ? `… (${chunk.length} total)` : "";
       console.error(
-        `[WARN] Batch history fetch failed ${e.status || ""}${
+        `\n[WARN] Batch history fetch failed ${e.status || ""}${
           e.code ? ` code=${e.code}` : ""
-        }. Retrying individually. IDs: [${head}] ${tail}`
+        }. ` + `Retrying individually. IDs: [${head}] ${more}`
       );
-
-      // Retry individually; skip the offenders.
       for (const id of chunk) {
         try {
           const payload = (await bugzillaGet(
@@ -374,12 +371,12 @@ async function fetchHistories(ids: number[]): Promise<BugHistory["bugs"]> {
           )) as BugHistory;
           histories.push(...payload.bugs);
         } catch (e2: any) {
-          // Most common: 400 code=100 "can't find" or 102 "access denied"
           console.error(
-            `[WARN] Skipping history for #${id}: ${e2.status || ""}${
-              e2.code ? ` code=${e2.code}` : ""
-            } ${e2.message}`
+            `[WARN] Skipping history for #${id}: ${e2.status || ""}` +
+              `${e2.code ? ` code=${e2.code}` : ""} ${e2.message || ""}`
           );
+        } finally {
+          progress.tick(1); // count each ID as handled (success or skip)
         }
       }
     }
@@ -389,6 +386,7 @@ async function fetchHistories(ids: number[]): Promise<BugHistory["bugs"]> {
     await fetchChunk(ids.slice(i, i + chunkSize));
   }
 
+  progress.done();
   return histories;
 }
 
@@ -529,6 +527,48 @@ Return a strict JSON object with:
   return { summaryMd: parsed.summary_md || content, assessments };
 }
 
+// --- progress.ts (inline in your file) ---
+type Progress = {
+  tick: (n?: number) => void;
+  done: () => void;
+};
+
+function createProgress(label: string, total: number): Progress {
+  let current = 0;
+  const width = 24; // bar width
+  let lastRender = 0;
+
+  function render() {
+    const now = Date.now();
+    // throttle re-renders to ~20fps to keep stderr tidy
+    if (now - lastRender < 50) return;
+    lastRender = now;
+
+    const pct = total > 0 ? Math.min(current / total, 1) : 0;
+    const filled = Math.round(pct * width);
+    const bar = "█".repeat(filled) + "░".repeat(width - filled);
+    const pctStr = (pct * 100).toFixed(0).padStart(3, " ");
+    const counts = total ? ` (${Math.min(current, total)}/${total})` : "";
+    const line = `[INFO] ${label} [${bar}] ${pctStr}%${counts}`;
+    process.stderr.write(`\r${line}`);
+  }
+
+  function tick(n = 1) {
+    current += n;
+    render();
+  }
+
+  function done() {
+    current = total;
+    render();
+    process.stderr.write(`\n`);
+  }
+
+  // initial render
+  render();
+  return { tick, done };
+}
+
 async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
   process.stderr.write(`[INFO] ${label} `);
   const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -583,11 +623,31 @@ async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
     );
 
     // Gather from components / metabug children / whiteboard tags
+    const preProgress = createProgress(
+      `Collecting candidate bugs`,
+      pairs.length + (argv.metabug?.length || 0) + (wbTags.length || 0) || 1
+    );
     const [componentBugs, specificBugs, wbBugs] = await Promise.all([
-      fetchComponentBugs(pairs, sinceISO),
-      fetchSpecificBugs(metabugChildren, sinceISO),
-      fetchWhiteboardBugs(wbTags),
+      (async () => {
+        const r = await fetchComponentBugs(pairs, sinceISO);
+        preProgress.tick(1);
+        return r;
+      })(),
+      (async () => {
+        const kids = await fetchMetabugChildren(
+          (argv.metabug || []).map(Number)
+        );
+        const r = await fetchSpecificBugs(kids, sinceISO);
+        preProgress.tick(1);
+        return r;
+      })(),
+      (async () => {
+        const r = await fetchWhiteboardBugs(wbTags);
+        preProgress.tick(1);
+        return r;
+      })(),
     ]);
+    preProgress.done();
 
     let candidates = dedupeById([...componentBugs, ...specificBugs, ...wbBugs]);
 
