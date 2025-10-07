@@ -161,32 +161,39 @@ function buildBugzillaSearchURL(
   sinceISO: string,
   whiteboards: string[] = []
 ): string {
-  const url = new URL(`${BUGZILLA_HOST}/buglist.cgi`);
+  const url = new URL(`https://${BUGZILLA_HOST}/buglist.cgi`);
 
-  // Status & resolution
+  // Special top-level filters
   url.searchParams.set("bug_status", "RESOLVED,VERIFIED,CLOSED");
   url.searchParams.set("resolution", "FIXED");
-
-  // Time window (Bugzilla UI params)
   url.searchParams.set("chfieldfrom", sinceISO);
   url.searchParams.set("chfieldto", "Now");
 
-  // IDs (optional)
   if (bugIds.length) {
     url.searchParams.set("bug_id", bugIds.join(","));
   }
 
-  // Product/components (optional; repeatable)
   for (const pc of pairs) {
     url.searchParams.append("product", pc.product);
     url.searchParams.append("component", pc.component);
   }
 
-  // Status Whiteboard tags (optional; repeatable)
-  for (const tag of whiteboards) {
-    url.searchParams.append("status_whiteboard", tag);
-    // classic UI uses *_type selectors; allwordssubstr = AND across words, substring works well too.
-    url.searchParams.append("status_whiteboard_type", "substring");
+  // ---- Whiteboard OR group via boolean chart ----
+  // f1=OP, j1=OR, (f2..fN rows), f{N+1}=CP
+  if (whiteboards.length) {
+    let idx = 1;
+    url.searchParams.set(`f${idx}`, "OP");  // open group
+    url.searchParams.set(`j${idx}`, "OR");  // join with OR
+    idx++;
+
+    for (const tag of whiteboards) {
+      url.searchParams.set(`f${idx}`, "status_whiteboard");
+      url.searchParams.set(`o${idx}`, "substring");
+      url.searchParams.set(`v${idx}`, tag);
+      idx++;
+    }
+
+    url.searchParams.set(`f${idx}`, "CP"); // close group
   }
 
   return url.toString();
@@ -666,7 +673,7 @@ async function withSpinner<T>(label: string, fn: () => Promise<T>): Promise<T> {
         ? ""
         : `\n\n## Demo suggestions\n`;
       const lines = demoItems.map((d) => {
-        return `- [Bug ${d.id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${d.id}): ${d.text}`;
+        return `- [Bug ${d.id}](https://${BUGZILLA_HOST}/show_bug.cgi?id=${d.id}): ${d.text}`;
       });
       output = output + header + (header ? lines.join("\n") : "");
     }
