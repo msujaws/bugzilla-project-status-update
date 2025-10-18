@@ -7,7 +7,86 @@ type Env = {
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  // Use TransformStream so we don't need the streams_enable_constructors flag
+  if (!env.OPENAI_API_KEY || !env.BUGZILLA_API_KEY) {
+    return new Response(
+      JSON.stringify({
+        error: "Server missing OPENAI_API_KEY or BUGZILLA_API_KEY",
+      }),
+      {
+        status: 500,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store",
+        },
+      }
+    );
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const {
+    components = [],
+    metabugs = [],
+    whiteboards = [],
+    days = 8,
+    format = "md",
+    model = "gpt-5",
+    debug = false,
+    voice = "normal",
+  } = body || {};
+
+  const url = new URL(request.url);
+  const accept = request.headers.get("accept") || "";
+  const streamHeader = (request.headers.get("x-snazzy-stream") || "").toLowerCase();
+  const streamParam = (url.searchParams.get("stream") || "").toLowerCase();
+  const wantsStream =
+    accept.includes("application/x-ndjson") ||
+    streamHeader === "1" ||
+    streamHeader === "true" ||
+    streamParam === "1" ||
+    streamParam === "true";
+
+  const envConfig = {
+    OPENAI_API_KEY: env.OPENAI_API_KEY,
+    BUGZILLA_API_KEY: env.BUGZILLA_API_KEY,
+    BUGZILLA_HOST: env.BUGZILLA_HOST,
+  };
+
+  const params = {
+    components,
+    metabugs,
+    whiteboards,
+    days,
+    format,
+    model,
+    debug,
+    voice,
+  };
+
+  if (!wantsStream) {
+    try {
+      const { output } = await generateStatus(params, envConfig);
+      return new Response(JSON.stringify({ output }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store",
+        },
+      });
+    } catch (e: any) {
+      return new Response(
+        JSON.stringify({ error: e?.message || String(e) }),
+        {
+          status: 500,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "no-store",
+          },
+        }
+      );
+    }
+  }
+
+  // Streaming (NDJSON) response
   const enc = new TextEncoder();
   const ts = new TransformStream();
   const writer = ts.writable.getWriter();
@@ -17,27 +96,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   (async () => {
     try {
-      if (!env.OPENAI_API_KEY || !env.BUGZILLA_API_KEY) {
-        write({
-          kind: "error",
-          msg: "Server missing OPENAI_API_KEY or BUGZILLA_API_KEY",
-        });
-        return;
-      }
-
-      const body = await request.json().catch(() => ({}));
-      const {
-        components = [],
-        metabugs = [],
-        whiteboards = [],
-        days = 8,
-        format = "md",
-        model = "gpt-5",
-        debug = false,
-        voice = "normal",
-      } = body || {};
-
-      // Wire core progress to NDJSON events for the client
       const hooks = {
         info: (msg: string) => write({ kind: "info", msg }),
         warn: (msg: string) => write({ kind: "warn", msg }),
@@ -47,28 +105,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           write({ kind: "progress", phase: name, current, total }),
       };
 
-      // Kick off
       write({ kind: "start", msg: "Starting snazzybot…" });
 
-      const { output } = await generateStatus(
-        {
-          components,
-          metabugs,
-          whiteboards,
-          days,
-          format,
-          model,
-          debug,
-          voice,
-        },
-        {
-          OPENAI_API_KEY: env.OPENAI_API_KEY,
-          BUGZILLA_API_KEY: env.BUGZILLA_API_KEY,
-          BUGZILLA_HOST: env.BUGZILLA_HOST,
-        },
-        hooks
-      );
-
+      const { output } = await generateStatus(params, envConfig, hooks);
       write({ kind: "done", output });
     } catch (e: any) {
       write({ kind: "error", msg: e?.message || String(e) });

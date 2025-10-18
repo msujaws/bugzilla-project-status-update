@@ -1,3 +1,5 @@
+import { markdownToHtml } from "./lib/markdown.js";
+
 const $ = (id) => document.getElementById(id);
 
 // ===== Emoji Confetti Engine (no deps) =====
@@ -24,8 +26,10 @@ function burstEmojis(mode = "normal") {
 
   const resize = () => {
     DPR = Math.min(window.devicePixelRatio || 1, 2);
-    W = canvas.clientWidth = window.innerWidth;
-    H = canvas.clientHeight = window.innerHeight;
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.style.width = `${W}px`;
+    canvas.style.height = `${H}px`;
     canvas.width = Math.floor(W * DPR);
     canvas.height = Math.floor(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -35,7 +39,7 @@ function burstEmojis(mode = "normal") {
   window.addEventListener("resize", resize, { once: true });
 
   const N = 80;
-  const lifeMs = 2800;
+  const lifeMs = 1800;
   const start = performance.now();
   const parts = Array.from({ length: N }, () => {
     const x = Math.random() * W;
@@ -182,101 +186,6 @@ function download(filename, content, mime) {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-function escapeHtml(str) {
-  return str.replace(/[&<>"']/g, (ch) => {
-    switch (ch) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      case "'":
-        return "&#39;";
-      default:
-        return ch;
-    }
-  });
-}
-
-function sanitizeHref(href) {
-  const trimmed = href.trim();
-  if (
-    /^https?:\/\//i.test(trimmed) ||
-    trimmed.startsWith("/") ||
-    trimmed.startsWith("#") ||
-    /^mailto:/i.test(trimmed)
-  ) {
-    return trimmed;
-  }
-  return "#";
-}
-
-function applyInlineMarkdown(text) {
-  let escaped = escapeHtml(text);
-  escaped = escaped.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    (_, label, href) =>
-      `<a href="${sanitizeHref(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`
-  );
-  escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-  escaped = escaped.replace(/\*(.+?)\*/g, "<i>$1</i>");
-  return escaped;
-}
-
-function mdToHtmlLite(md) {
-  const lines = (md || "").split(/\r?\n/);
-  const chunks = [];
-  let inList = false;
-
-  const closeList = () => {
-    if (inList) {
-      chunks.push("</ul>");
-      inList = false;
-    }
-  };
-
-  for (const raw of lines) {
-    const trimmed = raw.trim();
-    if (!trimmed) {
-      closeList();
-      continue;
-    }
-
-    if (trimmed.startsWith("### ")) {
-      closeList();
-      chunks.push(`<h3>${applyInlineMarkdown(trimmed.slice(4))}</h3>`);
-      continue;
-    }
-    if (trimmed.startsWith("## ")) {
-      closeList();
-      chunks.push(`<h2>${applyInlineMarkdown(trimmed.slice(3))}</h2>`);
-      continue;
-    }
-    if (trimmed.startsWith("# ")) {
-      closeList();
-      chunks.push(`<h1>${applyInlineMarkdown(trimmed.slice(2))}</h1>`);
-      continue;
-    }
-    if (trimmed.startsWith("- ")) {
-      if (!inList) {
-        chunks.push("<ul>");
-        inList = true;
-      }
-      chunks.push(`<li>${applyInlineMarkdown(trimmed.slice(2))}</li>`);
-      continue;
-    }
-
-    closeList();
-    chunks.push(`<p>${applyInlineMarkdown(trimmed)}</p>`);
-  }
-
-  closeList();
-  return chunks.join("\n");
-}
-
 function setResultIframe(html) {
   const frame = $("resultFrame");
   if (!frame) return;
@@ -337,7 +246,11 @@ async function runSnazzy(body) {
   try {
     const res = await fetch("/api/status", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        Accept: "application/x-ndjson",
+        "x-snazzy-stream": "1",
+      },
       body: JSON.stringify(body),
     });
 
@@ -356,7 +269,7 @@ async function runSnazzy(body) {
     if (ctype.includes("application/json") && !ctype.includes("ndjson")) {
       const data = await res.json();
       lastMarkdown = data.output || "";
-      lastHTML = mdToHtmlLite(lastMarkdown);
+      lastHTML = markdownToHtml(lastMarkdown);
       setResultIframe(lastHTML);
       setActionsEnabled(Boolean(lastMarkdown));
       spin.style.display = "none";
@@ -436,7 +349,7 @@ async function runSnazzy(body) {
 
       if (msg.kind === "done") {
         lastMarkdown = msg.output || "";
-        lastHTML = mdToHtmlLite(lastMarkdown);
+        lastHTML = markdownToHtml(lastMarkdown);
         setResultIframe(lastHTML);
         completePhase("openai");
         setActionsEnabled(Boolean(lastMarkdown));
@@ -564,7 +477,7 @@ const downloadHtmlBtn = $("dl-html");
 if (downloadHtmlBtn) {
   downloadHtmlBtn.addEventListener("click", () => {
     if (!lastHTML.trim()) return;
-    const html = `<!doctype html><meta charset="utf-8"><title>SnazzyBot Status</title><body>${lastHTML}</body>`;
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8" /><title>SnazzyBot Status</title></head><body>${lastHTML}</body></html>`;
     download("snazzybot-status.html", html, "text/html;charset=utf-8");
   });
 }

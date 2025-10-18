@@ -42,15 +42,6 @@ if (!BUGZILLA_API_KEY || !OPENAI_API_KEY) {
   process.exit(1);
 }
 
-const components: ProductComponent[] = (argv.component || []).map(
-  (s: string) => {
-    const [product, component] = s.split(":").map((x) => x.trim());
-    if (!product || !component) throw new Error(`Bad --component "${s}"`);
-    return { product, component };
-  }
-);
-
-const metabugs = (argv.metabug || []).filter((n) => Number.isFinite(n));
 const env = BUGZILLA_HOST
   ? { BUGZILLA_API_KEY, OPENAI_API_KEY, BUGZILLA_HOST }
   : { BUGZILLA_API_KEY, OPENAI_API_KEY };
@@ -70,7 +61,23 @@ const hooks = {
 
 (async () => {
   try {
-    const clampedDays = Number.isFinite(argv.days) ? Math.max(1, argv.days) : 8;
+    const components: ProductComponent[] = (argv.component || []).map(
+      (s: string) => {
+        const [product, component] = s.split(":").map((x) => x.trim());
+        if (!product || !component) {
+          throw new Error(`Bad --component "${s}"`);
+        }
+        return { product, component };
+      }
+    );
+
+    const metabugs = (argv.metabug || [])
+      .map((n) => Math.trunc(Number(n)))
+      .filter((n) => Number.isFinite(n) && n > 0);
+
+    const clampedDays = Number.isFinite(argv.days)
+      ? Math.max(1, Math.floor(argv.days))
+      : 8;
     const { output } = await generateStatus(
       {
         components,

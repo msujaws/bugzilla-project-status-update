@@ -2,6 +2,8 @@
 // Shared, runtime-agnostic core for "snazzybot".
 // Works in Node 18+ (global fetch) and Cloudflare Workers.
 
+import { escapeHtml, markdownToHtml } from "../public/lib/markdown.js";
+
 export type ProductComponent = { product: string; component: string };
 export type GenerateParams = {
   components?: ProductComponent[];
@@ -63,9 +65,9 @@ const BUG_FIELDS = [
   "blocks",
 ];
 
-const defaultHooks: ProgressHooks = {};
+const MAX_BUGS_FOR_OPENAI = 60;
 
-const enc = new TextEncoder();
+const defaultHooks: ProgressHooks = {};
 
 function isoDaysAgo(days: number): string {
   const d = new Date();
@@ -142,6 +144,7 @@ async function fetchByWhiteboards(
   sinceISO: string,
   hooks: ProgressHooks
 ) {
+  if (!tags.length) return [] as Bug[];
   const all: Bug[] = [];
   let i = 0;
   hooks.phase?.("collect-whiteboards", { total: tags.length });
@@ -298,100 +301,6 @@ export function buildBuglistURL(args: {
   return url.toString();
 }
 
-// ---------- Markdown helpers ----------
-function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (ch) => {
-    switch (ch) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      case "'":
-        return "&#39;";
-      default:
-        return ch;
-    }
-  });
-}
-
-function sanitizeHref(href: string): string {
-  const trimmed = href.trim();
-  if (
-    /^https?:\/\//i.test(trimmed) ||
-    trimmed.startsWith("/") ||
-    trimmed.startsWith("#") ||
-    /^mailto:/i.test(trimmed)
-  ) {
-    return trimmed;
-  }
-  return "#";
-}
-
-function applyInlineMarkdown(text: string): string {
-  let escaped = escapeHtml(text);
-  escaped = escaped.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    (_match, label, href) =>
-      `<a href="${sanitizeHref(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`
-  );
-  escaped = escaped.replace(/\*\*(.+?)\*\*/g, (_match, inner) => `<strong>${inner}</strong>`);
-  escaped = escaped.replace(/\*(.+?)\*/g, (_match, inner) => `<em>${inner}</em>`);
-  return escaped;
-}
-
-function markdownToHtml(md: string): string {
-  const lines = (md || "").split(/\r?\n/);
-  const out: string[] = [];
-  let inList = false;
-
-  const closeList = () => {
-    if (inList) {
-      out.push("</ul>");
-      inList = false;
-    }
-  };
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      closeList();
-      continue;
-    }
-    if (line.startsWith("### ")) {
-      closeList();
-      out.push(`<h3>${applyInlineMarkdown(line.slice(4))}</h3>`);
-      continue;
-    }
-    if (line.startsWith("## ")) {
-      closeList();
-      out.push(`<h2>${applyInlineMarkdown(line.slice(3))}</h2>`);
-      continue;
-    }
-    if (line.startsWith("# ")) {
-      closeList();
-      out.push(`<h1>${applyInlineMarkdown(line.slice(2))}</h1>`);
-      continue;
-    }
-    if (line.startsWith("- ")) {
-      if (!inList) {
-        out.push("<ul>");
-        inList = true;
-      }
-      out.push(`<li>${applyInlineMarkdown(line.slice(2))}</li>`);
-      continue;
-    }
-    closeList();
-    out.push(`<p>${applyInlineMarkdown(line)}</p>`);
-  }
-
-  closeList();
-  return out.join("\n");
-}
-
 // ---------- OpenAI (JSON) ----------
 async function openaiAssessAndSummarize(
   env: EnvLike,
@@ -537,12 +446,22 @@ export async function generateStatus(
     return { output: body, ids: [] };
   }
 
+  let aiCandidates = final;
+  let trimmedCount = 0;
+  if (final.length > MAX_BUGS_FOR_OPENAI) {
+    trimmedCount = final.length - MAX_BUGS_FOR_OPENAI;
+    hooks.warn?.(
+      `Trimming ${trimmedCount} bug(s) before OpenAI call to stay within token limits`
+    );
+    aiCandidates = final.slice(0, MAX_BUGS_FOR_OPENAI);
+  }
+
   // OpenAI (indeterminate step; caller shows spinner)
   hooks.phase?.("openai");
   const ai = await openaiAssessAndSummarize(
     env,
     model,
-    final,
+    aiCandidates,
     days,
     params.voice ?? "normal"
   );
@@ -563,6 +482,12 @@ export async function generateStatus(
 
   if (demo.length) {
     summary += `\n\n## Demo suggestions\n` + demo.join("\n");
+  }
+
+  if (trimmedCount > 0) {
+    const noun = trimmedCount === 1 ? "bug" : "bugs";
+    const verb = trimmedCount === 1 ? "was" : "were";
+    summary += `\n\n_Note: ${trimmedCount} additional ${noun} ${verb} omitted from the AI summary due to size limits._`;
   }
 
   const link = buildBuglistURL({
