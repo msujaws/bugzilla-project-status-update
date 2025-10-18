@@ -46,6 +46,7 @@
           radial-gradient(900px 500px at 90% 10%, #0f1540 0%, transparent 55%),
           radial-gradient(600px 300px at 50% 120%, #121735 0%, transparent 60%),
           var(--navy);
+        background-attachment: fixed;
         color: var(--ink);
       }
       .wrap {
@@ -152,7 +153,7 @@
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
-        margin-top: 12px;
+        margin-block: 12px;
       }
       button {
         border: 0;
@@ -177,6 +178,18 @@
       button:disabled {
         opacity: 0.6;
         cursor: not-allowed;
+      }
+      .icon-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .icon-btn svg {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        stroke: currentColor;
+        fill: none;
       }
 
       .status {
@@ -259,6 +272,7 @@
       }
       .footer {
         margin-top: 22px;
+        padding-bottom: 22px;
         color: var(--muted);
         font-size: 12px;
         text-align: center;
@@ -314,6 +328,40 @@
     </style>
   </head>
   <body>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      style="position: absolute; width: 0; height: 0; overflow: hidden"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <symbol id="icon-copy" viewBox="0 0 24 24">
+        <g
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="1.8"
+        >
+          <rect x="9" y="9" width="11" height="11" rx="2" ry="2"></rect>
+          <path
+            d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"
+          ></path>
+        </g>
+      </symbol>
+      <symbol id="icon-download" viewBox="0 0 24 24">
+        <g
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="1.8"
+        >
+          <path d="M12 4v9"></path>
+          <path d="M8 11l4 4 4-4"></path>
+          <path d="M4 20h16"></path>
+        </g>
+      </symbol>
+    </svg>
     <div class="wrap">
       <header>
         <img src="/logo.png" alt="SnazzyBot logo" />
@@ -372,14 +420,7 @@
           <div class="row" style="margin-top: 14px">
             <div>
               <label for="days">Days lookback</label>
-              <input id="days" type="number" min="1" value="8" />
-            </div>
-            <div>
-              <label for="format">Output format</label>
-              <select id="format">
-                <option value="md">Markdown</option>
-                <option value="html">HTML (best for Google Docs)</option>
-              </select>
+              <input id="days" type="number" min="1" value="7" />
             </div>
             <div>
               <label for="voice">Voice</label>
@@ -388,6 +429,8 @@
                 <option value="pirate">Pirate 🏴‍☠️</option>
                 <option value="snazzy-robot">Snazzy Robot 🤖</option>
               </select>
+            </div>
+            <div>
               <label for="debug">Debug</label>
               <select id="debug">
                 <option value="false">No</option>
@@ -398,14 +441,6 @@
 
           <div class="actions">
             <button id="run">Run SnazzyBot</button>
-            <button id="copy" class="secondary" disabled>Copy Markdown</button>
-            <button id="copy-rendered" class="secondary" disabled>
-              Copy Rendered
-            </button>
-            <button id="dl-md" class="secondary" disabled>Download .md</button>
-            <button id="dl-html" class="secondary" disabled>
-              Download .html
-            </button>
           </div>
 
           <div class="status">
@@ -425,7 +460,68 @@
         <!-- Right: Result -->
         <section class="card">
           <p class="kicker">Result</p>
-
+          <div class="actions">
+            <button
+              id="copy"
+              class="secondary icon-btn"
+              aria-label="Copy .md"
+              disabled
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <use href="#icon-copy"></use>
+              </svg>
+              <span aria-hidden="true">.md</span>
+            </button>
+            <button
+              id="dl-md"
+              class="secondary icon-btn"
+              aria-label="Download .md"
+              disabled
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <use href="#icon-download"></use>
+              </svg>
+              <span aria-hidden="true">.md</span>
+            </button>
+            <button
+              id="copy-rendered"
+              class="secondary icon-btn"
+              aria-label="Copy rendered result"
+              disabled
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <use href="#icon-copy"></use>
+              </svg>
+              <span aria-hidden="true">Rendered</span>
+            </button>
+            <button
+              id="dl-html"
+              class="secondary icon-btn"
+              aria-label="Download .html"
+              disabled
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <use href="#icon-download"></use>
+              </svg>
+              <span aria-hidden="true">.html</span>
+            </button>
+          </div>
           <!-- keep a hidden textual backup for accessibility / copy as markdown -->
           <div
             id="out"
@@ -820,7 +916,7 @@
             .filter((n) => Number.isFinite(n)),
           whiteboards: parseLines($("whiteboards").value),
           days: Number($("days").value) || 8,
-          format: $("format").value,
+          format: "md",
           voice: $("voice").value || "normal",
           debug: $("debug").value === "true",
         };
