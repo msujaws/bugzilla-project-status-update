@@ -41,6 +41,10 @@ body {
   color: var(--ink);
 }
 
+a:visited {
+  color: var(--muted);
+}
+
 .wrap {
   max-width: 1060px;
   margin: 36px auto 56px;
