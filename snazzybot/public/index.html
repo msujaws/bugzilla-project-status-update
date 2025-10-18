@@ -295,6 +295,13 @@
           transform: translateX(120%);
         }
       }
+      /* overlay for bursts */
+      #fx-layer {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 9999;
+      }
 
       @media (prefers-reduced-motion: reduce) {
         .progress .bar {
@@ -449,6 +456,91 @@
         >) ✨ — logo contributed by :jhirsch - name contributed by :sclements
       </p>
     </div>
+    <canvas id="fx-layer" aria-hidden="true"></canvas>
+    <script>
+      // ===== Emoji Confetti Engine (no deps) =====
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+
+      function burstEmojis(mode = "normal") {
+        if (reduceMotion) return; // be nice to folks who prefer less motion
+
+        const sets = {
+          normal: ["🎉", "✨", "🎊", "⭐️"],
+          pirate: ["🏴‍☠️", "☠️", "🦜", "⚓️"],
+          "snazzy-robot": ["🤖", "✨", "🛠️", "🔧"],
+        };
+        const EMOJI = sets[mode] || sets["normal"];
+
+        const canvas = document.getElementById("fx-layer");
+        const ctx = canvas.getContext("2d");
+        let W, H, DPR;
+
+        function resize() {
+          DPR = Math.min(window.devicePixelRatio || 1, 2);
+          W = canvas.clientWidth = window.innerWidth;
+          H = canvas.clientHeight = window.innerHeight;
+          canvas.width = Math.floor(W * DPR);
+          canvas.height = Math.floor(H * DPR);
+          ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        }
+        resize();
+        window.addEventListener("resize", resize, { once: true });
+
+        const N = 80; // # of particles
+        const lifeMs = 1800; // total lifetime
+        const start = performance.now();
+        const parts = Array.from({ length: N }, () => {
+          const x = Math.random() * W;
+          const y = -20 - Math.random() * 40; // start above the top
+          const speed = 2 + Math.random() * 3;
+          const angle = (Math.random() * Math.PI) / 3 + Math.PI / 6; // downward-ish
+          return {
+            x,
+            y,
+            vx: Math.cos(angle) * speed * (Math.random() < 0.5 ? -1 : 1),
+            vy: Math.sin(angle) * speed,
+            rot: Math.random() * Math.PI * 2,
+            vr: (Math.random() - 0.5) * 0.2,
+            size: 18 + Math.random() * 10,
+            emoji: EMOJI[(Math.random() * EMOJI.length) | 0],
+            t0: start,
+          };
+        });
+
+        function step(now) {
+          const t = now - start;
+          if (t > lifeMs + 400) {
+            ctx.clearRect(0, 0, W, H);
+            return;
+          }
+
+          ctx.clearRect(0, 0, W, H);
+          const fade = 1 - Math.min(1, t / lifeMs);
+          ctx.globalAlpha = Math.max(0, fade);
+
+          for (const p of parts) {
+            // gravity + drift
+            p.vy += 0.03;
+            p.x += p.vx;
+            p.y += p.vy;
+            p.rot += p.vr;
+
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
+            ctx.font = `${p.size}px system-ui, Apple Color Emoji, Segoe UI Emoji`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(p.emoji, 0, 0);
+            ctx.restore();
+          }
+          requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+    </script>
 
     <script>
       const $ = (id) => document.getElementById(id);
@@ -582,6 +674,7 @@
       // State for copy buttons
       let lastMarkdown = "";
       let lastHTML = "";
+      let currentVoice = "normal";
 
       // Stream-aware runner ---------------------------------------------------
       async function runSnazzy(body) {
@@ -698,6 +791,7 @@
                 completePhase("openai");
                 setActionsEnabled(true);
                 spin.style.display = "none";
+                burstEmojis(currentVoice);
               }
             }
           }
@@ -730,6 +824,7 @@
           voice: $("voice").value || "normal",
           debug: $("debug").value === "true",
         };
+        currentVoice = body.voice;
         runSnazzy(body);
       });
 
