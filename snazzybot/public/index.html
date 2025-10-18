@@ -2,211 +2,591 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>snazzybot — Bugzilla Status</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>SnazzyBot — Bugzilla Auto-Summarization</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/logo.png" sizes="any" />
     <style>
+      :root {
+        --navy: #0b1020;
+        --navy-2: #121735;
+        --navy-3: #1a2047;
+        --ink: #e8ebff;
+        --muted: #aab0d6;
+        --gold: #ffd05a;
+        --gold-2: #ffb400;
+        --accent: #7aa2ff;
+        --ok: #2ecc71;
+        --warn: #ffb347;
+        --err: #ff6b6b;
+        --radius: 16px;
+        --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --navy: #0b1020;
+        } /* keep brand dark even in light mode */
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
       body {
-        font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        margin: 24px;
-        color: #111;
+        height: 100%;
       }
-      h1 {
-        margin: 0 0 8px;
-        font-size: 20px;
+      body {
+        margin: 0;
+        font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+          Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
+          "Segoe UI Emoji";
+        background: radial-gradient(
+            1200px 600px at 10% -10%,
+            #1a2047 0%,
+            transparent 60%
+          ),
+          radial-gradient(900px 500px at 90% 10%, #0f1540 0%, transparent 55%),
+          radial-gradient(600px 300px at 50% 120%, #121735 0%, transparent 60%),
+          var(--navy);
+        color: var(--ink);
       }
-      .card {
-        border: 1px solid #ddd;
-        border-radius: 12px;
-        padding: 16px;
-        max-width: 900px;
+      .wrap {
+        max-width: 1060px;
+        margin: 36px auto 56px;
+        padding: 0 20px;
       }
-      label {
-        display: block;
-        font-weight: 600;
-        margin-top: 12px;
+      header {
+        display: grid;
+        grid-template-columns: 92px 1fr;
+        gap: 18px;
+        align-items: center;
+        margin-bottom: 18px;
       }
-      input,
-      textarea,
-      select {
-        width: 100%;
-        padding: 8px;
-        margin-top: 6px;
-        border: 1px solid #ccc;
-        border-radius: 8px;
+      header img {
+        width: 92px;
+        height: 92px;
+        border-radius: 20px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
       }
-      .row {
+      header h1 {
+        margin: 0;
+        font-size: 28px;
+        letter-spacing: 0.3px;
         display: flex;
+        align-items: center;
         gap: 12px;
       }
-      .row > div {
-        flex: 1;
+      header p {
+        margin: 6px 0 0 0;
+        color: var(--muted);
+      }
+      .badge {
+        display: inline-block;
+        font-weight: 700;
+        letter-spacing: 0.6px;
+        background: linear-gradient(90deg, var(--gold), var(--gold-2));
+        color: #1b1200;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        box-shadow: 0 8px 26px rgba(255, 208, 90, 0.25);
+      }
+      .card {
+        background: linear-gradient(
+          160deg,
+          rgba(255, 255, 255, 0.04),
+          rgba(255, 255, 255, 0.02)
+        );
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 18px;
+        backdrop-filter: blur(8px);
+      }
+      .grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: 1fr;
+      }
+      @media (min-width: 840px) {
+        .grid {
+          grid-template-columns: 1.1fr 0.9fr;
+        }
+      }
+      label {
+        font-weight: 700;
+        display: block;
+        margin-bottom: 6px;
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      textarea,
+      input,
+      select {
+        width: 100%;
+        background: #0f1633;
+        color: var(--ink);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        padding: 10px 12px;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      textarea:focus,
+      input:focus,
+      select:focus {
+        border-color: var(--gold);
+        box-shadow: 0 0 0 3px rgba(255, 208, 90, 0.2);
+      }
+      .row {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+      .row-2 {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: 1fr 1fr;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 12px;
       }
       button {
-        margin-top: 16px;
-        padding: 10px 14px;
         border: 0;
+        padding: 10px 14px;
         border-radius: 10px;
-        background: #0f62fe;
-        color: #fff;
-        font-weight: 600;
         cursor: pointer;
+        font-weight: 700;
+        color: #1b1200;
+        background: linear-gradient(90deg, var(--gold), var(--gold-2));
+        box-shadow: 0 8px 26px rgba(255, 208, 90, 0.22);
+        transition: transform 0.06s ease;
+      }
+      button.secondary {
+        background: #1b214b;
+        color: var(--ink);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: none;
+      }
+      button:active {
+        transform: translateY(1px);
       }
       button:disabled {
-        opacity: 0.7;
+        opacity: 0.6;
         cursor: not-allowed;
       }
-      pre {
-        background: #f7f7f7;
-        padding: 12px;
-        border-radius: 8px;
-        overflow: auto;
+
+      .status {
+        margin-top: 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 22px;
+        color: var(--muted);
       }
-      .spinner {
-        display: none;
-        margin-top: 8px;
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--gold);
+        box-shadow: 0 0 10px var(--gold);
       }
       .progress {
-        margin-top: 8px;
+        margin: 8px 0 14px;
         height: 10px;
-        background: #eee;
-        border-radius: 6px;
+        background: #0f1633;
+        border-radius: 999px;
         overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
       }
-      .progress > .bar {
+      .progress .bar {
         height: 100%;
         width: 0%;
-        background: #0f62fe;
+        background: linear-gradient(90deg, var(--gold), var(--gold-2));
         transition: width 0.2s ease;
       }
-      .small {
-        font-size: 12px;
-        color: #555;
-        margin-top: 4px;
+      .phase-title {
+        font-size: 13px;
+        color: var(--muted);
+        margin-top: 2px;
       }
-      .logline {
-        margin: 0;
+      .kicker {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 0 0 6px;
+      }
+      .out {
+        background: #0f1633;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 14px;
+        border-radius: 12px;
+        min-height: 160px;
         white-space: pre-wrap;
+        overflow: auto;
+        overflow-wrap: anywhere;
+      }
+      .log {
+        background: #0b122c;
+        border: 1px dashed rgba(255, 255, 255, 0.16);
+        padding: 12px;
+        border-radius: 12px;
+        max-height: 220px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+      .log .line {
+        margin: 0;
+        opacity: 0.95;
+      }
+      .log .info {
+        color: #b9c3ff;
+      }
+      .log .warn {
+        color: var(--warn);
+      }
+      .log .error {
+        color: var(--err);
+      }
+      details {
+        margin-top: 10px;
+      }
+      summary {
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .footer {
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 12px;
+        text-align: center;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #0f1633;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: var(--muted);
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+      }
+      .link-like {
+        color: var(--accent);
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      /* Add to <style> */
+      .progress .bar.indeterminate {
+        width: 30%;
+        animation: indet 1.2s ease-in-out infinite;
+      }
+      @keyframes indet {
+        0% {
+          transform: translateX(-100%);
+        }
+        50% {
+          transform: translateX(120%);
+        }
+        100% {
+          transform: translateX(120%);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .progress .bar {
+          transition: none;
+        }
+        button {
+          transition: none;
+        }
       }
     </style>
   </head>
   <body>
-    <h1>snazzybot</h1>
-    <div class="card">
-      <p>Generate a weekly, user-impact–focused status update from Bugzilla.</p>
-      <div class="row">
+    <div class="wrap">
+      <header>
+        <img src="/logo.png" alt="SnazzyBot logo" />
         <div>
-          <label
-            >Components (one per line, <code>Product:Component</code>)</label
-          >
-          <textarea
-            id="components"
-            rows="4"
-            placeholder="Firefox:General&#10;Fenix:Toolbar"
-          ></textarea>
+          <h1>SnazzyBot <span class="badge">AUTO-SUMMARIZATION</span></h1>
+          <p>
+            Weekly, user-impact–focused status updates from Bugzilla. Just pick
+            your sources and SnazzyBot does the rest.
+          </p>
         </div>
-        <div>
-          <label>Metabug IDs (comma or newline separated)</label>
-          <textarea id="metabugs" rows="4" placeholder="1882882"></textarea>
-        </div>
+      </header>
+
+      <div class="grid">
+        <!-- Left: Inputs -->
+        <section class="card">
+          <p class="kicker">Filters</p>
+
+          <div class="row-2">
+            <div>
+              <label for="components"
+                >Components
+                <span class="hint"
+                  >one per line: <code>Product:Component</code></span
+                ></label
+              >
+              <textarea
+                id="components"
+                rows="6"
+                placeholder="Firefox:General&#10;Fenix:Toolbar"
+              ></textarea>
+            </div>
+            <div>
+              <label for="whiteboards"
+                >Whiteboard tags <span class="hint">one per line</span></label
+              >
+              <textarea
+                id="whiteboards"
+                rows="6"
+                placeholder="[fx-vpn]&#10;[fidefe-sidebar]"
+              ></textarea>
+            </div>
+          </div>
+
+          <div style="margin-top: 14px">
+            <label for="metabugs"
+              >Metabug IDs
+              <span class="hint">comma or newline separated</span></label
+            >
+            <textarea
+              id="metabugs"
+              rows="3"
+              placeholder="1882882, 1993031"
+            ></textarea>
+          </div>
+
+          <div class="row" style="margin-top: 14px">
+            <div>
+              <label for="days">Days lookback</label>
+              <input id="days" type="number" min="1" value="8" />
+            </div>
+            <div>
+              <label for="format">Output format</label>
+              <select id="format">
+                <option value="md">Markdown</option>
+                <option value="html">HTML (best for Google Docs)</option>
+              </select>
+            </div>
+            <div>
+              <label for="debug">Debug</label>
+              <select id="debug">
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="run">Run SnazzyBot</button>
+            <button id="copy" class="secondary" disabled>Copy Markdown</button>
+            <button id="copy-rendered" class="secondary" disabled>
+              Copy Rendered
+            </button>
+            <button id="dl-md" class="secondary" disabled>Download .md</button>
+            <button id="dl-html" class="secondary" disabled>
+              Download .html
+            </button>
+          </div>
+
+          <div class="status">
+            <div class="dot" aria-hidden="true"></div>
+            <div id="spin" class="pill" style="display: none">⏳ Working…</div>
+            <div id="quick-status" class="pill" style="display: none"></div>
+          </div>
+
+          <div id="phases"></div>
+
+          <details id="logwrap">
+            <summary>Run log</summary>
+            <div id="log" class="log" role="log" aria-live="polite"></div>
+          </details>
+        </section>
+
+        <!-- Right: Result -->
+        <section class="card">
+          <p class="kicker">Result</p>
+
+          <!-- keep a hidden textual backup for accessibility / copy as markdown -->
+          <div
+            id="out"
+            class="out"
+            aria-live="polite"
+            style="display: none"
+          ></div>
+
+          <!-- rendered output -->
+          <iframe
+            id="resultFrame"
+            title="SnazzyBot result"
+            style="
+              width: 100%;
+              height: 320px;
+              border: 1px solid rgba(255, 255, 255, 0.12);
+              border-radius: 12px;
+              background: #0f1633;
+            "
+          ></iframe>
+        </section>
       </div>
-      <label>Whiteboard tags (one per line, e.g. <code>[fx-vpn]</code>)</label>
-      <textarea
-        id="whiteboards"
-        rows="3"
-        placeholder="[fx-vpn]&#10;[fidefe-sidebar]"
-      ></textarea>
 
-      <div class="row">
-        <div>
-          <label>Days lookback</label>
-          <input id="days" type="number" min="1" value="8" />
-        </div>
-        <div>
-          <label>Output format</label>
-          <select id="format">
-            <option value="md">Markdown</option>
-            <option value="html">HTML (best for Google Docs)</option>
-          </select>
-        </div>
-        <div>
-          <label>Debug</label>
-          <select id="debug">
-            <option value="false">No</option>
-            <option value="true">Yes</option>
-          </select>
-        </div>
-      </div>
-
-      <button id="run">Run snazzybot</button>
-      <div id="spin" class="spinner">⏳ Working…</div>
-
-      <h3>Result</h3>
-      <pre id="out" aria-live="polite"></pre>
+      <p class="footer">
+        Created by :jaws (<a href="https://github.com/msujaws/bugzilla-project-status-update">source</a>) ✨ — logo contributed by :jhirsch - name contributed by :sclements
+      </p>
     </div>
 
     <script>
-      const el = (id) => document.getElementById(id);
+      const $ = (id) => document.getElementById(id);
 
-      // Create or update a simple progress bar for a named phase
-      function ensurePhaseUI(name) {
-        const hostId = `phase-${name}`;
-        let host = document.getElementById(hostId);
+      // Phase UI ---------------------------------------------------------------
+      function ensurePhase(name, label) {
+        let host = document.querySelector(`[data-phase="${name}"]`);
         if (!host) {
           host = document.createElement("div");
-          host.id = hostId;
-          host.style.marginTop = "8px";
+          host.dataset.phase = name;
           const title = document.createElement("div");
-          title.className = "small";
-          title.id = `${hostId}-title`;
-          title.textContent = name;
+          title.className = "phase-title";
+          title.id = `title-${name}`;
+          title.textContent = label || name;
           const bar = document.createElement("div");
           bar.className = "progress";
           const fill = document.createElement("div");
           fill.className = "bar";
-          fill.id = `${hostId}-bar`;
+          fill.id = `bar-${name}`;
           bar.appendChild(fill);
           host.appendChild(title);
           host.appendChild(bar);
-          document
-            .getElementById("spin")
-            .insertAdjacentElement("afterend", host);
+          $("phases").appendChild(host);
         }
         return host;
       }
-      function setPhaseText(name, text) {
-        const t = document.getElementById(`phase-${name}-title`);
-        if (t) t.textContent = text;
+      function setPhaseText(name, txt) {
+        const t = $(`title-${name}`);
+        if (t) t.textContent = txt;
       }
       function setPhasePct(name, current, total) {
-        const bar = document.getElementById(`phase-${name}-bar`);
+        const bar = $(`bar-${name}`);
         if (!bar || !total) return;
+        bar.classList.remove("indeterminate");
         const pct = Math.max(
           0,
           Math.min(100, Math.round((current / total) * 100))
         );
         bar.style.width = pct + "%";
       }
-      function logLine(kind, msg) {
-        const out = document.getElementById("out");
-        const p = document.createElement("div");
-        p.className = "logline";
-        p.textContent =
-          (kind === "warn" ? "⚠️ " : kind === "error" ? "❌ " : "ℹ️ ") + msg;
-        out.appendChild(p);
-        out.scrollTop = out.scrollHeight;
+      function setPhaseIndeterminate(name) {
+        const bar = $(`bar-${name}`);
+        if (bar) {
+          bar.classList.add("indeterminate");
+          bar.style.width = ""; // animation controls width
+        }
+      }
+      function completePhase(name) {
+        const bar = $(`bar-${name}`);
+        if (bar) {
+          bar.classList.remove("indeterminate");
+          bar.style.width = "100%";
+        }
       }
 
-      // Handle either: (A) NDJSON streaming or (B) single JSON body
-      async function runSnazzybot(body) {
-        const btn = el("run");
-        const spin = el("spin");
-        const out = el("out");
-        btn.disabled = true;
-        spin.style.display = "block";
+      // Logging ---------------------------------------------------------------
+      function log(kind, msg) {
+        const line = document.createElement("div");
+        line.className = `line ${kind}`;
+        line.textContent =
+          (kind === "warn" ? "⚠️ " : "") +
+          (kind === "error" ? "❌ " : "") +
+          (kind === "info" ? "ℹ️ " : "") +
+          msg;
+        $("log").appendChild(line);
+        $("log").scrollTop = $("log").scrollHeight;
+      }
+
+      // Utilities -------------------------------------------------------------
+      function parseLines(t) {
+        return t
+          .split(/\r?\n|,/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+      function setActionsEnabled(enabled) {
+        ["copy", "copy-rendered", "dl-md", "dl-html"].forEach((id) => {
+          $(id).disabled = !enabled;
+        });
+      }
+      function download(filename, content, mime) {
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      function mdToHtmlLite(md) {
+        // VERY light conversion for viewing/clipboard (your server may already return HTML when format=html)
+        return md
+          .replace(/^### (.*)$/gm, "<h3>$1</h3>")
+          .replace(/^## (.*)$/gm, "<h2>$1</h2>")
+          .replace(/^# (.*)$/gm, "<h1>$1</h1>")
+          .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
+          .replace(/\*(.*?)\*/g, "<i>$1</i>")
+          .replace(/^\- (.*)$/gm, "<ul><li>$1</li></ul>")
+          .replace(
+            /\[([^\]]+)\]\(([^)]+)\)/g,
+            '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+          );
+      }
+      function setResultIframe(html) {
+        const frame = $("resultFrame");
+        const doc = `
+      <!doctype html><html><head>
+        <meta charset="utf-8" />
+        <style>
+          body{font:16px/1.55 system-ui, -apple-system, Segoe UI, Roboto, Arial; padding:16px; color:rgb(170, 176, 214);}
+          a{color:#0f62fe}
+          h1,h2,h3{margin:0.6em 0 0.35em}
+          ul{margin:0.4em 0 0.6em 1.2em}
+          code{background:#f2f4f8; padding:2px 5px; border-radius:6px}
+        </style>
+      </head><body>${html}</body></html>`;
+        frame.srcdoc = doc;
+
+        // Auto-size
+        const onload = () => {
+          try {
+            const h = frame.contentDocument.documentElement.scrollHeight;
+            frame.style.height = Math.min(Math.max(h + 2, 240), 1200) + "px";
+          } catch {}
+        };
+        frame.onload = onload;
+        // If srcdoc already parsed, tick sizing
+        setTimeout(onload, 50);
+      }
+
+      // State for copy buttons
+      let lastMarkdown = "";
+      let lastHTML = "";
+
+      // Stream-aware runner ---------------------------------------------------
+      async function runSnazzy(body) {
+        const runBtn = $("run"),
+          spin = $("spin");
+        runBtn.disabled = true;
+        setActionsEnabled(false);
+        spin.style.display = "inline-flex";
         spin.textContent = "⏳ Starting…";
-        out.textContent = ""; // clear previous result
-        // Remove old phase bars if any
-        document.querySelectorAll('[id^="phase-"]').forEach((n) => n.remove());
+        $("out").textContent = "";
+        $("log").textContent = "";
+        $("phases").innerHTML = "";
+        $("quick-status").style.display = "none";
+        setResultIframe("<em>Waiting for results…</em>");
 
         try {
           const res = await fetch("/api/status", {
@@ -216,17 +596,20 @@
           });
 
           const ctype = res.headers.get("content-type") || "";
-          // (B) Single JSON result (e.g., cache hit)
           if (ctype.includes("application/json") && !ctype.includes("ndjson")) {
+            // Cached fast-path (single JSON)
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || res.statusText);
-            // Replace result content
-            out.textContent = data.output || "";
+            lastMarkdown = data.output || "";
+            lastHTML = mdToHtmlLite(lastMarkdown);
+            setResultIframe(lastHTML);
+            setActionsEnabled(true);
             spin.style.display = "none";
+            $("quick-status").textContent = "Served from cache";
+            $("quick-status").style.display = "inline-flex";
             return;
           }
 
-          // (A) NDJSON streaming result
           if (!res.body) throw new Error("No response body");
           const reader = res.body.getReader();
           const dec = new TextDecoder();
@@ -236,9 +619,7 @@
             const { value, done } = await reader.read();
             if (done) break;
             buf += dec.decode(value, { stream: true });
-
             let idx;
-            // NDJSON: process complete lines
             while ((idx = buf.indexOf("\n")) >= 0) {
               const line = buf.slice(0, idx).trim();
               buf = buf.slice(idx + 1);
@@ -250,23 +631,37 @@
                 continue;
               }
 
-              switch (msg.kind) {
-                case "start":
-                  spin.textContent = "⏳ Starting…";
-                  break;
-                case "phase": {
-                  const label = msg.msg || msg.name || "Working…";
-                  ensurePhaseUI(msg.name || "phase");
+              if (msg.kind === "start") {
+                spin.textContent = "⏳ Starting…";
+              }
+              if (msg.kind === "info") {
+                log("info", msg.msg);
+              }
+              if (msg.kind === "warn") {
+                log("warn", msg.msg);
+              }
+
+              if (msg.kind === "phase") {
+                const name = msg.name || "phase";
+                ensurePhase(name, msg.msg || name);
+                // OpenAI is indeterminate
+                if (name === "openai") {
+                  setPhaseText(name, msg.msg || "openai");
+                  setPhaseIndeterminate(name);
+                } else {
                   setPhaseText(
-                    msg.name || "phase",
-                    label + (msg.total ? ` (0/${msg.total})` : "")
+                    name,
+                    (msg.msg || name) + (msg.total ? ` (0/${msg.total})` : "")
                   );
-                  if (msg.total) setPhasePct(msg.name || "phase", 0, msg.total);
-                  break;
+                  if (msg.total) setPhasePct(name, 0, msg.total);
                 }
-                case "progress": {
-                  const name = msg.phase || "phase";
-                  ensurePhaseUI(name);
+                spin.textContent = "⏳ " + (msg.msg || name);
+              }
+
+              if (msg.kind === "progress") {
+                const name = msg.phase || "phase";
+                if (name !== "openai") {
+                  // determinate phases only
                   if (msg.total) {
                     setPhasePct(name, msg.current || 0, msg.total);
                     setPhaseText(
@@ -278,44 +673,38 @@
                   } else {
                     setPhaseText(name, `${name}: ${msg.current ?? 0}`);
                   }
-                  break;
                 }
-                case "info":
-                  logLine("info", msg.msg);
-                  break;
-                case "warn":
-                  logLine("warn", msg.msg);
-                  break;
-                case "error":
-                  logLine("error", msg.msg);
-                  spin.style.display = "none";
-                  break;
-                case "done":
-                  // Replace log with the final output
-                  out.textContent = msg.output || "";
-                  spin.style.display = "none";
-                  break;
+              }
+
+              if (msg.kind === "error") {
+                log("error", msg.msg);
+                spin.style.display = "none";
+              }
+
+              if (msg.kind === "done") {
+                lastMarkdown = msg.output || "";
+                lastHTML = mdToHtmlLite(lastMarkdown);
+                setResultIframe(lastHTML);
+                // mark OpenAI as completed so it doesn't sit at 0%
+                completePhase("openai");
+                setActionsEnabled(true);
+                spin.style.display = "none";
               }
             }
           }
         } catch (e) {
-          document.getElementById("out").textContent =
-            "ERROR: " + (e.message || e);
-          el("spin").style.display = "none";
+          $("out").style.display = "block";
+          $("out").textContent = "ERROR: " + (e.message || e);
+          spin.style.display = "none";
         } finally {
-          el("run").disabled = false;
+          $("run").disabled = false;
         }
       }
 
-      // Wire up the button
-      el("run").addEventListener("click", async () => {
-        const parseLines = (t) =>
-          t
-            .split(/\r?\n|,/)
-            .map((s) => s.trim())
-            .filter(Boolean);
+      // Wire inputs -----------------------------------------------------------
+      $("run").addEventListener("click", () => {
         const body = {
-          components: parseLines(el("components").value)
+          components: parseLines($("components").value)
             .map((s) => {
               const [product, component] = s
                 .split(":")
@@ -323,15 +712,58 @@
               return product && component ? { product, component } : null;
             })
             .filter(Boolean),
-          metabugs: parseLines(el("metabugs").value)
+          metabugs: parseLines($("metabugs").value)
             .map((n) => Number(n))
             .filter((n) => Number.isFinite(n)),
-          whiteboards: parseLines(el("whiteboards").value),
-          days: Number(el("days").value) || 8,
-          format: el("format").value,
-          debug: el("debug").value === "true",
+          whiteboards: parseLines($("whiteboards").value),
+          days: Number($("days").value) || 8,
+          format: $("format").value,
+          debug: $("debug").value === "true",
         };
-        runSnazzybot(body);
+        runSnazzy(body);
+      });
+
+      // Actions ---------------------------------------------------------------
+      $("copy").addEventListener("click", async () => {
+        if (!lastMarkdown.trim()) return;
+        try {
+          await navigator.clipboard.writeText(lastMarkdown);
+          $("quick-status").textContent = "Copied Markdown";
+          $("quick-status").style.display = "inline-flex";
+        } catch {}
+      });
+
+      $("copy-rendered").addEventListener("click", async () => {
+        if (!lastHTML.trim()) return;
+        try {
+          if (navigator.clipboard && window.ClipboardItem) {
+            const blob = new Blob([lastHTML], { type: "text/html" });
+            const item = new ClipboardItem({
+              "text/html": blob,
+              "text/plain": new Blob([lastMarkdown], { type: "text/plain" }),
+            });
+            await navigator.clipboard.write([item]);
+          } else {
+            // Fallback: copy plain HTML as text
+            await navigator.clipboard.writeText(lastHTML);
+          }
+          $("quick-status").textContent = "Copied rendered HTML";
+          $("quick-status").style.display = "inline-flex";
+        } catch {}
+      });
+
+      $("dl-md").addEventListener("click", () => {
+        if (!lastMarkdown.trim()) return;
+        download(
+          "snazzybot-status.md",
+          lastMarkdown,
+          "text/markdown;charset=utf-8"
+        );
+      });
+      $("dl-html").addEventListener("click", () => {
+        if (!lastHTML.trim()) return;
+        const html = `<!doctype html><meta charset="utf-8"><title>SnazzyBot Status</title><body>${lastHTML}</body>`;
+        download("snazzybot-status.html", html, "text/html;charset=utf-8");
       });
     </script>
   </body>
