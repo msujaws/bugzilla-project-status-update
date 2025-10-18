@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>snazzybot — Bugzilla Status</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      body {
+        font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        margin: 24px;
+        color: #111;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+      .card {
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 16px;
+        max-width: 900px;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        margin-top: 12px;
+      }
+      input,
+      textarea,
+      select {
+        width: 100%;
+        padding: 8px;
+        margin-top: 6px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+      }
+      .row > div {
+        flex: 1;
+      }
+      button {
+        margin-top: 16px;
+        padding: 10px 14px;
+        border: 0;
+        border-radius: 10px;
+        background: #0f62fe;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
+      pre {
+        background: #f7f7f7;
+        padding: 12px;
+        border-radius: 8px;
+        overflow: auto;
+      }
+      .spinner {
+        display: none;
+        margin-top: 8px;
+      }
+      .progress {
+        margin-top: 8px;
+        height: 10px;
+        background: #eee;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .progress > .bar {
+        height: 100%;
+        width: 0%;
+        background: #0f62fe;
+        transition: width 0.2s ease;
+      }
+      .small {
+        font-size: 12px;
+        color: #555;
+        margin-top: 4px;
+      }
+      .logline {
+        margin: 0;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>snazzybot</h1>
+    <div class="card">
+      <p>Generate a weekly, user-impact–focused status update from Bugzilla.</p>
+      <div class="row">
+        <div>
+          <label
+            >Components (one per line, <code>Product:Component</code>)</label
+          >
+          <textarea
+            id="components"
+            rows="4"
+            placeholder="Firefox:General&#10;Fenix:Toolbar"
+          ></textarea>
+        </div>
+        <div>
+          <label>Metabug IDs (comma or newline separated)</label>
+          <textarea id="metabugs" rows="4" placeholder="1882882"></textarea>
+        </div>
+      </div>
+      <label>Whiteboard tags (one per line, e.g. <code>[fx-vpn]</code>)</label>
+      <textarea
+        id="whiteboards"
+        rows="3"
+        placeholder="[fx-vpn]&#10;[fidefe-sidebar]"
+      ></textarea>
+
+      <div class="row">
+        <div>
+          <label>Days lookback</label>
+          <input id="days" type="number" min="1" value="8" />
+        </div>
+        <div>
+          <label>Output format</label>
+          <select id="format">
+            <option value="md">Markdown</option>
+            <option value="html">HTML (best for Google Docs)</option>
+          </select>
+        </div>
+        <div>
+          <label>Debug</label>
+          <select id="debug">
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="run">Run snazzybot</button>
+      <div id="spin" class="spinner">⏳ Working…</div>
+
+      <h3>Result</h3>
+      <pre id="out" aria-live="polite"></pre>
+    </div>
+
+    <script>
+      const el = (id) => document.getElementById(id);
+
+      // Create or update a simple progress bar for a named phase
+      function ensurePhaseUI(name) {
+        const hostId = `phase-${name}`;
+        let host = document.getElementById(hostId);
+        if (!host) {
+          host = document.createElement("div");
+          host.id = hostId;
+          host.style.marginTop = "8px";
+          const title = document.createElement("div");
+          title.className = "small";
+          title.id = `${hostId}-title`;
+          title.textContent = name;
+          const bar = document.createElement("div");
+          bar.className = "progress";
+          const fill = document.createElement("div");
+          fill.className = "bar";
+          fill.id = `${hostId}-bar`;
+          bar.appendChild(fill);
+          host.appendChild(title);
+          host.appendChild(bar);
+          document
+            .getElementById("spin")
+            .insertAdjacentElement("afterend", host);
+        }
+        return host;
+      }
+      function setPhaseText(name, text) {
+        const t = document.getElementById(`phase-${name}-title`);
+        if (t) t.textContent = text;
+      }
+      function setPhasePct(name, current, total) {
+        const bar = document.getElementById(`phase-${name}-bar`);
+        if (!bar || !total) return;
+        const pct = Math.max(
+          0,
+          Math.min(100, Math.round((current / total) * 100))
+        );
+        bar.style.width = pct + "%";
+      }
+      function logLine(kind, msg) {
+        const out = document.getElementById("out");
+        const p = document.createElement("div");
+        p.className = "logline";
+        p.textContent =
+          (kind === "warn" ? "⚠️ " : kind === "error" ? "❌ " : "ℹ️ ") + msg;
+        out.appendChild(p);
+        out.scrollTop = out.scrollHeight;
+      }
+
+      // Handle either: (A) NDJSON streaming or (B) single JSON body
+      async function runSnazzybot(body) {
+        const btn = el("run");
+        const spin = el("spin");
+        const out = el("out");
+        btn.disabled = true;
+        spin.style.display = "block";
+        spin.textContent = "⏳ Starting…";
+        out.textContent = ""; // clear previous result
+        // Remove old phase bars if any
+        document.querySelectorAll('[id^="phase-"]').forEach((n) => n.remove());
+
+        try {
+          const res = await fetch("/api/status", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          });
+
+          const ctype = res.headers.get("content-type") || "";
+          // (B) Single JSON result (e.g., cache hit)
+          if (ctype.includes("application/json") && !ctype.includes("ndjson")) {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || res.statusText);
+            // Replace result content
+            out.textContent = data.output || "";
+            spin.style.display = "none";
+            return;
+          }
+
+          // (A) NDJSON streaming result
+          if (!res.body) throw new Error("No response body");
+          const reader = res.body.getReader();
+          const dec = new TextDecoder();
+          let buf = "";
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+
+            let idx;
+            // NDJSON: process complete lines
+            while ((idx = buf.indexOf("\n")) >= 0) {
+              const line = buf.slice(0, idx).trim();
+              buf = buf.slice(idx + 1);
+              if (!line) continue;
+              let msg;
+              try {
+                msg = JSON.parse(line);
+              } catch {
+                continue;
+              }
+
+              switch (msg.kind) {
+                case "start":
+                  spin.textContent = "⏳ Starting…";
+                  break;
+                case "phase": {
+                  const label = msg.msg || msg.name || "Working…";
+                  ensurePhaseUI(msg.name || "phase");
+                  setPhaseText(
+                    msg.name || "phase",
+                    label + (msg.total ? ` (0/${msg.total})` : "")
+                  );
+                  if (msg.total) setPhasePct(msg.name || "phase", 0, msg.total);
+                  break;
+                }
+                case "progress": {
+                  const name = msg.phase || "phase";
+                  ensurePhaseUI(name);
+                  if (msg.total) {
+                    setPhasePct(name, msg.current || 0, msg.total);
+                    setPhaseText(
+                      name,
+                      `${name}: ${Math.round(
+                        (msg.current / msg.total) * 100
+                      )}% (${msg.current}/${msg.total})`
+                    );
+                  } else {
+                    setPhaseText(name, `${name}: ${msg.current ?? 0}`);
+                  }
+                  break;
+                }
+                case "info":
+                  logLine("info", msg.msg);
+                  break;
+                case "warn":
+                  logLine("warn", msg.msg);
+                  break;
+                case "error":
+                  logLine("error", msg.msg);
+                  spin.style.display = "none";
+                  break;
+                case "done":
+                  // Replace log with the final output
+                  out.textContent = msg.output || "";
+                  spin.style.display = "none";
+                  break;
+              }
+            }
+          }
+        } catch (e) {
+          document.getElementById("out").textContent =
+            "ERROR: " + (e.message || e);
+          el("spin").style.display = "none";
+        } finally {
+          el("run").disabled = false;
+        }
+      }
+
+      // Wire up the button
+      el("run").addEventListener("click", async () => {
+        const parseLines = (t) =>
+          t
+            .split(/\r?\n|,/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+        const body = {
+          components: parseLines(el("components").value)
+            .map((s) => {
+              const [product, component] = s
+                .split(":")
+                .map((x) => x && x.trim());
+              return product && component ? { product, component } : null;
+            })
+            .filter(Boolean),
+          metabugs: parseLines(el("metabugs").value)
+            .map((n) => Number(n))
+            .filter((n) => Number.isFinite(n)),
+          whiteboards: parseLines(el("whiteboards").value),
+          days: Number(el("days").value) || 8,
+          format: el("format").value,
+          debug: el("debug").value === "true",
+        };
+        runSnazzybot(body);
+      });
+    </script>
+  </body>
+</html>

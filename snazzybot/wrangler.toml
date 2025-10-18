@@ -1,0 +1,9 @@
+name = "snazzybot"
+pages_build_output_dir = "public"
+
+# Pages Functions live in ./functions
+[pages]
+pages_build_output_dir = "public"
+
+# Route Pages Functions (no extra config needed for local dev)
+

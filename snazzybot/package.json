@@ -1,0 +1,17 @@
+{
+  "name": "snazzybot",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev:pages": "wrangler pages dev ./public",
+    "deploy": "wrangler pages publish ./public",
+    "cli": "tsx cli/weekly-bugzilla-status.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "yargs": "^17.7.2",
+    "wrangler": "^4.43.0"
+  }
+}
