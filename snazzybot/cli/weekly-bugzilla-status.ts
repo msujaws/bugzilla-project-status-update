@@ -1,4 +1,18 @@
 #!/usr/bin/env ts-node
+/**
+ * Weekly Bugzilla status CLI entry point.
+ *
+ * Reads configuration from CLI flags, enforces required env vars, and prints
+ * the generated report to stdout. Example usage from the `snazzybot` directory:
+ *
+ *   npm run cli -- --whiteboard "[fx-vpn]" --days 3 --format md
+ *
+ * Required environment:
+ *   BUGZILLA_API_KEY - REST API key for Bugzilla.
+ *   OPENAI_API_KEY   - API key for generating summaries.
+ *
+ * See README for additional options.
+ */
 // cli/weekly-bugzilla-status.ts
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
