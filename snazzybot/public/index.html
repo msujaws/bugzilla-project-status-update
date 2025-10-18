@@ -375,6 +375,12 @@
               </select>
             </div>
             <div>
+              <label for="voice">Voice</label>
+              <select id="voice">
+                <option value="normal" selected>Normal</option>
+                <option value="pirate">Pirate 🏴‍☠️</option>
+                <option value="snazzy-robot">Snazzy Robot 🤖</option>
+              </select>
               <label for="debug">Debug</label>
               <select id="debug">
                 <option value="false">No</option>
@@ -437,7 +443,10 @@
       </div>
 
       <p class="footer">
-        Created by :jaws (<a href="https://github.com/msujaws/bugzilla-project-status-update">source</a>) ✨ — logo contributed by :jhirsch - name contributed by :sclements
+        Created by :jaws (<a
+          href="https://github.com/msujaws/bugzilla-project-status-update"
+          >source</a
+        >) ✨ — logo contributed by :jhirsch - name contributed by :sclements
       </p>
     </div>
 
@@ -718,6 +727,7 @@
           whiteboards: parseLines($("whiteboards").value),
           days: Number($("days").value) || 8,
           format: $("format").value,
+          voice: $("voice").value || "normal",
           debug: $("debug").value === "true",
         };
         runSnazzy(body);

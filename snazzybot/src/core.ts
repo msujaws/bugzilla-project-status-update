@@ -11,6 +11,7 @@ export type GenerateParams = {
   model?: string; // default "gpt-5"
   format?: "md" | "html"; // output format (only affects final link wrapper, not body)
   debug?: boolean;
+  voice?: "normal" | "pirate" | "snazzy-robot";
 };
 
 export type EnvLike = {
@@ -302,13 +303,21 @@ async function openaiAssessAndSummarize(
   env: EnvLike,
   model: string,
   bugs: Bug[],
-  days: number
+  days: number,
+  voice: "normal" | "pirate" | "snazzy-robot" = "normal"
 ) {
+  const voiceHint =
+    voice === "pirate"
+      ? "Write in light, readable pirate-speak (sprinkle nautical words like ‘Ahoy’, ‘ship’, ‘crew’). Keep it professional, clear, and not overdone."
+      : voice === "snazzy-robot"
+      ? "Write as a friendly, upbeat robot narrator (light ‘beep boop’, ‘systems nominal’). Keep it human-readable and charming, not spammy."
+      : "Write in a clear, friendly, professional tone.";
   // System prompt: NO demo section request here (script appends its own later).
   const system =
     "You are an expert release PM creating a short, spoken weekly update.\n" +
     "Focus ONLY on user impact. Skip items with no obvious user impact.\n" +
-    "Keep the overall summary ~170 words. Output valid JSON only.";
+    "Keep the overall summary ~170 words. Output valid JSON only.\n" +
+    voiceHint;
 
   const user = `Data window: last ${days} days.
 Bugs (done/fixed):
@@ -436,7 +445,13 @@ export async function generateStatus(
 
   // OpenAI (indeterminate step; caller shows spinner)
   hooks.phase?.("openai");
-  const ai = await openaiAssessAndSummarize(env, model, final, days);
+  const ai = await openaiAssessAndSummarize(
+    env,
+    model,
+    final,
+    days,
+    params.voice ?? "normal"
+  );
 
   // Build ONE canonical Demo suggestions section (no duplication)
   const demo = (ai.assessments || [])

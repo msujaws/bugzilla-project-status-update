@@ -34,6 +34,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         format = "md",
         model = "gpt-5",
         debug = false,
+        voice = "normal",
       } = body || {};
 
       // Wire core progress to NDJSON events for the client
@@ -50,7 +51,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       write({ kind: "start", msg: "Starting snazzybot…" });
 
       const { output } = await generateStatus(
-        { components, metabugs, whiteboards, days, format, model, debug },
+        {
+          components,
+          metabugs,
+          whiteboards,
+          days,
+          format,
+          model,
+          debug,
+          voice,
+        },
         {
           OPENAI_API_KEY: env.OPENAI_API_KEY,
           BUGZILLA_API_KEY: env.BUGZILLA_API_KEY,
