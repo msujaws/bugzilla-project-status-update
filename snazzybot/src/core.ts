@@ -298,6 +298,100 @@ export function buildBuglistURL(args: {
   return url.toString();
 }
 
+// ---------- Markdown helpers ----------
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (ch) => {
+    switch (ch) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#39;";
+      default:
+        return ch;
+    }
+  });
+}
+
+function sanitizeHref(href: string): string {
+  const trimmed = href.trim();
+  if (
+    /^https?:\/\//i.test(trimmed) ||
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("#") ||
+    /^mailto:/i.test(trimmed)
+  ) {
+    return trimmed;
+  }
+  return "#";
+}
+
+function applyInlineMarkdown(text: string): string {
+  let escaped = escapeHtml(text);
+  escaped = escaped.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    (_match, label, href) =>
+      `<a href="${sanitizeHref(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`
+  );
+  escaped = escaped.replace(/\*\*(.+?)\*\*/g, (_match, inner) => `<strong>${inner}</strong>`);
+  escaped = escaped.replace(/\*(.+?)\*/g, (_match, inner) => `<em>${inner}</em>`);
+  return escaped;
+}
+
+function markdownToHtml(md: string): string {
+  const lines = (md || "").split(/\r?\n/);
+  const out: string[] = [];
+  let inList = false;
+
+  const closeList = () => {
+    if (inList) {
+      out.push("</ul>");
+      inList = false;
+    }
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      closeList();
+      continue;
+    }
+    if (line.startsWith("### ")) {
+      closeList();
+      out.push(`<h3>${applyInlineMarkdown(line.slice(4))}</h3>`);
+      continue;
+    }
+    if (line.startsWith("## ")) {
+      closeList();
+      out.push(`<h2>${applyInlineMarkdown(line.slice(3))}</h2>`);
+      continue;
+    }
+    if (line.startsWith("# ")) {
+      closeList();
+      out.push(`<h1>${applyInlineMarkdown(line.slice(2))}</h1>`);
+      continue;
+    }
+    if (line.startsWith("- ")) {
+      if (!inList) {
+        out.push("<ul>");
+        inList = true;
+      }
+      out.push(`<li>${applyInlineMarkdown(line.slice(2))}</li>`);
+      continue;
+    }
+    closeList();
+    out.push(`<p>${applyInlineMarkdown(line)}</p>`);
+  }
+
+  closeList();
+  return out.join("\n");
+}
+
 // ---------- OpenAI (JSON) ----------
 async function openaiAssessAndSummarize(
   env: EnvLike,
@@ -481,11 +575,8 @@ export async function generateStatus(
 
   const output =
     params.format === "html"
-      ? summary // your upstream prompt returns markdown; optionally convert here if you want real HTML
-          .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-          .replace(/^## (.*)$/gim, "<h2>$1</h2>")
-          .replace(/^- (.*)$/gim, "<ul><li>$1</li></ul>") +
-        `\n<p><a href="${link}">View bugs in Bugzilla</a></p>`
+      ? markdownToHtml(summary) +
+        `\n<p><a href="${escapeHtml(link)}">View bugs in Bugzilla</a></p>`
       : `${summary}\n\n[View bugs in Bugzilla](${link})`;
 
   return { output, ids: final.map((b) => b.id) };
