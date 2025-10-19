@@ -39,7 +39,7 @@ function burstEmojis(mode = "normal") {
   window.addEventListener("resize", resize, { once: true });
 
   const N = 80;
-  const lifeMs = 1800;
+  const lifeMs = 5000;
   const start = performance.now();
   const parts = Array.from({ length: N }, () => {
     const x = Math.random() * W;
