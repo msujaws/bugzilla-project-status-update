@@ -230,7 +230,8 @@ async function fetchHistoriesRobust(
 ) {
   if (!ids.length) return [] as BugHistory["bugs"];
   hooks.phase?.("histories", { total: ids.length });
-  const CHUNK = 200;
+  // Smaller batch size to avoid path-length / server limits.
+  const CHUNK = 50;
   const hist: BugHistory["bugs"] = [];
   let handled = 0;
   for (let i = 0; i < ids.length; i += CHUNK) {
@@ -244,21 +245,33 @@ async function fetchHistoriesRobust(
       handled += chunk.length;
       hooks.progress?.("histories", handled, ids.length);
     } catch (e: any) {
-      hooks.warn?.(
-        `Batch history failed; retrying individually (${chunk.length})`
-      );
-      for (const id of chunk) {
+      // Try mini-batches (reduce further) before going fully per-ID.
+      hooks.warn?.(`Batch history failed; retrying in mini-batches…`);
+      const MINI = 10;
+      for (let j = 0; j < chunk.length; j += MINI) {
+        const mini = chunk.slice(j, j + MINI);
         try {
           const payload = (await bzGet(
             env,
-            `/bug/${id}/history`
+            `/bug/${mini.join(",")}/history`
           )) as BugHistory;
           hist.push(...payload.bugs);
-        } catch {
-          hooks.warn?.(`Skipping history for #${id}`);
-        } finally {
-          handled += 1;
+          handled += mini.length;
           hooks.progress?.("histories", handled, ids.length);
+        } catch {
+          // Fall back to individual only for the troublesome mini-chunk
+          hooks.warn?.(`Mini-batch failed; retrying individually (${mini.length})`);
+          for (const id of mini) {
+            try {
+              const payload = (await bzGet(env, `/bug/${id}/history`)) as BugHistory;
+              hist.push(...payload.bugs);
+            } catch {
+              hooks.warn?.(`Skipping history for #${id}`);
+            } finally {
+              handled += 1;
+              hooks.progress?.("histories", handled, ids.length);
+            }
+          }
         }
       }
     }
