@@ -80,6 +80,11 @@ function isSecurityRestricted(groups?: string[]): boolean {
 }
 
 // ---------- Bugzilla helpers (REST) ----------
+// --- Simple 24h memory cache for Node / local dev (per-process) ---
+const ONE_DAY_S = 24 * 60 * 60;
+const ONE_DAY_MS = ONE_DAY_S * 1000;
+const memCache = new Map<string, { exp: number; json: any }>();
+
 async function bzGet(
   env: EnvLike,
   path: string,
@@ -94,9 +99,42 @@ async function bzGet(
     else url.searchParams.set(k, String(v));
   }
   url.searchParams.set("api_key", env.BUGZILLA_API_KEY);
-  const r = await fetch(url.toString());
+
+  const key = url.toString();
+
+  // Cloudflare Cache first (if available)
+  const cfCache = (globalThis as any).caches?.default;
+  if (cfCache) {
+    const cached = await cfCache.match(key);
+    if (cached) {
+      return cached.json();
+    }
+  } else {
+    // Node memory cache
+    const hit = memCache.get(key);
+    if (hit && hit.exp > Date.now()) return hit.json;
+  }
+
+  const r = await fetch(key);
   if (!r.ok) throw new Error(`Bugzilla ${r.status}: ${await r.text()}`);
-  return r.json();
+  const json = await r.json();
+
+  // Store into Cloudflare cache (immutable for 1 day), else mem cache
+  if (cfCache) {
+    // Clone JSON into a Response with Cache-Control so Cloudflare honors TTL
+    const resp = new Response(JSON.stringify(json), {
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        // s-maxage controls edge cache; also add immutable for safety
+        "cache-control": `public, s-maxage=${ONE_DAY_S}, max-age=0, immutable`,
+      },
+    });
+    // Ignore failures; caching is opportunistic
+    try { await cfCache.put(key, resp); } catch {}
+  } else {
+    memCache.set(key, { exp: Date.now() + ONE_DAY_MS, json });
+  }
+  return json;
 }
 
 async function fetchMetabugChildren(
