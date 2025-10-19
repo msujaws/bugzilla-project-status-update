@@ -3,8 +3,9 @@ import { markdownToHtml } from "./lib/markdown.js";
 const $ = (id) => document.getElementById(id);
 
 // ===== Emoji Confetti Engine (no deps) =====
-const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
-  .matches;
+const reduceMotion = window.matchMedia(
+  "(prefers-reduced-motion: reduce)"
+).matches;
 
 function burstEmojis(mode = "normal") {
   if (reduceMotion) return; // respect reduced motion preference
@@ -408,6 +409,16 @@ if (runButton) {
     const voice = $("voice")?.value || "normal";
     const debug = $("debug")?.value === "true";
 
+    const sp = new URLSearchParams();
+    // Store raw textarea strings; they're newline-safe in params.
+    sp.set("components", $("components")?.value || "");
+    sp.set("whiteboards", $("whiteboards")?.value || "");
+    sp.set("metabugs", $("metabugs")?.value || "");
+    sp.set("days", String(days));
+    sp.set("voice", voice);
+    sp.set("debug", String(debug));
+    history.replaceState(null, "", `?${sp.toString()}`);
+
     currentVoice = voice;
     runSnazzy({
       components,
@@ -420,6 +431,22 @@ if (runButton) {
     });
   });
 }
+
+function hydrateFromURL() {
+  const sp = new URLSearchParams(location.search);
+  const set = (id, v) => {
+    const el = $(id);
+    if (el && v != null) el.value = v;
+  };
+  if (sp.has("components")) set("components", sp.get("components") || "");
+  if (sp.has("whiteboards")) set("whiteboards", sp.get("whiteboards") || "");
+  if (sp.has("metabugs")) set("metabugs", sp.get("metabugs") || "");
+  if (sp.has("days")) set("days", sp.get("days") || "7");
+  if (sp.has("voice")) set("voice", sp.get("voice") || "normal");
+  if (sp.has("debug"))
+    set("debug", sp.get("debug") === "true" ? "true" : "false");
+}
+hydrateFromURL();
 
 // Actions -------------------------------------------------------------------
 const copyBtn = $("copy");
@@ -469,7 +496,11 @@ const downloadMdBtn = $("dl-md");
 if (downloadMdBtn) {
   downloadMdBtn.addEventListener("click", () => {
     if (!lastMarkdown.trim()) return;
-    download("snazzybot-status.md", lastMarkdown, "text/markdown;charset=utf-8");
+    download(
+      "snazzybot-status.md",
+      lastMarkdown,
+      "text/markdown;charset=utf-8"
+    );
   });
 }
 
