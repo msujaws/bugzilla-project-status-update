@@ -33,7 +33,11 @@ body {
   margin: 0;
   font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-  background: radial-gradient(1200px 600px at 10% -10%, #1a2047 0%, transparent 60%),
+  background: radial-gradient(
+      1200px 600px at 10% -10%,
+      #1a2047 0%,
+      transparent 60%
+    ),
     radial-gradient(900px 500px at 90% 10%, #0f1540 0%, transparent 55%),
     radial-gradient(600px 300px at 50% 120%, #121735 0%, transparent 60%),
     var(--navy);
@@ -328,23 +332,19 @@ summary {
   cursor: pointer;
 }
 
-/* Add to <style> */
+.progress {
+  position: relative;
+}
 .progress .bar.indeterminate {
-  width: 30%;
+  width: 45%;
   animation: indet 1.2s ease-in-out infinite;
 }
-
 @keyframes indet {
   0% {
-    transform: translateX(-100%);
+    transform: translateX(-45%);
   }
-
-  50% {
-    transform: translateX(120%);
-  }
-
   100% {
-    transform: translateX(120%);
+    transform: translateX(100%);
   }
 }
 
