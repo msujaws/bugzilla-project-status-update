@@ -355,6 +355,45 @@ function qualifiesByHistory(hb: BugHistory["bugs"][number], sinceISO: string) {
   return false;
 }
 
+// Debug-friendly variant that explains *why not qualified*
+function qualifiesByHistoryWhy(
+  hb: BugHistory["bugs"][number],
+  sinceISO: string
+): { ok: boolean; why?: string } {
+  const since = Date.parse(sinceISO);
+  if (!hb?.history || !hb.history.length) {
+    return { ok: false, why: "no history entries" };
+  }
+  let sawRecent = false;
+  for (const h of hb.history) {
+    const when = Date.parse(h.when);
+    if (when < since) continue;
+    sawRecent = true;
+    let newToResolved = false,
+      fixed = false,
+      resolvedToVerified = false,
+      verifiedToClosed = false;
+    for (const c of h.changes) {
+      if (
+        c.field_name === "status" &&
+        c.added === "RESOLVED" &&
+        /^(NEW|ASSIGNED)$/.test(c.removed)
+      )
+        newToResolved = true;
+      if (c.field_name === "resolution" && c.added === "FIXED") fixed = true;
+      if (c.field_name === "status" && c.removed === "RESOLVED" && c.added === "VERIFIED")
+        resolvedToVerified = true;
+      if (c.field_name === "status" && c.removed === "VERIFIED" && c.added === "CLOSED")
+        verifiedToClosed = true;
+    }
+    if ((newToResolved && fixed) || resolvedToVerified || verifiedToClosed) {
+      return { ok: true };
+    }
+  }
+  if (!sawRecent) return { ok: false, why: "no recent history in window" };
+  return { ok: false, why: "no qualifying transitions (resolved/fixed/verify/close)" };
+}
+
 // ---------- Buglist (UI) link ----------
 export function buildBuglistURL(args: {
   sinceISO: string;
@@ -495,6 +534,8 @@ export async function generateStatus(
   const days = params.days ?? 8;
   const model = params.model ?? "gpt-5";
   const sinceISO = isoDaysAgo(days);
+  const isDebug = !!params.debug;
+  const dlog = (m: string) => { if (isDebug) hooks.info?.(`[debug] ${m}`); };
 
   const pcs = params.components ?? [];
   const wbs = params.whiteboards ?? [];
@@ -515,13 +556,27 @@ export async function generateStatus(
     fetchByWhiteboards(env, wbs, sinceISO, hooks),
   ]);
 
+  if (isDebug) {
+    dlog(`source counts → metabug children: ${idsFromMetabugs.length}, byComponents: ${byComponents.length}, byWhiteboards: ${byWhiteboards.length}`);
+    const sample = (arr: any[], n = 8) => arr.slice(0, n).map((b: any) => b.id ?? b).join(", ");
+    if (byComponents.length) dlog(`byComponents sample IDs: ${sample(byComponents)}`);
+    if (byWhiteboards.length) dlog(`byWhiteboards sample IDs: ${sample(byWhiteboards)}`);
+  }
+
   const byIds = await fetchByIds(env, idsFromMetabugs, sinceISO);
+  if (isDebug) dlog(`byIds (filtered) count: ${byIds.length} (from metabug children)`);
 
   // Union + security filter
   const seen = new Set<number>();
-  let candidates = [...byComponents, ...byWhiteboards, ...byIds]
-    .filter((b) => !seen.has(b.id) && seen.add(b.id))
-    .filter((b) => !isSecurityRestricted(b.groups));
+  const union = [...byComponents, ...byWhiteboards, ...byIds].filter((b) => !seen.has(b.id) && seen.add(b.id));
+  const securityFiltered = union.filter((b) => isSecurityRestricted(b.groups));
+  let candidates = union.filter((b) => !isSecurityRestricted(b.groups));
+
+  if (isDebug) {
+    dlog(`union candidates: ${union.length}`);
+    dlog(`security-restricted removed: ${securityFiltered.length}${securityFiltered.length ? ` (sample: ${securityFiltered.slice(0,6).map(b=>b.id).join(", ")})` : ""}`);
+    dlog(`candidates after security filter: ${candidates.length}`);
+  }
 
   hooks.info?.(`Candidates after initial query: ${candidates.length}`);
 
@@ -531,12 +586,65 @@ export async function generateStatus(
     candidates.map((b) => b.id),
     hooks
   );
-  const allowed = new Set<number>(
-    histories.filter((h) => qualifiesByHistory(h, sinceISO)).map((h) => h.id)
-  );
-  const final = candidates.filter((b) => allowed.has(b.id));
+  const byIdHistory = new Map<number, BugHistory["bugs"][number]>();
+  for (const h of histories) byIdHistory.set(h.id, h);
+
+  // Explain *why* each candidate is excluded (debug)
+  const reasonCounts = new Map<string, number>();
+  const reasonExamples = new Map<string, number[]>(); // store a few IDs per reason
+  const bump = (why: string, id: number) => {
+    reasonCounts.set(why, (reasonCounts.get(why) ?? 0) + 1);
+    const arr = reasonExamples.get(why) ?? [];
+    if (arr.length < 6) arr.push(id);
+    reasonExamples.set(why, arr);
+  };
+
+  const allowed = new Set<number>();
+  for (const b of candidates) {
+    const h = byIdHistory.get(b.id);
+    if (!h) {
+      if (isDebug) bump("no history returned for id", b.id);
+      continue;
+    }
+    const q = isDebug ? qualifiesByHistoryWhy(h, sinceISO) : { ok: qualifiesByHistory(h, sinceISO) };
+    if (q.ok) {
+      allowed.add(b.id);
+    } else if (isDebug) {
+      bump(q.why || "failed history qualification", b.id);
+    }
+  }
+
+  if (isDebug) {
+    // Summarize reasons
+    const entries = [...reasonCounts.entries()].sort((a,b)=>b[1]-a[1]);
+    if (entries.length) {
+      dlog(`non-qualified reasons (top):`);
+      for (const [why, count] of entries) {
+        const ids = reasonExamples.get(why) || [];
+        dlog(`  • ${why}: ${count}${ids.length ? ` (eg: ${ids.join(", ")})` : ""}`);
+      }
+    }
+    // Coverage gap
+    if (histories.length !== candidates.length) {
+      const missing = candidates
+        .map((b)=>b.id)
+        .filter((id)=>!byIdHistory.has(id))
+        .slice(0,12);
+      dlog(`history coverage: ${histories.length}/${candidates.length}${missing.length ? ` (no history for: ${missing.join(", ")})` : ""}`);
+    } else {
+      dlog(`history coverage: ${histories.length}/${candidates.length} (complete)`);
+    }
+  }  const final = candidates.filter((b) => allowed.has(b.id));
 
   hooks.info?.(`Qualified bugs: ${final.length}`);
+
+  if (isDebug) {
+    if (final.length) {
+      dlog(`qualified IDs: ${final.slice(0, 20).map(b=>b.id).join(", ")}${final.length>20?" …":""}`);
+    } else {
+      dlog(`no qualified bugs → check reasons above; also verify statuses/resolution and history window.`);
+    }
+  }
 
   if (!final.length) {
     const link = buildBuglistURL({
@@ -550,6 +658,7 @@ export async function generateStatus(
       params.format === "html"
         ? `<p><em>No user-impacting changes in the last ${days} days.</em></p><p><a href="${link}">View bugs in Bugzilla</a></p>`
         : `_No user-impacting changes in the last ${days} days._\n\n[View bugs in Bugzilla](${link})`;
+    if (isDebug) dlog(`buglist link for manual inspection: ${link}`);
     return { output: body, ids: [] };
   }
 
@@ -561,6 +670,9 @@ export async function generateStatus(
       `Trimming ${trimmedCount} bug(s) before OpenAI call to stay within token limits`
     );
     aiCandidates = final.slice(0, MAX_BUGS_FOR_OPENAI);
+    if (isDebug) dlog(`OpenAI candidate IDs (trimmed to ${MAX_BUGS_FOR_OPENAI}): ${aiCandidates.slice(0,30).map(b=>b.id).join(", ")}${final.length>30?" …":""}`);
+  } else if (isDebug) {
+    dlog(`OpenAI candidate IDs (${aiCandidates.length}): ${aiCandidates.slice(0,30).map(b=>b.id).join(", ")}${aiCandidates.length>30?" …":""}`);
   }
 
   // OpenAI (indeterminate step; caller shows spinner)
