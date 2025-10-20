@@ -231,6 +231,55 @@ async function fetchByIds(env: EnvLike, ids: number[], sinceISO: string) {
   );
 }
 
+/**
+ * Bugzilla quirk (b.m.o): history for multiple bugs must be fetched via:
+ *   /rest/bug?id=123,456/history
+ * i.e., "/history" is appended to the *value* of the id query, not as a path segment.
+ */
+async function bzGetHistory(
+  env: EnvLike,
+  ids: number[]
+): Promise<BugHistory> {
+  const host = env.BUGZILLA_HOST || "https://bugzilla.mozilla.org";
+  const url = new URL(`${host}/rest/bug`);
+  // Important: append "/history" to the id value
+  url.searchParams.set("id", `${ids.join(",")}/history`);
+  url.searchParams.set("api_key", env.BUGZILLA_API_KEY);
+
+  // Reuse caching layer semantics manually (keyed by full URL)
+  const key = url.toString();
+  const bypass = !!env.SNAZZY_SKIP_CACHE;
+  const cfCache = (globalThis as any).caches?.default;
+  if (!bypass && cfCache) {
+    const cached = await cfCache.match(key);
+    if (cached) return cached.json();
+  } else if (!bypass) {
+    const hit = memCache.get(key);
+    if (hit && hit.exp > Date.now()) return hit.json;
+  }
+
+  const r = await fetch(key);
+  if (!r.ok) throw new Error(`Bugzilla ${r.status}: ${await r.text()}`);
+  const json = (await r.json()) as BugHistory;
+
+  if (!bypass && cfCache) {
+    try {
+      await cfCache.put(
+        key,
+        new Response(JSON.stringify(json), {
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "public, s-maxage=86400, max-age=0, immutable",
+          },
+        })
+      );
+    } catch {}
+  } else if (!bypass) {
+    memCache.set(key, { exp: Date.now() + ONE_DAY_MS, json });
+  }
+  return json;
+}
+
 async function fetchHistoriesRobust(
   env: EnvLike,
   ids: number[],
@@ -239,30 +288,35 @@ async function fetchHistoriesRobust(
   if (!ids.length) return [] as BugHistory["bugs"];
   hooks.phase?.("histories", { total: ids.length });
 
-  const results: BugHistory["bugs"] = [];
-  const CONCURRENCY = 5; // up to 5 in-flight requests
+  // Always use the b.m.o-compatible batch route via bzGetHistory,
+  // but keep batches small to control URL size + subrequest count.
+  const CHUNK = 25;
+  const out: BugHistory["bugs"] = [];
   let handled = 0;
-  let cursor = 0;
+  hooks.info?.(`History mode: b.m.o batch via ?id=…/history (chunk=${CHUNK})`);
 
-  const worker = async () => {
-    while (true) {
-      const idx = cursor++;
-      if (idx >= ids.length) break;
-      const id = ids[idx];
-      try {
-        const payload = (await bzGet(env, `/bug/${id}/history`)) as BugHistory;
-        if (payload?.bugs?.length) results.push(...payload.bugs);
-      } catch {
-        hooks.warn?.(`Skipping history for #${id}`);
-      } finally {
-        handled += 1;
-        hooks.progress?.("histories", handled, ids.length);
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const slice = ids.slice(i, i + CHUNK);
+    try {
+      const payload = await bzGetHistory(env, slice);
+      out.push(...(payload?.bugs || []));
+    } catch {
+      // Rarely, a batch may fail; try per-ID with the same route form.
+      hooks.warn?.(`Batch history failed for ${slice.length} IDs; falling back individually`);
+      for (const id of slice) {
+        try {
+          const payload = await bzGetHistory(env, [id]);
+          out.push(...(payload?.bugs || []));
+        } catch {
+          hooks.warn?.(`Skipping history for #${id}`);
+        }
       }
+    } finally {
+      handled += slice.length;
+      hooks.progress?.("histories", Math.min(handled, ids.length), ids.length);
     }
-  };
-
-  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-  return results;
+  }
+  return out;
 }
 
 function qualifiesByHistory(hb: BugHistory["bugs"][number], sinceISO: string) {
