@@ -238,6 +238,7 @@ button:disabled {
   border-radius: 999px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
 }
 
 .progress .bar {
@@ -332,20 +333,17 @@ summary {
   cursor: pointer;
 }
 
-.progress {
-  position: relative;
-}
 .progress .bar.indeterminate {
-  width: 45%;
-  animation: indet 1.2s ease-in-out infinite;
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 40%;              /* chunk size; tweak as desired */
+  left: -40%;              /* start just off the left edge */
+  animation: indet 2s ease-in-out infinite;
 }
 @keyframes indet {
-  0% {
-    transform: translateX(-45%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
+  from { left: -40%; }     /* fully off left */
+  to   { left: 100%; }     /* fully off right */
 }
 
 /* overlay for bursts */
