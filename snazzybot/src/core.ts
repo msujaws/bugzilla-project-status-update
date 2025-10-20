@@ -237,58 +237,31 @@ async function fetchHistoriesRobust(
 ) {
   if (!ids.length) return [] as BugHistory["bugs"];
   hooks.phase?.("histories", { total: ids.length });
-  // Smaller batch size to avoid path-length / server limits.
-  const CHUNK = 50;
-  const hist: BugHistory["bugs"] = [];
+
+  const results: BugHistory["bugs"] = [];
+  const CONCURRENCY = 5; // up to 5 in-flight requests
   let handled = 0;
-  for (let i = 0; i < ids.length; i += CHUNK) {
-    const chunk = ids.slice(i, i + CHUNK);
-    try {
-      const payload = (await bzGet(
-        env,
-        `/bug/${chunk.join(",")}/history`
-      )) as BugHistory;
-      hist.push(...payload.bugs);
-      handled += chunk.length;
-      hooks.progress?.("histories", handled, ids.length);
-    } catch (e: any) {
-      // Try mini-batches (reduce further) before going fully per-ID.
-      hooks.warn?.(`Batch history failed; retrying in mini-batches…`);
-      const MINI = 10;
-      for (let j = 0; j < chunk.length; j += MINI) {
-        const mini = chunk.slice(j, j + MINI);
-        try {
-          const payload = (await bzGet(
-            env,
-            `/bug/${mini.join(",")}/history`
-          )) as BugHistory;
-          hist.push(...payload.bugs);
-          handled += mini.length;
-          hooks.progress?.("histories", handled, ids.length);
-        } catch {
-          // Fall back to individual only for the troublesome mini-chunk
-          hooks.warn?.(
-            `Mini-batch failed; retrying individually (${mini.length})`
-          );
-          for (const id of mini) {
-            try {
-              const payload = (await bzGet(
-                env,
-                `/bug/${id}/history`
-              )) as BugHistory;
-              hist.push(...payload.bugs);
-            } catch {
-              hooks.warn?.(`Skipping history for #${id}`);
-            } finally {
-              handled += 1;
-              hooks.progress?.("histories", handled, ids.length);
-            }
-          }
-        }
+  let cursor = 0;
+
+  const worker = async () => {
+    while (true) {
+      const idx = cursor++;
+      if (idx >= ids.length) break;
+      const id = ids[idx];
+      try {
+        const payload = (await bzGet(env, `/bug/${id}/history`)) as BugHistory;
+        if (payload?.bugs?.length) results.push(...payload.bugs);
+      } catch {
+        hooks.warn?.(`Skipping history for #${id}`);
+      } finally {
+        handled += 1;
+        hooks.progress?.("histories", handled, ids.length);
       }
     }
-  }
-  return hist;
+  };
+
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  return results;
 }
 
 function qualifiesByHistory(hb: BugHistory["bugs"][number], sinceISO: string) {
