@@ -32,11 +32,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     model = "gpt-5",
     debug = false,
     voice = "normal",
+    skipCache = false,
   } = body || {};
 
   const url = new URL(request.url);
   const accept = request.headers.get("accept") || "";
-  const streamHeader = (request.headers.get("x-snazzy-stream") || "").toLowerCase();
+  const streamHeader = (
+    request.headers.get("x-snazzy-stream") || ""
+  ).toLowerCase();
   const streamParam = (url.searchParams.get("stream") || "").toLowerCase();
   const wantsStream =
     accept.includes("application/x-ndjson") ||
@@ -49,6 +52,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     OPENAI_API_KEY: env.OPENAI_API_KEY,
     BUGZILLA_API_KEY: env.BUGZILLA_API_KEY,
     BUGZILLA_HOST: env.BUGZILLA_HOST,
+    SNAZZY_SKIP_CACHE: Boolean(skipCache),
   };
 
   const params = {
@@ -73,16 +77,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         },
       });
     } catch (e: any) {
-      return new Response(
-        JSON.stringify({ error: e?.message || String(e) }),
-        {
-          status: 500,
-          headers: {
-            "content-type": "application/json; charset=utf-8",
-            "cache-control": "no-store",
-          },
-        }
-      );
+      return new Response(JSON.stringify({ error: e?.message || String(e) }), {
+        status: 500,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store",
+        },
+      });
     }
   }
 

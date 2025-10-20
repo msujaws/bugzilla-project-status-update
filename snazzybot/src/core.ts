@@ -20,6 +20,8 @@ export type EnvLike = {
   BUGZILLA_API_KEY: string;
   OPENAI_API_KEY: string;
   BUGZILLA_HOST?: string; // default https://bugzilla.mozilla.org
+  /** When true, do not read/write the Bugzilla response cache */
+  SNAZZY_SKIP_CACHE?: boolean;
 };
 
 export type ProgressHooks = {
@@ -101,18 +103,21 @@ async function bzGet(
   url.searchParams.set("api_key", env.BUGZILLA_API_KEY);
 
   const key = url.toString();
+  const bypass = !!env.SNAZZY_SKIP_CACHE;
 
   // Cloudflare Cache first (if available)
   const cfCache = (globalThis as any).caches?.default;
-  if (cfCache) {
+  if (!bypass && cfCache) {
     const cached = await cfCache.match(key);
     if (cached) {
       return cached.json();
     }
   } else {
-    // Node memory cache
-    const hit = memCache.get(key);
-    if (hit && hit.exp > Date.now()) return hit.json;
+    // Node memory cache (read) only when not bypassing
+    if (!bypass) {
+      const hit = memCache.get(key);
+      if (hit && hit.exp > Date.now()) return hit.json;
+    }
   }
 
   const r = await fetch(key);
@@ -120,7 +125,7 @@ async function bzGet(
   const json = await r.json();
 
   // Store into Cloudflare cache (immutable for 1 day), else mem cache
-  if (cfCache) {
+  if (!bypass && cfCache) {
     // Clone JSON into a Response with Cache-Control so Cloudflare honors TTL
     const resp = new Response(JSON.stringify(json), {
       headers: {
@@ -130,8 +135,10 @@ async function bzGet(
       },
     });
     // Ignore failures; caching is opportunistic
-    try { await cfCache.put(key, resp); } catch {}
-  } else {
+    try {
+      await cfCache.put(key, resp);
+    } catch {}
+  } else if (!bypass) {
     memCache.set(key, { exp: Date.now() + ONE_DAY_MS, json });
   }
   return json;
@@ -260,10 +267,15 @@ async function fetchHistoriesRobust(
           hooks.progress?.("histories", handled, ids.length);
         } catch {
           // Fall back to individual only for the troublesome mini-chunk
-          hooks.warn?.(`Mini-batch failed; retrying individually (${mini.length})`);
+          hooks.warn?.(
+            `Mini-batch failed; retrying individually (${mini.length})`
+          );
           for (const id of mini) {
             try {
-              const payload = (await bzGet(env, `/bug/${id}/history`)) as BugHistory;
+              const payload = (await bzGet(
+                env,
+                `/bug/${id}/history`
+              )) as BugHistory;
               hist.push(...payload.bugs);
             } catch {
               hooks.warn?.(`Skipping history for #${id}`);

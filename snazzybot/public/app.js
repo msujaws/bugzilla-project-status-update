@@ -408,6 +408,7 @@ if (runButton) {
     const days = Number($("days")?.value) || 8;
     const voice = $("voice")?.value || "normal";
     const debug = $("debug")?.value === "true";
+    const skipCache = $("cache")?.value === "false";
 
     const sp = new URLSearchParams();
     // Store raw textarea strings; they're newline-safe in params.
@@ -417,6 +418,8 @@ if (runButton) {
     sp.set("days", String(days));
     sp.set("voice", voice);
     sp.set("debug", String(debug));
+    if (skipCache) sp.set("nocache", "1");
+    else sp.delete("nocache");
     history.replaceState(null, "", `?${sp.toString()}`);
 
     currentVoice = voice;
@@ -428,6 +431,7 @@ if (runButton) {
       format: "md",
       voice,
       debug,
+      skipCache,
     });
   });
 }
@@ -445,6 +449,7 @@ function hydrateFromURL() {
   if (sp.has("voice")) set("voice", sp.get("voice") || "normal");
   if (sp.has("debug"))
     set("debug", sp.get("debug") === "true" ? "true" : "false");
+  if (sp.has("nocache")) set("cache", "false");
 }
 hydrateFromURL();
 

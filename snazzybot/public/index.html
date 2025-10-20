@@ -117,6 +117,13 @@
                 <option value="true">Yes</option>
               </select>
             </div>
+            <div>
+              <label for="cache">Cache (TTL 1d)</label>
+              <select id="cache">
+                <option value="true" selected>Yes</option>
+                <option value="false">No</option>
+              </select>
+            </div>
           </div>
 
           <div class="actions">
@@ -226,11 +233,10 @@
       </div>
 
       <p class="footer">
-        (<a
-          href="https://github.com/msujaws/bugzilla-project-status-update"
+        (<a href="https://github.com/msujaws/bugzilla-project-status-update"
           >source</a
-        >) ✨
-        created by :jaws  — logo contributed by :jhirsch - name contributed by :sclements
+        >) ✨ created by :jaws — logo contributed by :jhirsch - name contributed
+        by :sclements
       </p>
     </div>
     <canvas id="fx-layer" aria-hidden="true"></canvas>

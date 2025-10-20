@@ -26,6 +26,11 @@ const argv = yargs(hideBin(process.argv))
   .option("model", { type: "string", default: "gpt-5" })
   .option("format", { choices: ["md", "html"] as const, default: "md" })
   .option("debug", { type: "boolean", default: false })
+  .option("no-cache", {
+    type: "boolean",
+    default: false,
+    desc: "Bypass Bugzilla cache",
+  })
   .option("voice", {
     choices: ["normal", "pirate", "snazzy-robot"] as const,
     default: "normal",
@@ -43,8 +48,17 @@ if (!BUGZILLA_API_KEY || !OPENAI_API_KEY) {
 }
 
 const env = BUGZILLA_HOST
-  ? { BUGZILLA_API_KEY, OPENAI_API_KEY, BUGZILLA_HOST }
-  : { BUGZILLA_API_KEY, OPENAI_API_KEY };
+  ? {
+      BUGZILLA_API_KEY,
+      OPENAI_API_KEY,
+      BUGZILLA_HOST,
+      SNAZZY_SKIP_CACHE: Boolean(argv["no-cache"]),
+    }
+  : {
+      BUGZILLA_API_KEY,
+      OPENAI_API_KEY,
+      SNAZZY_SKIP_CACHE: Boolean(argv["no-cache"]),
+    };
 
 const hooks = {
   info: (m: string) => console.error("[INFO]", m),
