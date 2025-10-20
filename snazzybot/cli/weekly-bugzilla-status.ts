@@ -35,6 +35,11 @@ const argv = yargs(hideBin(process.argv))
     choices: ["normal", "pirate", "snazzy-robot"] as const,
     default: "normal",
   })
+  .option("audience", {
+    choices: ["technical", "product", "leadership"] as const,
+    default: "technical",
+    desc: "Tailor summary depth and framing",
+  })
   .help()
   .strict()
   .parseSync();
@@ -102,6 +107,7 @@ const hooks = {
         format: argv.format,
         debug: argv.debug,
         voice: argv.voice,
+        audience: argv.audience,
       },
       env,
       hooks

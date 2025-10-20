@@ -156,7 +156,7 @@ select:focus {
 .row {
   display: grid;
   gap: 14px;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
 }
 
 .row-2 {

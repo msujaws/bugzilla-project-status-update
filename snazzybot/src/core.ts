@@ -14,6 +14,7 @@ export type GenerateParams = {
   format?: "md" | "html"; // output format (only affects final link wrapper, not body)
   debug?: boolean;
   voice?: "normal" | "pirate" | "snazzy-robot";
+  audience?: "technical" | "product" | "leadership";
 };
 
 export type EnvLike = {
@@ -343,7 +344,8 @@ async function openaiAssessAndSummarize(
   model: string,
   bugs: Bug[],
   days: number,
-  voice: "normal" | "pirate" | "snazzy-robot" = "normal"
+  voice: "normal" | "pirate" | "snazzy-robot" = "normal",
+  audience: "technical" | "product" | "leadership" = "technical"
 ) {
   const voiceHint =
     voice === "pirate"
@@ -351,12 +353,27 @@ async function openaiAssessAndSummarize(
       : voice === "snazzy-robot"
       ? "Write as a friendly, upbeat robot narrator (light ‘beep boop’, ‘systems nominal’). Keep it human-readable and charming, not spammy."
       : "Write in a clear, friendly, professional tone.";
+
+  const audienceHint =
+    audience === "technical"
+      ? "Audience: engineers. Include specific technical details where valuable (file/feature areas, prefs/flags, APIs, perf metrics, platform scopes). Assume context; keep acronyms if common. Avoid business framing."
+      : audience === "leadership"
+      ? "Audience: leadership. Be high-level and concise. Focus on user/business impact, risks, timelines, and cross-team blockers. Avoid low-level tech details and code paths."
+      : "Audience: product managers. Emphasize user impact, product implications, rollout/experimentation notes, and notable tradeoffs. Include light technical context only when it clarifies impact.";
+
+  const lengthHint =
+    audience === "technical"
+      ? "~220 words total."
+      : audience === "leadership"
+      ? "~120 words total."
+      : "~170 words total.";
   // System prompt: NO demo section request here (script appends its own later).
   const system =
     "You are an expert release PM creating a short, spoken weekly update.\n" +
     "Focus ONLY on user impact. Skip items with no obvious user impact.\n" +
-    "Keep the overall summary ~170 words. Output valid JSON only.\n" +
-    voiceHint;
+    `Keep the overall summary ${lengthHint} Output valid JSON only.\n` +
+    `${voiceHint}\n` +
+    `${audienceHint}`;
 
   const user = `Data window: last ${days} days.
 Bugs (done/fixed):
@@ -499,7 +516,8 @@ export async function generateStatus(
     model,
     aiCandidates,
     days,
-    params.voice ?? "normal"
+    params.voice ?? "normal",
+    params.audience ?? "technical"
   );
 
   // Build ONE canonical Demo suggestions section (no duplication)

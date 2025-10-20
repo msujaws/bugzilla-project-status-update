@@ -407,6 +407,7 @@ if (runButton) {
     const whiteboards = parseLines($("whiteboards")?.value || "");
     const days = Number($("days")?.value) || 8;
     const voice = $("voice")?.value || "normal";
+    const audience = $("audience")?.value || "technical";
     const debug = $("debug")?.value === "true";
     const skipCache = $("cache")?.value === "false";
 
@@ -417,6 +418,7 @@ if (runButton) {
     sp.set("metabugs", $("metabugs")?.value || "");
     sp.set("days", String(days));
     sp.set("voice", voice);
+    sp.set("aud", audience);
     sp.set("debug", String(debug));
     if (skipCache) sp.set("nocache", "1");
     else sp.delete("nocache");
@@ -430,6 +432,7 @@ if (runButton) {
       days,
       format: "md",
       voice,
+      audience,
       debug,
       skipCache,
     });
@@ -447,6 +450,7 @@ function hydrateFromURL() {
   if (sp.has("metabugs")) set("metabugs", sp.get("metabugs") || "");
   if (sp.has("days")) set("days", sp.get("days") || "7");
   if (sp.has("voice")) set("voice", sp.get("voice") || "normal");
+  if (sp.has("aud")) set("audience", sp.get("aud") || "technical");
   if (sp.has("debug"))
     set("debug", sp.get("debug") === "true" ? "true" : "false");
   if (sp.has("nocache")) set("cache", "false");

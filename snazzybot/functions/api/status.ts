@@ -33,6 +33,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     debug = false,
     voice = "normal",
     skipCache = false,
+    audience = "technical",
   } = body || {};
 
   const url = new URL(request.url);
@@ -64,6 +65,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     model,
     debug,
     voice,
+    audience,
   };
 
   if (!wantsStream) {
