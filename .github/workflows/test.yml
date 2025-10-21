@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install deps
+        run: npm ci --prefer-offline --no-audit
+        working-directory: snazzybot
+      - name: Unit & Integration (Vitest)
+        run: npm run coverage
+        working-directory: snazzybot
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+        working-directory: snazzybot
+      - name: E2E (Playwright)
+        run: npm run test:e2e
+        working-directory: snazzybot
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: snazzybot/coverage/lcov.info

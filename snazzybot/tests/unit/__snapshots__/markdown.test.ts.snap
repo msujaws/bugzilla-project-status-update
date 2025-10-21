@@ -1,0 +1,13 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`markdown helpers > renders simple doc to HTML (headers, lists) 1`] = `
+"<h1>T</h1>
+<ul>
+<li>A</li>
+<li>B</li>
+</ul>
+<ol>
+<li>X</li>
+<li>Y</li>
+</ol>"
+`;

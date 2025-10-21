@@ -1,0 +1,12 @@
+{
+  "id": 1987802,
+  "summary": "[a11y] Remove VPN toggle hover tooltip",
+  "product": "Firefox",
+  "component": "IP Protection",
+  "status": "RESOLVED",
+  "resolution": "FIXED",
+  "last_change_time": "2025-10-21T09:36:11Z",
+  "groups": [],
+  "depends_on": [],
+  "blocks": []
+}

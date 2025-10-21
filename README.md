@@ -47,14 +47,11 @@ BUGZILLA_API_KEY="..." OPENAI_API_KEY="..." \
 
 This serves the assets in `snazzybot/public` and proxies API calls through the local worker.
 
-## Legacy Script
-
-The original root-level script remains available:
+## Local Testing
 
 ```bash
-npm install
-BUGZILLA_API_KEY="..." OPENAI_API_KEY="..." \
-  npm run status -- --component "Firefox:General" --days 8
+cd snazzybot
+npm ci
+npm run test:watch
+npm run test:e2e
 ```
-
-Its flags mirror the CLI options described above, with markdown output to stdout.

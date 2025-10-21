@@ -1,3 +1,6 @@
 node_modules/
 snazzybot/.env
 snazzybot/.wrangler/
+snazzybot/coverage/
+snazzybot/test-results/
+snazzybot/playwright-report/
