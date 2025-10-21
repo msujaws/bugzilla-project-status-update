@@ -15,6 +15,8 @@ export type GenerateParams = {
   debug?: boolean;
   voice?: "normal" | "pirate" | "snazzy-robot";
   audience?: "technical" | "product" | "leadership";
+  // Optional: directly summarize a known set of bug IDs
+  ids?: number[];
 };
 
 export type EnvLike = {
@@ -231,25 +233,15 @@ async function fetchByIds(env: EnvLike, ids: number[], sinceISO: string) {
   );
 }
 
-/**
- * Bugzilla quirk (b.m.o): history for multiple bugs must be fetched via:
- *   /rest/bug?id=123,456/history
- * i.e., "/history" is appended to the *value* of the id query, not as a path segment.
- */
-async function bzGetHistory(
-  env: EnvLike,
-  ids: number[]
-): Promise<BugHistory> {
+async function bzGetHistorySingle(env: EnvLike, id: number): Promise<BugHistory> {
   const host = env.BUGZILLA_HOST || "https://bugzilla.mozilla.org";
-  const url = new URL(`${host}/rest/bug`);
-  // Important: append "/history" to the id value
-  url.searchParams.set("id", `${ids.join(",")}/history`);
-  url.searchParams.set("api_key", env.BUGZILLA_API_KEY);
-
-  // Reuse caching layer semantics manually (keyed by full URL)
-  const key = url.toString();
   const bypass = !!env.SNAZZY_SKIP_CACHE;
   const cfCache = (globalThis as any).caches?.default;
+
+  const url = new URL(`${host}/rest/bug/${id}/history`);
+  url.searchParams.set("api_key", env.BUGZILLA_API_KEY);
+  const key = url.toString();
+
   if (!bypass && cfCache) {
     const cached = await cfCache.match(key);
     if (cached) return cached.json();
@@ -286,36 +278,33 @@ async function fetchHistoriesRobust(
   hooks: ProgressHooks
 ) {
   if (!ids.length) return [] as BugHistory["bugs"];
+
   hooks.phase?.("histories", { total: ids.length });
+  hooks.info?.(`History mode: per-ID /rest/bug/<id>/history (concurrency=8)`);
 
-  // Always use the b.m.o-compatible batch route via bzGetHistory,
-  // but keep batches small to control URL size + subrequest count.
-  const CHUNK = 25;
-  const out: BugHistory["bugs"] = [];
+  const CONCURRENCY = 8; // polite on Workers & Bugzilla
   let handled = 0;
-  hooks.info?.(`History mode: b.m.o batch via ?id=…/history (chunk=${CHUNK})`);
+  const out: BugHistory["bugs"] = [];
 
-  for (let i = 0; i < ids.length; i += CHUNK) {
-    const slice = ids.slice(i, i + CHUNK);
-    try {
-      const payload = await bzGetHistory(env, slice);
-      out.push(...(payload?.bugs || []));
-    } catch {
-      // Rarely, a batch may fail; try per-ID with the same route form.
-      hooks.warn?.(`Batch history failed for ${slice.length} IDs; falling back individually`);
-      for (const id of slice) {
-        try {
-          const payload = await bzGetHistory(env, [id]);
-          out.push(...(payload?.bugs || []));
-        } catch {
-          hooks.warn?.(`Skipping history for #${id}`);
-        }
+  // Simple worker pool
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < ids.length) {
+      const idx = cursor++;
+      const id = ids[idx];
+      try {
+        const payload = await bzGetHistorySingle(env, id);
+        if (payload?.bugs?.length) out.push(payload.bugs[0]);
+      } catch (e) {
+        hooks.warn?.(`Skipping history for #${id} (${(e as Error)?.message || e})`);
+      } finally {
+        handled++;
+        hooks.progress?.("histories", handled, ids.length);
       }
-    } finally {
-      handled += slice.length;
-      hooks.progress?.("histories", Math.min(handled, ids.length), ids.length);
     }
-  }
+  };
+
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   return out;
 }
 
@@ -324,33 +313,27 @@ function qualifiesByHistory(hb: BugHistory["bugs"][number], sinceISO: string) {
   for (const h of hb.history || []) {
     const when = Date.parse(h.when);
     if (when < since) continue;
-    let newToResolved = false,
-      fixed = false,
-      resolvedToVerified = false,
-      verifiedToClosed = false;
+    // Accept common Bugzilla field names:
+    // - status can be "status" or "bug_status"
+    // - resolution is "resolution"
+    // Any change to {RESOLVED|VERIFIED|CLOSED} or resolution->FIXED in-window qualifies.
+    let statusProgress = false;
+    let fixed = false;
     for (const c of h.changes) {
+      const fn = c.field_name?.toLowerCase();
       if (
-        c.field_name === "status" &&
-        c.added === "RESOLVED" &&
-        /^(NEW|ASSIGNED)$/.test(c.removed)
-      )
-        newToResolved = true;
-      if (c.field_name === "resolution" && c.added === "FIXED") fixed = true;
-      if (
-        c.field_name === "status" &&
-        c.removed === "RESOLVED" &&
-        c.added === "VERIFIED"
-      )
-        resolvedToVerified = true;
-      if (
-        c.field_name === "status" &&
-        c.removed === "VERIFIED" &&
-        c.added === "CLOSED"
-      )
-        verifiedToClosed = true;
+        (fn === "status" || fn === "bug_status") &&
+        (c.added === "RESOLVED" ||
+          c.added === "VERIFIED" ||
+          c.added === "CLOSED")
+      ) {
+        statusProgress = true;
+      }
+      if (fn === "resolution" && c.added === "FIXED") {
+        fixed = true;
+      }
     }
-    if ((newToResolved && fixed) || resolvedToVerified || verifiedToClosed)
-      return true;
+    if (fixed || statusProgress) return true;
   }
   return false;
 }
@@ -369,29 +352,31 @@ function qualifiesByHistoryWhy(
     const when = Date.parse(h.when);
     if (when < since) continue;
     sawRecent = true;
-    let newToResolved = false,
-      fixed = false,
-      resolvedToVerified = false,
-      verifiedToClosed = false;
+    let statusProgress = false;
+    let fixed = false;
     for (const c of h.changes) {
+      const fn = c.field_name?.toLowerCase();
       if (
-        c.field_name === "status" &&
-        c.added === "RESOLVED" &&
-        /^(NEW|ASSIGNED)$/.test(c.removed)
-      )
-        newToResolved = true;
-      if (c.field_name === "resolution" && c.added === "FIXED") fixed = true;
-      if (c.field_name === "status" && c.removed === "RESOLVED" && c.added === "VERIFIED")
-        resolvedToVerified = true;
-      if (c.field_name === "status" && c.removed === "VERIFIED" && c.added === "CLOSED")
-        verifiedToClosed = true;
+        (fn === "status" || fn === "bug_status") &&
+        (c.added === "RESOLVED" ||
+          c.added === "VERIFIED" ||
+          c.added === "CLOSED")
+      ) {
+        statusProgress = true;
+      }
+      if (fn === "resolution" && c.added === "FIXED") {
+        fixed = true;
+      }
     }
-    if ((newToResolved && fixed) || resolvedToVerified || verifiedToClosed) {
+    if (fixed || statusProgress) {
       return { ok: true };
     }
   }
   if (!sawRecent) return { ok: false, why: "no recent history in window" };
-  return { ok: false, why: "no qualifying transitions (resolved/fixed/verify/close)" };
+  return {
+    ok: false,
+    why: "no qualifying transitions (bug_status/resolution)",
+  };
 }
 
 // ---------- Buglist (UI) link ----------
@@ -531,11 +516,79 @@ export async function generateStatus(
   env: EnvLike,
   hooks: ProgressHooks = defaultHooks
 ): Promise<{ output: string; ids: number[] }> {
+  // If caller passes explicit IDs, skip discovery & history and just summarize.
+  if (params.ids && params.ids.length) {
+    const days = params.days ?? 8;
+    const model = params.model ?? "gpt-5";
+    const sinceISO = isoDaysAgo(days);
+    const pcs = params.components ?? [];
+    const wbs = params.whiteboards ?? [];
+
+    const ids = params.ids.slice();
+    hooks.info?.(`Summarizing ${ids.length} pre-qualified bugs…`);
+
+    // Build link and run OpenAI on *metadata* (fetch fields again to render titles/products)
+    const { bugs } = (await bzGet(env, `/bug`, {
+      id: ids.join(","),
+      include_fields: BUG_FIELDS.join(","),
+    })) as { bugs: Bug[] };
+
+    const link = buildBuglistURL({
+      sinceISO,
+      whiteboards: wbs,
+      ids,
+      components: pcs,
+      host: env.BUGZILLA_HOST,
+    });
+
+    const limited = bugs.slice(0, Math.min(bugs.length, MAX_BUGS_FOR_OPENAI));
+    if (bugs.length > MAX_BUGS_FOR_OPENAI) {
+      hooks.warn?.(
+        `Trimming ${
+          bugs.length - MAX_BUGS_FOR_OPENAI
+        } bug(s) before OpenAI call to stay within token limits`
+      );
+    }
+
+    hooks.phase?.("openai");
+    const ai = await openaiAssessAndSummarize(
+      env,
+      model,
+      limited,
+      days,
+      params.voice ?? "normal",
+      params.audience ?? "product"
+    );
+
+    const demo = (ai.assessments || [])
+      .filter((a) => Number(a.impact_score) >= 6 && a.demo_suggestion)
+      .map(
+        (a) =>
+          `- [Bug ${a.bug_id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${a.bug_id}): ${a.demo_suggestion}`
+      );
+
+    let summary = (ai.summary_md || "").trim();
+    summary = summary
+      .replace(/(^|\n)+#{0,2}\s*Demo suggestions[\s\S]*$/i, "")
+      .trim();
+    if (demo.length) summary += `\n\n## Demo suggestions\n` + demo.join("\n");
+
+    const output =
+      params.format === "html"
+        ? markdownToHtml(summary) +
+          `\n<p><a href="${escapeHtml(link)}">View bugs in Bugzilla</a></p>`
+        : `${summary}\n\n[View bugs in Bugzilla](${link})`;
+
+    return { output, ids };
+  }
+
   const days = params.days ?? 8;
   const model = params.model ?? "gpt-5";
   const sinceISO = isoDaysAgo(days);
   const isDebug = !!params.debug;
-  const dlog = (m: string) => { if (isDebug) hooks.info?.(`[debug] ${m}`); };
+  const dlog = (m: string) => {
+    if (isDebug) hooks.info?.(`[debug] ${m}`);
+  };
 
   const pcs = params.components ?? [];
   const wbs = params.whiteboards ?? [];
@@ -557,24 +610,44 @@ export async function generateStatus(
   ]);
 
   if (isDebug) {
-    dlog(`source counts → metabug children: ${idsFromMetabugs.length}, byComponents: ${byComponents.length}, byWhiteboards: ${byWhiteboards.length}`);
-    const sample = (arr: any[], n = 8) => arr.slice(0, n).map((b: any) => b.id ?? b).join(", ");
-    if (byComponents.length) dlog(`byComponents sample IDs: ${sample(byComponents)}`);
-    if (byWhiteboards.length) dlog(`byWhiteboards sample IDs: ${sample(byWhiteboards)}`);
+    dlog(
+      `source counts → metabug children: ${idsFromMetabugs.length}, byComponents: ${byComponents.length}, byWhiteboards: ${byWhiteboards.length}`
+    );
+    const sample = (arr: any[], n = 8) =>
+      arr
+        .slice(0, n)
+        .map((b: any) => b.id ?? b)
+        .join(", ");
+    if (byComponents.length)
+      dlog(`byComponents sample IDs: ${sample(byComponents)}`);
+    if (byWhiteboards.length)
+      dlog(`byWhiteboards sample IDs: ${sample(byWhiteboards)}`);
   }
 
   const byIds = await fetchByIds(env, idsFromMetabugs, sinceISO);
-  if (isDebug) dlog(`byIds (filtered) count: ${byIds.length} (from metabug children)`);
+  if (isDebug)
+    dlog(`byIds (filtered) count: ${byIds.length} (from metabug children)`);
 
   // Union + security filter
   const seen = new Set<number>();
-  const union = [...byComponents, ...byWhiteboards, ...byIds].filter((b) => !seen.has(b.id) && seen.add(b.id));
+  const union = [...byComponents, ...byWhiteboards, ...byIds].filter(
+    (b) => !seen.has(b.id) && seen.add(b.id)
+  );
   const securityFiltered = union.filter((b) => isSecurityRestricted(b.groups));
   let candidates = union.filter((b) => !isSecurityRestricted(b.groups));
 
   if (isDebug) {
     dlog(`union candidates: ${union.length}`);
-    dlog(`security-restricted removed: ${securityFiltered.length}${securityFiltered.length ? ` (sample: ${securityFiltered.slice(0,6).map(b=>b.id).join(", ")})` : ""}`);
+    dlog(
+      `security-restricted removed: ${securityFiltered.length}${
+        securityFiltered.length
+          ? ` (sample: ${securityFiltered
+              .slice(0, 6)
+              .map((b) => b.id)
+              .join(", ")})`
+          : ""
+      }`
+    );
     dlog(`candidates after security filter: ${candidates.length}`);
   }
 
@@ -600,13 +673,32 @@ export async function generateStatus(
   };
 
   const allowed = new Set<number>();
+  // Optional debug peek: show a couple of raw changes so we can see field names
+  if (isDebug) {
+    let shown = 0;
+    for (const b of candidates) {
+      if (shown >= 3) break;
+      const h = byIdHistory.get(b.id);
+      const changes = h?.history?.[0]?.changes || [];
+      if (changes.length) {
+        hooks.info?.(
+          `[debug] sample history #${b.id} first changes: ${JSON.stringify(
+            changes.slice(0, 2)
+          )}`
+        );
+        shown++;
+      }
+    }
+  }
   for (const b of candidates) {
     const h = byIdHistory.get(b.id);
     if (!h) {
       if (isDebug) bump("no history returned for id", b.id);
       continue;
     }
-    const q = isDebug ? qualifiesByHistoryWhy(h, sinceISO) : { ok: qualifiesByHistory(h, sinceISO) };
+    const q = isDebug
+      ? qualifiesByHistoryWhy(h, sinceISO)
+      : { ok: qualifiesByHistory(h, sinceISO) };
     if (q.ok) {
       allowed.add(b.id);
     } else if (isDebug) {
@@ -616,33 +708,49 @@ export async function generateStatus(
 
   if (isDebug) {
     // Summarize reasons
-    const entries = [...reasonCounts.entries()].sort((a,b)=>b[1]-a[1]);
+    const entries = [...reasonCounts.entries()].sort((a, b) => b[1] - a[1]);
     if (entries.length) {
       dlog(`non-qualified reasons (top):`);
       for (const [why, count] of entries) {
         const ids = reasonExamples.get(why) || [];
-        dlog(`  • ${why}: ${count}${ids.length ? ` (eg: ${ids.join(", ")})` : ""}`);
+        dlog(
+          `  • ${why}: ${count}${ids.length ? ` (eg: ${ids.join(", ")})` : ""}`
+        );
       }
     }
     // Coverage gap
     if (histories.length !== candidates.length) {
       const missing = candidates
-        .map((b)=>b.id)
-        .filter((id)=>!byIdHistory.has(id))
-        .slice(0,12);
-      dlog(`history coverage: ${histories.length}/${candidates.length}${missing.length ? ` (no history for: ${missing.join(", ")})` : ""}`);
+        .map((b) => b.id)
+        .filter((id) => !byIdHistory.has(id))
+        .slice(0, 12);
+      dlog(
+        `history coverage: ${histories.length}/${candidates.length}${
+          missing.length ? ` (no history for: ${missing.join(", ")})` : ""
+        }`
+      );
     } else {
-      dlog(`history coverage: ${histories.length}/${candidates.length} (complete)`);
+      dlog(
+        `history coverage: ${histories.length}/${candidates.length} (complete)`
+      );
     }
-  }  const final = candidates.filter((b) => allowed.has(b.id));
+  }
+  const final = candidates.filter((b) => allowed.has(b.id));
 
   hooks.info?.(`Qualified bugs: ${final.length}`);
 
   if (isDebug) {
     if (final.length) {
-      dlog(`qualified IDs: ${final.slice(0, 20).map(b=>b.id).join(", ")}${final.length>20?" …":""}`);
+      dlog(
+        `qualified IDs: ${final
+          .slice(0, 20)
+          .map((b) => b.id)
+          .join(", ")}${final.length > 20 ? " …" : ""}`
+      );
     } else {
-      dlog(`no qualified bugs → check reasons above; also verify statuses/resolution and history window.`);
+      dlog(
+        `no qualified bugs → check reasons above; also verify statuses/resolution and history window.`
+      );
     }
   }
 
@@ -670,9 +778,20 @@ export async function generateStatus(
       `Trimming ${trimmedCount} bug(s) before OpenAI call to stay within token limits`
     );
     aiCandidates = final.slice(0, MAX_BUGS_FOR_OPENAI);
-    if (isDebug) dlog(`OpenAI candidate IDs (trimmed to ${MAX_BUGS_FOR_OPENAI}): ${aiCandidates.slice(0,30).map(b=>b.id).join(", ")}${final.length>30?" …":""}`);
+    if (isDebug)
+      dlog(
+        `OpenAI candidate IDs (trimmed to ${MAX_BUGS_FOR_OPENAI}): ${aiCandidates
+          .slice(0, 30)
+          .map((b) => b.id)
+          .join(", ")}${final.length > 30 ? " …" : ""}`
+      );
   } else if (isDebug) {
-    dlog(`OpenAI candidate IDs (${aiCandidates.length}): ${aiCandidates.slice(0,30).map(b=>b.id).join(", ")}${aiCandidates.length>30?" …":""}`);
+    dlog(
+      `OpenAI candidate IDs (${aiCandidates.length}): ${aiCandidates
+        .slice(0, 30)
+        .map((b) => b.id)
+        .join(", ")}${aiCandidates.length > 30 ? " …" : ""}`
+    );
   }
 
   // OpenAI (indeterminate step; caller shows spinner)
@@ -725,4 +844,83 @@ export async function generateStatus(
       : `${summary}\n\n[View bugs in Bugzilla](${link})`;
 
   return { output, ids: final.map((b) => b.id) };
+}
+
+export async function discoverCandidates(
+  params: Omit<GenerateParams, "ids">,
+  env: EnvLike,
+  hooks: ProgressHooks = defaultHooks
+): Promise<{ sinceISO: string; candidates: Bug[] }> {
+  const days = params.days ?? 8;
+  const sinceISO = isoDaysAgo(days);
+  const pcs = params.components ?? [];
+  const wbs = params.whiteboards ?? [];
+  const meta = params.metabugs ?? [];
+
+  hooks.info?.(`Window: last ${days} days (since ${sinceISO})`);
+  if (wbs.length) hooks.info?.(`Whiteboard filters: ${wbs.join(", ")}`);
+  if (pcs.length)
+    hooks.info?.(
+      `Components: ${pcs.map((p) => `${p.product}:${p.component}`).join(", ")}`
+    );
+  if (meta.length) hooks.info?.(`Metabugs: ${meta.join(", ")}`);
+
+  const [idsFromMetabugs, byComponents, byWhiteboards] = await Promise.all([
+    fetchMetabugChildren(env, meta, hooks),
+    fetchByComponents(env, pcs, sinceISO),
+    fetchByWhiteboards(env, wbs, sinceISO, hooks),
+  ]);
+
+  const byIds = await fetchByIds(env, idsFromMetabugs, sinceISO);
+  const seen = new Set<number>();
+  const union = [...byComponents, ...byWhiteboards, ...byIds].filter(
+    (b) => !seen.has(b.id) && seen.add(b.id)
+  );
+  const candidates = union.filter((b) => !isSecurityRestricted(b.groups));
+
+  hooks.info?.(`Candidates after initial query: ${candidates.length}`);
+  return { sinceISO, candidates };
+}
+
+export async function qualifyHistoryPage(
+  env: EnvLike,
+  sinceISO: string,
+  candidates: Bug[],
+  cursor: number,
+  pageSize: number,
+  hooks: ProgressHooks = defaultHooks,
+  debug = false
+): Promise<{
+  qualifiedIds: number[];
+  nextCursor: number | null;
+  total: number;
+}> {
+  const start = Math.max(0, cursor | 0);
+  const end = Math.min(candidates.length, start + Math.max(1, pageSize | 0));
+  const slice = candidates.slice(start, end);
+  hooks.phase?.("histories", { total: slice.length });
+
+  // Fetch histories for this slice only
+  const histories = await fetchHistoriesRobust(
+    env,
+    slice.map((b) => b.id),
+    hooks
+  );
+  const byIdHistory = new Map<number, BugHistory["bugs"][number]>();
+  for (const h of histories) byIdHistory.set(h.id, h);
+
+  const qualified: number[] = [];
+  for (const b of slice) {
+    const h = byIdHistory.get(b.id);
+    if (!h) continue;
+    const ok = qualifiesByHistory(h, sinceISO);
+    if (ok) qualified.push(b.id);
+  }
+
+  const nextCursor = end < candidates.length ? end : null;
+  if (debug)
+    hooks.info?.(
+      `[debug] page qualified=${qualified.length} (cursor ${start}→${end}/${candidates.length})`
+    );
+  return { qualifiedIds: qualified, nextCursor, total: candidates.length };
 }

@@ -1,5 +1,5 @@
 // functions/api/status.ts
-import { generateStatus } from "../../src/core";
+import { generateStatus, discoverCandidates, qualifyHistoryPage } from "../../src/core";
 
 type Env = {
   OPENAI_API_KEY: string;
@@ -34,6 +34,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     voice = "normal",
     skipCache = false,
     audience = "technical",
+    mode = "oneshot", // "discover" | "page" | "finalize" | "oneshot" (legacy)
+    cursor = 0,
+    pageSize = 35,
+    // only for finalize
+    ids = [],
   } = body || {};
 
   const url = new URL(request.url);
@@ -66,9 +71,78 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     debug,
     voice,
     audience,
-  };
+  } as const;
 
   if (!wantsStream) {
+    // ---- Paging protocol ----
+    if (mode === "discover") {
+      try {
+        const { sinceISO, candidates } = await discoverCandidates(params, envConfig);
+        return new Response(
+          JSON.stringify({
+            sinceISO,
+            total: candidates.length,
+            // return a compact array to hold in the client between calls
+            candidates: candidates.map((b) => ({
+              id: b.id,
+              last_change_time: b.last_change_time,
+              product: b.product,
+              component: b.component,
+            })),
+          }),
+          { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } }
+        );
+      } catch (e: any) {
+        return new Response(JSON.stringify({ error: e?.message || String(e) }), {
+          status: 500,
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+        });
+      }
+    }
+    if (mode === "page") {
+      try {
+        const { sinceISO, candidates } = await discoverCandidates(params, envConfig);
+        const { qualifiedIds, nextCursor, total } = await qualifyHistoryPage(
+          envConfig,
+          sinceISO,
+          candidates,
+          Number(cursor) || 0,
+          Number(pageSize) || 35,
+          {
+            info: (msg: string) => debug && console.log("[INFO]", msg),
+            warn: (msg: string) => console.warn("[WARN]", msg),
+            phase: () => {},
+            progress: () => {},
+          },
+          !!debug
+        );
+        return new Response(
+          JSON.stringify({ qualifiedIds, nextCursor, total }),
+          { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } }
+        );
+      } catch (e: any) {
+        return new Response(JSON.stringify({ error: e?.message || String(e) }), {
+          status: 500,
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+        });
+      }
+    }
+    if (mode === "finalize") {
+      try {
+        const { output } = await generateStatus({ ...params, ids }, envConfig);
+        return new Response(JSON.stringify({ output }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+        });
+      } catch (e: any) {
+        return new Response(JSON.stringify({ error: e?.message || String(e) }), {
+          status: 500,
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+        });
+      }
+    }
+
+    // ---- Legacy one-shot (unchanged) ----
     try {
       const { output } = await generateStatus(params, envConfig);
       return new Response(JSON.stringify({ output }), {

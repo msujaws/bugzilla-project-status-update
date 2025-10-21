@@ -220,17 +220,8 @@ let lastMarkdown = "";
 let lastHTML = "";
 let currentVoice = "normal";
 
-// Stream-aware runner -------------------------------------------------------
-async function runSnazzy(body) {
-  const runBtn = $("run");
-  const spin = $("spin");
-  if (!runBtn || !spin) return;
-
-  runBtn.disabled = true;
-  setActionsEnabled(false);
-  spin.style.display = "inline-flex";
-  spin.textContent = "⏳ Starting…";
-
+// Helpers shared by both runners -------------------------------------------
+function resetUIBeforeRun() {
   const out = $("out");
   if (out) {
     out.textContent = "";
@@ -243,137 +234,184 @@ async function runSnazzy(body) {
   const quickStatus = $("quick-status");
   if (quickStatus) quickStatus.style.display = "none";
   setResultIframe("<em>Waiting for results…</em>");
+}
+
+// Streaming runner (NDJSON) -------------------------------------------------
+async function runSnazzyStream(body) {
+  const runBtn = $("run");
+  const spin = $("spin");
+  if (!runBtn || !spin) return;
+
+  runBtn.disabled = true;
+  setActionsEnabled(false);
+  spin.style.display = "inline-flex";
+  spin.textContent = "⏳ Starting…";
+  resetUIBeforeRun();
 
   try {
     const res = await fetch("/api/status", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        Accept: "application/x-ndjson",
+        // tell the Worker to use the streaming branch
+        "accept": "application/x-ndjson",
         "x-snazzy-stream": "1",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        ...body,
+        // no mode needed for streaming; the server does oneshot with hooks
+      }),
     });
-
-    const ctype = (res.headers.get("content-type") || "").toLowerCase();
-    if (!res.ok) {
-      if (ctype.includes("application/json")) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.error || data.msg || res.statusText || `HTTP ${res.status}`
-        );
-      }
-      const text = await res.text();
-      throw new Error(text.trim() || `HTTP ${res.status}`);
+    if (!res.ok || !res.body) {
+      const data = await res.text().catch(() => "");
+      throw new Error(data || res.statusText || `HTTP ${res.status}`);
     }
 
-    if (ctype.includes("application/json") && !ctype.includes("ndjson")) {
-      const data = await res.json();
-      lastMarkdown = data.output || "";
-      lastHTML = markdownToHtml(lastMarkdown);
-      setResultIframe(lastHTML);
-      setActionsEnabled(Boolean(lastMarkdown));
-      spin.style.display = "none";
-      if (quickStatus) {
-        quickStatus.textContent = "Served from cache";
-        quickStatus.style.display = "inline-flex";
-      }
-      return;
-    }
-
-    const bodyStream = res.body;
-    if (!bodyStream) throw new Error("No response body");
-    const reader = bodyStream.getReader();
-    const dec = new TextDecoder();
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
     let buf = "";
 
-    const processLine = (line) => {
-      let msg;
-      try {
-        msg = JSON.parse(line);
-      } catch {
-        return;
-      }
-
-      if (msg.kind === "start") {
-        spin.textContent = "⏳ Starting…";
-      }
-      if (msg.kind === "info") {
-        log("info", msg.msg);
-      }
-      if (msg.kind === "warn") {
-        log("warn", msg.msg);
-      }
-
-      if (msg.kind === "phase") {
-        const name = msg.name || "phase";
-        ensurePhase(name, msg.msg || name);
-        if (name === "openai") {
-          setPhaseText(name, msg.msg || "openai");
-          setPhaseIndeterminate(name);
-        } else {
-          setPhaseText(
-            name,
-            (msg.msg || name) + (msg.total ? ` (0/${msg.total})` : "")
-          );
-          if (msg.total) setPhasePct(name, 0, msg.total);
-        }
-        spin.textContent = `⏳ ${msg.msg || name}`;
-      }
-
-      if (msg.kind === "progress") {
-        const name = msg.phase || "phase";
-        if (name !== "openai") {
-          if (msg.total) {
-            setPhasePct(name, msg.current || 0, msg.total);
-            setPhaseText(
-              name,
-              `${name}: ${Math.round(
-                ((msg.current || 0) / msg.total) * 100
-              )}% (${msg.current}/${msg.total})`
-            );
+    const flushLine = (line) => {
+      if (!line.trim()) return;
+      let evt;
+      try { evt = JSON.parse(line); } catch { return; }
+      switch (evt.kind) {
+        case "start":
+          spin.textContent = "⏳ Discovering…";
+          break;
+        case "info":
+          log("info", evt.msg || "");
+          break;
+        case "warn":
+          log("warn", evt.msg || "");
+          break;
+        case "phase": {
+          const name = String(evt.name || "phase");
+          ensurePhase(name, name);
+          if (typeof evt.total === "number") {
+            setPhasePct(name, 0, evt.total || 1);
           } else {
-            setPhaseText(name, `${name}: ${msg.current ?? 0}`);
+            setPhaseIndeterminate(name);
           }
+          break;
         }
-      }
-
-      if (msg.kind === "error") {
-        log("error", msg.msg);
-        spin.style.display = "none";
-        setActionsEnabled(Boolean(lastMarkdown));
-        if (out) {
-          out.style.display = "block";
-          out.textContent = `ERROR: ${msg.msg}`;
+        case "progress": {
+          const name = String(evt.phase || "phase");
+          if (typeof evt.total === "number") {
+            setPhasePct(name, Number(evt.current) || 0, Number(evt.total) || 1);
+          } else {
+            setPhaseIndeterminate(name);
+          }
+          break;
         }
-      }
-
-      if (msg.kind === "done") {
-        lastMarkdown = msg.output || "";
-        lastHTML = markdownToHtml(lastMarkdown);
-        setResultIframe(lastHTML);
-        completePhase("openai");
-        setActionsEnabled(Boolean(lastMarkdown));
-        spin.style.display = "none";
-        if (out) out.style.display = "none";
-        burstEmojis(currentVoice);
+        case "done": {
+          lastMarkdown = (evt.output || "").trim();
+          lastHTML = markdownToHtml(lastMarkdown);
+          setResultIframe(lastHTML);
+          setActionsEnabled(Boolean(lastMarkdown));
+          spin.style.display = "none";
+          burstEmojis(currentVoice);
+          break;
+        }
+        case "error":
+          throw new Error(evt.msg || "Server error");
       }
     };
 
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
-      buf += dec.decode(value, { stream: true });
+      buf += decoder.decode(value, { stream: true });
       let idx;
       while ((idx = buf.indexOf("\n")) >= 0) {
-        const line = buf.slice(0, idx).trim();
+        const line = buf.slice(0, idx);
         buf = buf.slice(idx + 1);
-        if (line) processLine(line);
+        flushLine(line);
       }
     }
+    // flush any remaining partial (in case the stream ended without newline)
+    if (buf) flushLine(buf);
+  } catch (err) {
+    console.error(err);
+    const out = $("out");
+    if (out) {
+      out.style.display = "block";
+      const message =
+        err instanceof Error ? err.message : typeof err === "string" ? err : "";
+      out.textContent = `ERROR: ${message || "Unknown error"}`;
+    }
+    setActionsEnabled(Boolean(lastMarkdown));
+    $("spin")?.style && ( $("spin").style.display = "none" );
+  } finally {
+    const runBtn = $("run");
+    if (runBtn) runBtn.disabled = false;
+  }
+}
 
-    const tail = buf.trim();
-    if (tail) processLine(tail);
+// Existing paged runner (kept as fallback) ----------------------------------
+async function runSnazzyPaged(body) {
+  const runBtn = $("run");
+  const spin = $("spin");
+  if (!runBtn || !spin) return;
+
+  runBtn.disabled = true;
+  setActionsEnabled(false);
+  spin.style.display = "inline-flex";
+  spin.textContent = "⏳ Starting…";
+
+  resetUIBeforeRun();
+
+  const callJSON = async (payload) => {
+    const res = await fetch("/api/status", {
+      method: "POST",
+      headers: { "content-type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || res.statusText || `HTTP ${res.status}`);
+    }
+    return res.json();
+  };
+
+  try {
+    // 1) Discover all candidates (counts & compact metadata)
+    spin.style.display = "inline-flex";
+    spin.textContent = "⏳ Discovering…";
+    const discover = await callJSON({ ...body, mode: "discover" });
+    const total = discover.total || 0;
+    log("info", `Candidates: ${total}`);
+
+    // 2) Page through histories
+    const qualified = new Set();
+    let cursor = 0;
+    const step = Math.min(35, Math.max(20, Math.ceil(40))); // default ~35 per page
+    ensurePhase("histories", "histories");
+    while (cursor != null && cursor < total) {
+      spin.textContent = `⏳ Histories ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`;
+      setPhaseText("histories", `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`);
+      setPhasePct("histories", Math.min(cursor + step, total), total);
+      const page = await callJSON({ ...body, mode: "page", cursor, pageSize: step });
+      (page.qualifiedIds || []).forEach((id) => qualified.add(id));
+      cursor = page.nextCursor;
+    }
+    completePhase("histories");
+    log("info", `Qualified (history): ${qualified.size}`);
+
+    // 3) Finalize (OpenAI + output)
+    spin.textContent = "⏳ Summarizing…";
+    ensurePhase("openai", "openai");
+    setPhaseIndeterminate("openai");
+    const final = await callJSON({ ...body, mode: "finalize", ids: [...qualified] });
+    lastMarkdown = final.output || "";
+    lastHTML = markdownToHtml(lastMarkdown);
+    setResultIframe(lastHTML);
+    completePhase("openai");
+    setActionsEnabled(Boolean(lastMarkdown));
+    spin.style.display = "none";
+    const out = $("out");
+    if (out) out.style.display = "none";
+    burstEmojis(currentVoice);
   } catch (err) {
     console.error(err);
     setActionsEnabled(Boolean(lastMarkdown));
@@ -425,7 +463,7 @@ if (runButton) {
     history.replaceState(null, "", `?${sp.toString()}`);
 
     currentVoice = voice;
-    runSnazzy({
+    const payload = {
       components,
       metabugs,
       whiteboards,
@@ -435,7 +473,13 @@ if (runButton) {
       audience,
       debug,
       skipCache,
-    });
+    };
+    // If Debug = Yes, use streaming (shows live logs + progress)
+    if (debug) {
+      runSnazzyStream(payload);
+    } else {
+      runSnazzyPaged(payload);
+    }
   });
 }
 
