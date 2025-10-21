@@ -9,7 +9,12 @@
   },
   "main": "index.js",
   "scripts": {
-    "status": "tsx weekly-bugzilla-status.ts"
+    "status": "tsx weekly-bugzilla-status.ts",
+    "test": "npm run --prefix snazzybot test",
+    "test:watch": "npm run --prefix snazzybot test:watch",
+    "test:e2e": "npm run --prefix snazzybot test:e2e",
+    "test:all": "npm run --prefix snazzybot test:all",
+    "coverage": "npm run --prefix snazzybot coverage"
   },
   "repository": {
     "type": "git",

@@ -55,3 +55,15 @@ npm ci
 npm run test:watch
 npm run test:e2e
 ```
+
+When working from the repository root (for example via VS Code's built-in test runner), you can also use:
+
+```bash
+npm run test
+npm run test:watch
+npm run test:e2e
+npm run test:all
+npm run coverage
+```
+
+Each command proxies to the scripts in `snazzybot/package.json` so that editors can discover and execute them without manual navigation.
