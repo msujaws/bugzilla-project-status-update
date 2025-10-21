@@ -114,10 +114,10 @@ const hooks = {
     );
 
     console.log(output);
-  } catch (err) {
+  } catch (error) {
     const msg =
-      err instanceof Error ? err.message : typeof err === "string" ? err : "";
-    console.error("ERROR:", msg || err);
+      error instanceof Error ? error.message : (typeof error === "string" ? error : "");
+    console.error("ERROR:", msg || error);
     process.exitCode = 1;
   }
 })();

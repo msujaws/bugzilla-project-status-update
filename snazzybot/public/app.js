@@ -3,13 +3,13 @@ import { markdownToHtml } from "./lib/markdown.js";
 const $ = (id) => document.getElementById(id);
 
 // ===== Emoji Confetti Engine (no deps) =====
-const reduceMotion = window.matchMedia(
+const reduceMotion = globalThis.matchMedia(
   "(prefers-reduced-motion: reduce)"
 ).matches;
 
 function burstEmojis(mode = "normal") {
   if (reduceMotion) return; // respect reduced motion preference
-  const canvas = document.getElementById("fx-layer");
+  const canvas = document.querySelector("#fx-layer");
   if (!canvas) return;
 
   const sets = {
@@ -107,11 +107,11 @@ function ensurePhase(name, label) {
     const fill = document.createElement("div");
     fill.className = "bar";
     fill.id = `bar-${name}`;
-    bar.appendChild(fill);
-    host.appendChild(title);
-    host.appendChild(bar);
+    bar.append(fill);
+    host.append(title);
+    host.append(bar);
     const phases = $("phases");
-    if (phases) phases.appendChild(host);
+    if (phases) phases.append(host);
   }
   return host;
 }
@@ -156,7 +156,7 @@ function log(kind, msg) {
     msg;
   const logHost = $("log");
   if (!logHost) return;
-  logHost.appendChild(line);
+  logHost.append(line);
   logHost.scrollTop = logHost.scrollHeight;
 }
 
@@ -169,10 +169,10 @@ function parseLines(t) {
 }
 
 function setActionsEnabled(enabled) {
-  ["copy", "copy-rendered", "dl-md", "dl-html"].forEach((id) => {
+  for (const id of ["copy", "copy-rendered", "dl-md", "dl-html"]) {
     const el = $(id);
     if (el) el.disabled = !enabled;
-  });
+  }
 }
 
 function download(filename, content, mime) {
@@ -181,9 +181,9 @@ function download(filename, content, mime) {
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
-  document.body.appendChild(a);
+  document.body.append(a);
   a.click();
-  document.body.removeChild(a);
+  a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
@@ -207,11 +207,11 @@ function setResultIframe(html) {
     try {
       const h = frame.contentDocument.documentElement.scrollHeight;
       frame.style.height = `${Math.min(Math.max(h + 2, 240), 1200)}px`;
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     }
   };
-  frame.onload = onload;
+  frame.addEventListener('load', onload);
   setTimeout(onload, 50);
 }
 
@@ -276,15 +276,18 @@ async function runSnazzyStream(body) {
       let evt;
       try { evt = JSON.parse(line); } catch { return; }
       switch (evt.kind) {
-        case "start":
+        case "start": {
           spin.textContent = "⏳ Discovering…";
           break;
-        case "info":
+        }
+        case "info": {
           log("info", evt.msg || "");
           break;
-        case "warn":
+        }
+        case "warn": {
           log("warn", evt.msg || "");
           break;
+        }
         case "phase": {
           const name = String(evt.name || "phase");
           ensurePhase(name, name);
@@ -320,8 +323,9 @@ async function runSnazzyStream(body) {
           burstEmojis(currentVoice);
           break;
         }
-        case "error":
+        case "error": {
           throw new Error(evt.msg || "Server error");
+        }
       }
     };
 
@@ -338,13 +342,13 @@ async function runSnazzyStream(body) {
     }
     // flush any remaining partial (in case the stream ended without newline)
     if (buf) flushLine(buf);
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error(error);
     const out = $("out");
     if (out) {
       out.style.display = "block";
       const message =
-        err instanceof Error ? err.message : typeof err === "string" ? err : "";
+        error instanceof Error ? error.message : (typeof error === "string" ? error : "");
       out.textContent = `ERROR: ${message || "Unknown error"}`;
     }
     setActionsEnabled(Boolean(lastMarkdown));
@@ -394,12 +398,12 @@ async function runSnazzyPaged(body) {
     let cursor = 0;
     const step = Math.min(35, Math.max(20, Math.ceil(40))); // default ~35 per page
     ensurePhase("histories", "histories");
-    while (cursor != null && cursor < total) {
+    while (cursor != undefined && cursor < total) {
       spin.textContent = `⏳ Histories ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`;
       setPhaseText("histories", `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`);
       setPhasePct("histories", Math.min(cursor + step, total), total);
       const page = await callJSON({ ...body, mode: "page", cursor, pageSize: step });
-      (page.qualifiedIds || []).forEach((id) => qualified.add(id));
+      for (const id of (page.qualifiedIds || [])) qualified.add(id);
       cursor = page.nextCursor;
     }
     completePhase("histories");
@@ -419,13 +423,13 @@ async function runSnazzyPaged(body) {
     const out = $("out");
     if (out) out.style.display = "none";
     burstEmojis(currentVoice);
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error(error);
     setActionsEnabled(Boolean(lastMarkdown));
     if (out) {
       out.style.display = "block";
       const message =
-        err instanceof Error ? err.message : typeof err === "string" ? err : "";
+        error instanceof Error ? error.message : (typeof error === "string" ? error : "");
       out.textContent = `ERROR: ${message || "Unknown error"}`;
     }
     spin.style.display = "none";
@@ -447,7 +451,7 @@ if (runButton) {
       })
       .filter(Boolean);
     const metabugs = parseLines($("metabugs")?.value || "")
-      .map((n) => Number(n))
+      .map(Number)
       .filter((n) => Number.isFinite(n));
     const whiteboards = parseLines($("whiteboards")?.value || "");
     const days = Number($("days")?.value) || 8;
@@ -494,7 +498,7 @@ function hydrateFromURL() {
   const sp = new URLSearchParams(location.search);
   const set = (id, v) => {
     const el = $(id);
-    if (el && v != null) el.value = v;
+    if (el && v != undefined) el.value = v;
   };
   if (sp.has("components")) set("components", sp.get("components") || "");
   if (sp.has("whiteboards")) set("whiteboards", sp.get("whiteboards") || "");
@@ -520,8 +524,8 @@ if (copyBtn) {
         quickStatus.textContent = "Copied Markdown";
         quickStatus.style.display = "inline-flex";
       }
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     }
   });
 }
@@ -531,7 +535,7 @@ if (copyRenderedBtn) {
   copyRenderedBtn.addEventListener("click", async () => {
     if (!lastHTML.trim()) return;
     try {
-      if (navigator.clipboard && window.ClipboardItem) {
+      if (navigator.clipboard && globalThis.ClipboardItem) {
         const blob = new Blob([lastHTML], { type: "text/html" });
         const item = new ClipboardItem({
           "text/html": blob,
@@ -546,8 +550,8 @@ if (copyRenderedBtn) {
         quickStatus.textContent = "Copied rendered HTML";
         quickStatus.style.display = "inline-flex";
       }
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     }
   });
 }

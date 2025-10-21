@@ -100,7 +100,7 @@ async function bzGet(
   for (const [k, v] of Object.entries(params)) {
     if (v === undefined) continue;
     if (Array.isArray(v))
-      v.forEach((x) => url.searchParams.append(k, String(x)));
+      for (const x of v) url.searchParams.append(k, String(x));
     else url.searchParams.set(k, String(v));
   }
   url.searchParams.set("api_key", env.BUGZILLA_API_KEY);
@@ -152,7 +152,7 @@ async function fetchMetabugChildren(
   metabugIds: number[],
   hooks: ProgressHooks
 ) {
-  if (!metabugIds.length) return [] as number[];
+  if (metabugIds.length === 0) return [] as number[];
   hooks.info?.(`Fetching metabugs: ${metabugIds.join(", ")}`);
   const { bugs } = (await bzGet(env, `/bug`, {
     id: metabugIds.join(","),
@@ -160,8 +160,8 @@ async function fetchMetabugChildren(
   })) as { bugs: Bug[] };
   const ids = new Set<number>();
   for (const b of bugs) {
-    (b.depends_on || []).forEach((id) => ids.add(id));
-    (b.blocks || []).forEach((id) => ids.add(id));
+    for (const id of (b.depends_on || [])) ids.add(id);
+    for (const id of (b.blocks || [])) ids.add(id);
   }
   return [...ids];
 }
@@ -192,7 +192,7 @@ async function fetchByWhiteboards(
   sinceISO: string,
   hooks: ProgressHooks
 ) {
-  if (!tags.length) return [] as Bug[];
+  if (tags.length === 0) return [] as Bug[];
   const all: Bug[] = [];
   let i = 0;
   hooks.phase?.("collect-whiteboards", { total: tags.length });
@@ -212,7 +212,7 @@ async function fetchByWhiteboards(
 }
 
 async function fetchByIds(env: EnvLike, ids: number[], sinceISO: string) {
-  if (!ids.length) return [] as Bug[];
+  if (ids.length === 0) return [] as Bug[];
   // Pull metadata (then we'll check history/time)
   const CHUNK = 300;
   const out: Bug[] = [];
@@ -277,7 +277,7 @@ async function fetchHistoriesRobust(
   ids: number[],
   hooks: ProgressHooks
 ) {
-  if (!ids.length) return [] as BugHistory["bugs"];
+  if (ids.length === 0) return [] as BugHistory["bugs"];
 
   hooks.phase?.("histories", { total: ids.length });
   hooks.info?.(`History mode: per-ID /rest/bug/<id>/history (concurrency=8)`);
@@ -295,8 +295,8 @@ async function fetchHistoriesRobust(
       try {
         const payload = await bzGetHistorySingle(env, id);
         if (payload?.bugs?.length) out.push(payload.bugs[0]);
-      } catch (e) {
-        hooks.warn?.(`Skipping history for #${id} (${(e as Error)?.message || e})`);
+      } catch (error) {
+        hooks.warn?.(`Skipping history for #${id} (${(error as Error)?.message || error})`);
       } finally {
         handled++;
         hooks.progress?.("histories", handled, ids.length);
@@ -344,7 +344,7 @@ function qualifiesByHistoryWhy(
   sinceISO: string
 ): { ok: boolean; why?: string } {
   const since = Date.parse(sinceISO);
-  if (!hb?.history || !hb.history.length) {
+  if (!hb?.history || hb.history.length === 0) {
     return { ok: false, why: "no history entries" };
   }
   let sawRecent = false;
@@ -428,23 +428,23 @@ async function openaiAssessAndSummarize(
   const voiceHint =
     voice === "pirate"
       ? "Write in light, readable pirate-speak (sprinkle nautical words like ‘Ahoy’, ‘ship’, ‘crew’). Keep it professional, clear, and not overdone."
-      : voice === "snazzy-robot"
+      : (voice === "snazzy-robot"
       ? "Write as a friendly, upbeat robot narrator (light ‘beep boop’, ‘systems nominal’). Keep it human-readable and charming, not spammy."
-      : "Write in a clear, friendly, professional tone.";
+      : "Write in a clear, friendly, professional tone.");
 
   const audienceHint =
     audience === "technical"
       ? "Audience: engineers. Include specific technical details where valuable (file/feature areas, prefs/flags, APIs, perf metrics, platform scopes). Assume context; keep acronyms if common. Avoid business framing."
-      : audience === "leadership"
+      : (audience === "leadership"
       ? "Audience: leadership. Be high-level and concise. Focus on user/business impact, risks, timelines, and cross-team blockers. Avoid low-level tech details and code paths."
-      : "Audience: product managers. Emphasize user impact, product implications, rollout/experimentation notes, and notable tradeoffs. Include light technical context only when it clarifies impact.";
+      : "Audience: product managers. Emphasize user impact, product implications, rollout/experimentation notes, and notable tradeoffs. Include light technical context only when it clarifies impact.");
 
   const lengthHint =
     audience === "technical"
       ? "~220 words total."
-      : audience === "leadership"
+      : (audience === "leadership"
       ? "~120 words total."
-      : "~170 words total.";
+      : "~170 words total.");
   // System prompt: NO demo section request here (script appends its own later).
   const system =
     "You are an expert release PM creating a short, spoken weekly update.\n" +
@@ -517,14 +517,14 @@ export async function generateStatus(
   hooks: ProgressHooks = defaultHooks
 ): Promise<{ output: string; ids: number[] }> {
   // If caller passes explicit IDs, skip discovery & history and just summarize.
-  if (params.ids && params.ids.length) {
+  if (params.ids && params.ids.length > 0) {
     const days = params.days ?? 8;
     const model = params.model ?? "gpt-5";
     const sinceISO = isoDaysAgo(days);
     const pcs = params.components ?? [];
     const wbs = params.whiteboards ?? [];
 
-    const ids = params.ids.slice();
+    const ids = [...params.ids];
     hooks.info?.(`Summarizing ${ids.length} pre-qualified bugs…`);
 
     // Build link and run OpenAI on *metadata* (fetch fields again to render titles/products)
@@ -571,7 +571,7 @@ export async function generateStatus(
     summary = summary
       .replace(/(^|\n)+#{0,2}\s*Demo suggestions[\s\S]*$/i, "")
       .trim();
-    if (demo.length) summary += `\n\n## Demo suggestions\n` + demo.join("\n");
+    if (demo.length > 0) summary += `\n\n## Demo suggestions\n` + demo.join("\n");
 
     const output =
       params.format === "html"
@@ -595,12 +595,12 @@ export async function generateStatus(
   const meta = params.metabugs ?? [];
 
   hooks.info?.(`Window: last ${days} days (since ${sinceISO})`);
-  if (wbs.length) hooks.info?.(`Whiteboard filters: ${wbs.join(", ")}`);
-  if (pcs.length)
+  if (wbs.length > 0) hooks.info?.(`Whiteboard filters: ${wbs.join(", ")}`);
+  if (pcs.length > 0)
     hooks.info?.(
       `Components: ${pcs.map((p) => `${p.product}:${p.component}`).join(", ")}`
     );
-  if (meta.length) hooks.info?.(`Metabugs: ${meta.join(", ")}`);
+  if (meta.length > 0) hooks.info?.(`Metabugs: ${meta.join(", ")}`);
 
   // Collect candidates from all sources
   const [idsFromMetabugs, byComponents, byWhiteboards] = await Promise.all([
@@ -618,9 +618,9 @@ export async function generateStatus(
         .slice(0, n)
         .map((b: any) => b.id ?? b)
         .join(", ");
-    if (byComponents.length)
+    if (byComponents.length > 0)
       dlog(`byComponents sample IDs: ${sample(byComponents)}`);
-    if (byWhiteboards.length)
+    if (byWhiteboards.length > 0)
       dlog(`byWhiteboards sample IDs: ${sample(byWhiteboards)}`);
   }
 
@@ -640,7 +640,7 @@ export async function generateStatus(
     dlog(`union candidates: ${union.length}`);
     dlog(
       `security-restricted removed: ${securityFiltered.length}${
-        securityFiltered.length
+        securityFiltered.length > 0
           ? ` (sample: ${securityFiltered
               .slice(0, 6)
               .map((b) => b.id)
@@ -680,7 +680,7 @@ export async function generateStatus(
       if (shown >= 3) break;
       const h = byIdHistory.get(b.id);
       const changes = h?.history?.[0]?.changes || [];
-      if (changes.length) {
+      if (changes.length > 0) {
         hooks.info?.(
           `[debug] sample history #${b.id} first changes: ${JSON.stringify(
             changes.slice(0, 2)
@@ -709,29 +709,29 @@ export async function generateStatus(
   if (isDebug) {
     // Summarize reasons
     const entries = [...reasonCounts.entries()].sort((a, b) => b[1] - a[1]);
-    if (entries.length) {
+    if (entries.length > 0) {
       dlog(`non-qualified reasons (top):`);
       for (const [why, count] of entries) {
         const ids = reasonExamples.get(why) || [];
         dlog(
-          `  • ${why}: ${count}${ids.length ? ` (eg: ${ids.join(", ")})` : ""}`
+          `  • ${why}: ${count}${ids.length > 0 ? ` (eg: ${ids.join(", ")})` : ""}`
         );
       }
     }
     // Coverage gap
-    if (histories.length !== candidates.length) {
+    if (histories.length === candidates.length) {
+      dlog(
+        `history coverage: ${histories.length}/${candidates.length} (complete)`
+      );
+    } else {
       const missing = candidates
         .map((b) => b.id)
         .filter((id) => !byIdHistory.has(id))
         .slice(0, 12);
       dlog(
         `history coverage: ${histories.length}/${candidates.length}${
-          missing.length ? ` (no history for: ${missing.join(", ")})` : ""
+          missing.length > 0 ? ` (no history for: ${missing.join(", ")})` : ""
         }`
-      );
-    } else {
-      dlog(
-        `history coverage: ${histories.length}/${candidates.length} (complete)`
       );
     }
   }
@@ -740,7 +740,7 @@ export async function generateStatus(
   hooks.info?.(`Qualified bugs: ${final.length}`);
 
   if (isDebug) {
-    if (final.length) {
+    if (final.length > 0) {
       dlog(
         `qualified IDs: ${final
           .slice(0, 20)
@@ -754,7 +754,7 @@ export async function generateStatus(
     }
   }
 
-  if (!final.length) {
+  if (final.length === 0) {
     const link = buildBuglistURL({
       sinceISO,
       whiteboards: wbs,
@@ -819,7 +819,7 @@ export async function generateStatus(
     .replace(/(^|\n)+#{0,2}\s*Demo suggestions[\s\S]*$/i, "")
     .trim();
 
-  if (demo.length) {
+  if (demo.length > 0) {
     summary += `\n\n## Demo suggestions\n` + demo.join("\n");
   }
 
@@ -858,12 +858,12 @@ export async function discoverCandidates(
   const meta = params.metabugs ?? [];
 
   hooks.info?.(`Window: last ${days} days (since ${sinceISO})`);
-  if (wbs.length) hooks.info?.(`Whiteboard filters: ${wbs.join(", ")}`);
-  if (pcs.length)
+  if (wbs.length > 0) hooks.info?.(`Whiteboard filters: ${wbs.join(", ")}`);
+  if (pcs.length > 0)
     hooks.info?.(
       `Components: ${pcs.map((p) => `${p.product}:${p.component}`).join(", ")}`
     );
-  if (meta.length) hooks.info?.(`Metabugs: ${meta.join(", ")}`);
+  if (meta.length > 0) hooks.info?.(`Metabugs: ${meta.join(", ")}`);
 
   const [idsFromMetabugs, byComponents, byWhiteboards] = await Promise.all([
     fetchMetabugChildren(env, meta, hooks),
