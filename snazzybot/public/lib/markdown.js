@@ -48,35 +48,39 @@ export function applyInlineMarkdown(text) {
   if (!text) return "";
 
   const codeSnippets = [];
+  const linkSnippets = [];
+
+  // --- protect inline code first ---
   const withoutCode = text.replace(/`([^`]+)`/g, (_match, code) => {
     const token = `@@CODE${codeSnippets.length}@@`;
     codeSnippets.push(`<code>${escapeHtml(code)}</code>`);
     return token;
   });
 
-  const segments = [];
-  let lastIndex = 0;
-  for (const match of withoutCode.matchAll(LINK_PATTERN)) {
-    const [raw, label, href] = match;
-    if (typeof match.index === "number") {
-      segments.push(escapeHtml(withoutCode.slice(lastIndex, match.index)));
-      segments.push(
-        `<a href="${sanitizeHref(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(
-          label
-        )}</a>`
-      );
-      lastIndex = match.index + raw.length;
-    }
-  }
-  segments.push(escapeHtml(withoutCode.slice(lastIndex)));
+  // --- protect links so underscores don't get parsed ---
+  const withoutLinks = withoutCode.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
+    const token = `@@LINK${linkSnippets.length}@@`;
+    const safe = `<a href="${sanitizeHref(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+    linkSnippets.push(safe);
+    return token;
+  });
 
-  let formatted = segments.join("");
-  formatted = formatted.replace(BOLD_PATTERN, "<strong>$2</strong>");
-  formatted = formatted.replace(ITALIC_PATTERN, "<em>$2</em>");
-  formatted = restoreCodeSnippets(formatted, codeSnippets);
+  // --- now safely apply bold / italic ---
+  let formatted = escapeHtml(withoutLinks);
+  formatted = formatted.replace(/(\*\*|__)(.+?)\1/g, "<strong>$2</strong>");
+  formatted = formatted.replace(/(\*|_)([^*_]+?)\1/g, "<em>$2</em>");
+
+  // --- restore placeholders ---
+  codeSnippets.forEach((html, i) => {
+    formatted = formatted.replaceAll(`@@CODE${i}@@`, html);
+  });
+  linkSnippets.forEach((html, i) => {
+    formatted = formatted.replaceAll(`@@LINK${i}@@`, html);
+  });
 
   return formatted;
 }
+
 
 export function markdownToHtml(md) {
   const lines = (md || "").split(/\r?\n/);
