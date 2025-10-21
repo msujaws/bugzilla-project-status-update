@@ -58,12 +58,15 @@ export function applyInlineMarkdown(text) {
   });
 
   // --- protect links so underscores don't get parsed ---
-  const withoutLinks = withoutCode.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
-    const token = `@@LINK${linkSnippets.length}@@`;
-    const safe = `<a href="${sanitizeHref(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
-    linkSnippets.push(safe);
-    return token;
-  });
+  const withoutLinks = withoutCode.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    (_m, label, href) => {
+      const token = `@@LINK${linkSnippets.length}@@`;
+      const safe = `<a href="${sanitizeHref(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+      linkSnippets.push(safe);
+      return token;
+    },
+  );
 
   // --- now safely apply bold / italic ---
   let formatted = escapeHtml(withoutLinks);
@@ -80,7 +83,6 @@ export function applyInlineMarkdown(text) {
 
   return formatted;
 }
-
 
 export function markdownToHtml(md) {
   const lines = (md || "").split(/\r?\n/);

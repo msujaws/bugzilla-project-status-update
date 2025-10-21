@@ -8,9 +8,7 @@ import {
 
 describe("markdown helpers", () => {
   it("escapes HTML entities", () => {
-    expect(escapeHtml('<b>& " \' >')).toBe(
-      "&lt;b&gt;&amp; &quot; &#39; &gt;",
-    );
+    expect(escapeHtml("<b>& \" ' >")).toBe("&lt;b&gt;&amp; &quot; &#39; &gt;");
   });
 
   it("sanitizes href to safe targets", () => {
@@ -33,7 +31,8 @@ describe("markdown helpers", () => {
   });
 
   it("leaves underscores inside links intact", () => {
-    const src = "Check [hello_world](https://x.test?bug_id=12345&field_name=foo)";
+    const src =
+      "Check [hello_world](https://x.test?bug_id=12345&field_name=foo)";
     const html = applyInlineMarkdown(src);
     expect(html).toContain("hello_world");
     expect(html).toContain('href="https://x.test?bug_id=12345&field_name=foo"');

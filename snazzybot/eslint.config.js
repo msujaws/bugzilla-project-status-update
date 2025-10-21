@@ -1,80 +1,86 @@
-import js from '@eslint/js';
-import tsPlugin from '@typescript-eslint/eslint-plugin';
-import tsParser from '@typescript-eslint/parser';
-import globals from 'globals';
-import unicorn from 'eslint-plugin-unicorn';
+import js from "@eslint/js";
+import tsPlugin from "@typescript-eslint/eslint-plugin";
+import tsParser from "@typescript-eslint/parser";
+import globals from "globals";
+import unicorn from "eslint-plugin-unicorn";
 
 const commonUnicornRules = {
-  'unicorn/filename-case': 'off',
-  'unicorn/prevent-abbreviations': 'off'
+  "unicorn/filename-case": "off",
+  "unicorn/prevent-abbreviations": "off",
 };
 
 export default [
   {
-    ignores: ['public/lib/markdown.js', 'node_modules', 'dist', '.wrangler', 'coverage']
+    ignores: [
+      "public/lib/markdown.js",
+      "node_modules",
+      "dist",
+      ".wrangler",
+      "coverage",
+    ],
   },
   {
-    files: ['**/*.ts'],
+    files: ["**/*.ts"],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module'
+        ecmaVersion: "latest",
+        sourceType: "module",
       },
       globals: {
         ...globals.browser,
-        ...globals.node
-      }
+        ...globals.node,
+      },
     },
     plugins: {
-      '@typescript-eslint': tsPlugin,
-      unicorn
+      "@typescript-eslint": tsPlugin,
+      unicorn,
     },
     rules: {
       ...js.configs.recommended.rules,
       ...tsPlugin.configs.recommended.rules,
       ...unicorn.configs.recommended.rules,
-      ...commonUnicornRules
-    }
+      ...commonUnicornRules,
+    },
   },
   {
-    files: ['cli/**/*.ts'],
+    files: ["cli/**/*.ts"],
     languageOptions: {
       globals: {
-        ...globals.node
-      }
-    }
+        ...globals.node,
+      },
+    },
   },
   {
-    files: ['functions/**/*.ts'],
+    files: ["functions/**/*.ts"],
     languageOptions: {
       globals: {
         ...globals.serviceworker,
-        PagesFunction: 'readonly',
-        Env: 'readonly',
-        ExecutionContext: 'readonly',
-        KVNamespace: 'readonly'
-      }
-    }
+        PagesFunction: "readonly",
+        Env: "readonly",
+        ExecutionContext: "readonly",
+        KVNamespace: "readonly",
+      },
+    },
   },
   {
-    files: ['public/**/*.js'],
+    files: ["public/**/*.js"],
     languageOptions: {
       parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module'
+        ecmaVersion: "latest",
+        sourceType: "module",
       },
       globals: {
-        ...globals.browser
-      }
+        ...globals.browser,
+      },
     },
     plugins: {
-      unicorn
+      unicorn,
     },
     rules: {
       ...js.configs.recommended.rules,
       ...unicorn.configs.recommended.rules,
-      ...commonUnicornRules
-    }
-  }
+      ...commonUnicornRules,
+    },
+  },
 ];

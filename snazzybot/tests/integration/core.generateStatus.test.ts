@@ -99,9 +99,31 @@ describe("core integration (with MSW mocks)", () => {
           ],
         });
       }),
-      http.get("https://bugzilla.mozilla.org/rest/bug/:id/history", ({ params }) => {
-        const id = Number((params as { id: string }).id);
-        if (id === 1_987_803) {
+      http.get(
+        "https://bugzilla.mozilla.org/rest/bug/:id/history",
+        ({ params }) => {
+          const id = Number((params as { id: string }).id);
+          if (id === 1_987_803) {
+            return HttpResponse.json({
+              bugs: [
+                {
+                  id,
+                  history: [
+                    {
+                      when: "2025-10-21T09:36:11Z",
+                      changes: [
+                        {
+                          field_name: "status",
+                          removed: "RESOLVED",
+                          added: "ASSIGNED",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            });
+          }
           return HttpResponse.json({
             bugs: [
               {
@@ -110,31 +132,20 @@ describe("core integration (with MSW mocks)", () => {
                   {
                     when: "2025-10-21T09:36:11Z",
                     changes: [
-                      { field_name: "status", removed: "RESOLVED", added: "ASSIGNED" },
+                      {
+                        field_name: "status",
+                        removed: "ASSIGNED",
+                        added: "RESOLVED",
+                      },
+                      { field_name: "resolution", removed: "", added: "FIXED" },
                     ],
                   },
                 ],
               },
             ],
           });
-        }
-        return HttpResponse.json({
-          bugs: [
-            {
-              id,
-              history: [
-                {
-                  when: "2025-10-21T09:36:11Z",
-                  changes: [
-                    { field_name: "status", removed: "ASSIGNED", added: "RESOLVED" },
-                    { field_name: "resolution", removed: "", added: "FIXED" },
-                  ],
-                },
-              ],
-            },
-          ],
-        });
-      }),
+        },
+      ),
     );
 
     const res = await generateStatus(
@@ -203,25 +214,32 @@ describe("core integration (with MSW mocks)", () => {
           ],
         });
       }),
-      http.get("https://bugzilla.mozilla.org/rest/bug/:id/history", ({ params }) => {
-        const id = Number((params as { id: string }).id);
-        return HttpResponse.json({
-          bugs: [
-            {
-              id,
-              history: [
-                {
-                  when: "2025-10-21T09:36:11Z",
-                  changes: [
-                    { field_name: "status", removed: "ASSIGNED", added: "RESOLVED" },
-                    { field_name: "resolution", removed: "", added: "FIXED" },
-                  ],
-                },
-              ],
-            },
-          ],
-        });
-      }),
+      http.get(
+        "https://bugzilla.mozilla.org/rest/bug/:id/history",
+        ({ params }) => {
+          const id = Number((params as { id: string }).id);
+          return HttpResponse.json({
+            bugs: [
+              {
+                id,
+                history: [
+                  {
+                    when: "2025-10-21T09:36:11Z",
+                    changes: [
+                      {
+                        field_name: "status",
+                        removed: "ASSIGNED",
+                        added: "RESOLVED",
+                      },
+                      { field_name: "resolution", removed: "", added: "FIXED" },
+                    ],
+                  },
+                ],
+              },
+            ],
+          });
+        },
+      ),
     );
 
     const res = await generateStatus(

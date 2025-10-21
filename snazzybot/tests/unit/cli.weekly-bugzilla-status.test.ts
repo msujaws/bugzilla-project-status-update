@@ -23,13 +23,9 @@ describe("CLI weekly-bugzilla-status", () => {
     delete process.env.OPENAI_API_KEY;
 
     const spyError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation(
-        ((() => {
-          // no-op: prevent real exit during tests
-        }) as unknown) as typeof process.exit,
-      );
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      // no-op: prevent real exit during tests
+    }) as unknown as typeof process.exit);
 
     vi.resetModules();
     await import("../../cli/weekly-bugzilla-status.ts");
@@ -96,9 +92,9 @@ describe("CLI weekly-bugzilla-status", () => {
     vi.resetModules();
     await import("../../cli/weekly-bugzilla-status.ts");
 
-    expect(
-      spyErr.mock.calls.map((call) => call.join(" ")).join("\n"),
-    ).toMatch(/Bad --component/i);
+    expect(spyErr.mock.calls.map((call) => call.join(" ")).join("\n")).toMatch(
+      /Bad --component/i,
+    );
     expect(process.exitCode).toBe(1);
   });
 });

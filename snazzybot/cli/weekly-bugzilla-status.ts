@@ -74,7 +74,7 @@ const hooks = {
     console.error(
       `[INFO] ${n}: ${tot ? Math.round((cur / tot) * 100) : 0}% (${cur}/${
         tot ?? "?"
-      })`
+      })`,
     ),
 };
 
@@ -87,7 +87,7 @@ async function main() {
           throw new Error(`Bad --component "${s}"`);
         }
         return { product, component };
-      }
+      },
     );
 
     const metabugs = (argv.metabug || [])
@@ -110,13 +110,17 @@ async function main() {
         audience: argv.audience,
       },
       env,
-      hooks
+      hooks,
     );
 
     console.log(output);
   } catch (error) {
     const msg =
-      error instanceof Error ? error.message : (typeof error === "string" ? error : "");
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : "";
     console.error("ERROR:", msg || error);
     process.exitCode = 1;
   }

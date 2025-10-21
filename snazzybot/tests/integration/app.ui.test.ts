@@ -119,14 +119,12 @@ describe("public/app.js UI", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    const copyBtn = dom.window.document.querySelector<HTMLButtonElement>(
-      "#copy",
-    );
+    const copyBtn =
+      dom.window.document.querySelector<HTMLButtonElement>("#copy");
     expect(copyBtn?.disabled).toBe(false);
 
-    const frame = dom.window.document.querySelector<HTMLIFrameElement>(
-      "#resultFrame",
-    );
+    const frame =
+      dom.window.document.querySelector<HTMLIFrameElement>("#resultFrame");
     expect(frame?.srcdoc).toContain("View bugs in Bugzilla");
   });
 });

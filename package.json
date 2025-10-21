@@ -14,7 +14,8 @@
     "test:watch": "npm run --prefix snazzybot test:watch",
     "test:e2e": "npm run --prefix snazzybot test:e2e",
     "test:all": "npm run --prefix snazzybot test:all",
-    "coverage": "npm run --prefix snazzybot coverage"
+    "coverage": "npm run --prefix snazzybot coverage",
+    "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\""
   },
   "repository": {
     "type": "git",
@@ -28,6 +29,7 @@
   },
   "homepage": "https://github.com/msujaws/bugzilla-project-status-update#readme",
   "devDependencies": {
+    "prettier": "^3.6.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"

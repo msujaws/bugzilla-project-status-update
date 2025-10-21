@@ -4,7 +4,7 @@ const $ = (id) => document.querySelector(`#${id}`);
 
 // ===== Emoji Confetti Engine (no deps) =====
 const reduceMotion = globalThis.matchMedia(
-  "(prefers-reduced-motion: reduce)"
+  "(prefers-reduced-motion: reduce)",
 ).matches;
 
 function burstEmojis(mode = "normal") {
@@ -211,7 +211,7 @@ function setResultIframe(html) {
       console.error(error);
     }
   };
-  frame.addEventListener('load', onload);
+  frame.addEventListener("load", onload);
   setTimeout(onload, 50);
 }
 
@@ -267,7 +267,7 @@ async function runSnazzyStream(body) {
       headers: {
         "content-type": "application/json",
         // tell the Worker to use the streaming branch
-        "accept": "application/x-ndjson",
+        accept: "application/x-ndjson",
         "x-snazzy-stream": "1",
       },
       body: JSON.stringify({
@@ -287,7 +287,11 @@ async function runSnazzyStream(body) {
     const flushLine = (line) => {
       if (!line.trim()) return;
       let evt;
-      try { evt = JSON.parse(line); } catch { return; }
+      try {
+        evt = JSON.parse(line);
+      } catch {
+        return;
+      }
       switch (evt.kind) {
         case "start": {
           spin.textContent = "⏳ Discovering…";
@@ -318,7 +322,7 @@ async function runSnazzyStream(body) {
             setPhasePct(name, Number(evt.current) || 0, Number(evt.total) || 1);
             setPhaseText(
               name,
-              `${name}: ${Number(evt.current) || 0}/${Number(evt.total) || 1}`
+              `${name}: ${Number(evt.current) || 0}/${Number(evt.total) || 1}`,
             );
           } else {
             setPhaseIndeterminate(name);
@@ -361,7 +365,11 @@ async function runSnazzyStream(body) {
     if (out) {
       out.style.display = "block";
       const message =
-        error instanceof Error ? error.message : (typeof error === "string" ? error : "");
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "";
       out.textContent = `ERROR: ${message || "Unknown error"}`;
     }
     setActionsEnabled(Boolean(lastMarkdown));
@@ -400,10 +408,18 @@ async function runSnazzyPaged(body) {
     ensurePhase("histories", "histories");
     while (cursor != undefined && cursor < total) {
       spin.textContent = `⏳ Histories ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`;
-      setPhaseText("histories", `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`);
+      setPhaseText(
+        "histories",
+        `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`,
+      );
       setPhasePct("histories", Math.min(cursor + step, total), total);
-      const page = await postStatusJSON({ ...body, mode: "page", cursor, pageSize: step });
-      for (const id of (page.qualifiedIds || [])) qualified.add(id);
+      const page = await postStatusJSON({
+        ...body,
+        mode: "page",
+        cursor,
+        pageSize: step,
+      });
+      for (const id of page.qualifiedIds || []) qualified.add(id);
       cursor = page.nextCursor;
     }
     completePhase("histories");
@@ -413,7 +429,11 @@ async function runSnazzyPaged(body) {
     spin.textContent = "⏳ Summarizing…";
     ensurePhase("openai", "openai");
     setPhaseIndeterminate("openai");
-    const final = await postStatusJSON({ ...body, mode: "finalize", ids: [...qualified] });
+    const final = await postStatusJSON({
+      ...body,
+      mode: "finalize",
+      ids: [...qualified],
+    });
     lastMarkdown = final.output || "";
     lastHTML = markdownToHtml(lastMarkdown);
     setResultIframe(lastHTML);
@@ -428,7 +448,11 @@ async function runSnazzyPaged(body) {
     if (out) {
       out.style.display = "block";
       const message =
-        error instanceof Error ? error.message : (typeof error === "string" ? error : "");
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "";
       out.textContent = `ERROR: ${message || "Unknown error"}`;
     }
     spin.style.display = "none";
@@ -502,8 +526,10 @@ if (runButton) {
 
 function hydrateFromURL() {
   const sp = new URLSearchParams(location.search);
-  if (sp.has("components")) setFieldValue("components", sp.get("components") || "");
-  if (sp.has("whiteboards")) setFieldValue("whiteboards", sp.get("whiteboards") || "");
+  if (sp.has("components"))
+    setFieldValue("components", sp.get("components") || "");
+  if (sp.has("whiteboards"))
+    setFieldValue("whiteboards", sp.get("whiteboards") || "");
   if (sp.has("metabugs")) setFieldValue("metabugs", sp.get("metabugs") || "");
   if (sp.has("days")) setFieldValue("days", sp.get("days") || "7");
   if (sp.has("voice")) setFieldValue("voice", sp.get("voice") || "normal");
@@ -565,7 +591,7 @@ if (downloadMdBtn) {
     download(
       "snazzybot-status.md",
       lastMarkdown,
-      "text/markdown;charset=utf-8"
+      "text/markdown;charset=utf-8",
     );
   });
 }

@@ -1,5 +1,9 @@
 // functions/api/status.ts
-import { generateStatus, discoverCandidates, qualifyHistoryPage } from "../../src/core";
+import {
+  generateStatus,
+  discoverCandidates,
+  qualifyHistoryPage,
+} from "../../src/core";
 
 type Env = {
   OPENAI_API_KEY: string;
@@ -28,7 +32,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           "content-type": "application/json; charset=utf-8",
           "cache-control": "no-store",
         },
-      }
+      },
     );
   }
 
@@ -87,7 +91,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     // ---- Paging protocol ----
     if (mode === "discover") {
       try {
-        const { sinceISO, candidates } = await discoverCandidates(params, envConfig);
+        const { sinceISO, candidates } = await discoverCandidates(
+          params,
+          envConfig,
+        );
         return new Response(
           JSON.stringify({
             sinceISO,
@@ -100,18 +107,30 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
               component: b.component,
             })),
           }),
-          { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } }
+          {
+            status: 200,
+            headers: {
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "no-store",
+            },
+          },
         );
       } catch (error: unknown) {
         return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
           status: 500,
-          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "no-store",
+          },
         });
       }
     }
     if (mode === "page") {
       try {
-        const { sinceISO, candidates } = await discoverCandidates(params, envConfig);
+        const { sinceISO, candidates } = await discoverCandidates(
+          params,
+          envConfig,
+        );
         const { qualifiedIds, nextCursor, total } = await qualifyHistoryPage(
           envConfig,
           sinceISO,
@@ -124,16 +143,25 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
             phase: () => {},
             progress: () => {},
           },
-          !!debug
+          !!debug,
         );
         return new Response(
           JSON.stringify({ qualifiedIds, nextCursor, total }),
-          { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } }
+          {
+            status: 200,
+            headers: {
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "no-store",
+            },
+          },
         );
       } catch (error: unknown) {
         return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
           status: 500,
-          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "no-store",
+          },
         });
       }
     }
@@ -142,12 +170,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         const { output } = await generateStatus({ ...params, ids }, envConfig);
         return new Response(JSON.stringify({ output }), {
           status: 200,
-          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "no-store",
+          },
         });
       } catch (error: unknown) {
         return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
           status: 500,
-          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "no-store",
+          },
         });
       }
     }

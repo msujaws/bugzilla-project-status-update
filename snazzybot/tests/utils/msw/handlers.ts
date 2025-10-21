@@ -59,23 +59,30 @@ export const handlers = [
   }),
 
   // Bug history
-  http.get("https://bugzilla.mozilla.org/rest/bug/:id/history", ({ params }) => {
-    const { id } = params as { id: string };
-    return HttpResponse.json({
-      bugs: [
-        {
-          id: Number(id),
-          history: [
-            {
-              when: "2025-10-21T09:36:11Z",
-              changes: [
-                { field_name: "status", removed: "ASSIGNED", added: "RESOLVED" },
-                { field_name: "resolution", removed: "", added: "FIXED" },
-              ],
-            },
-          ],
-        },
-      ],
-    });
-  }),
+  http.get(
+    "https://bugzilla.mozilla.org/rest/bug/:id/history",
+    ({ params }) => {
+      const { id } = params as { id: string };
+      return HttpResponse.json({
+        bugs: [
+          {
+            id: Number(id),
+            history: [
+              {
+                when: "2025-10-21T09:36:11Z",
+                changes: [
+                  {
+                    field_name: "status",
+                    removed: "ASSIGNED",
+                    added: "RESOLVED",
+                  },
+                  { field_name: "resolution", removed: "", added: "FIXED" },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+    },
+  ),
 ];

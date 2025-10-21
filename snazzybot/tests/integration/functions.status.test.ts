@@ -22,7 +22,11 @@ describe("functions/api/status.ts", () => {
     const r = await mf.dispatchFetch("http://local/api/status", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ days: 8, format: "md", whiteboards: ["[fx-vpn]"] }),
+      body: JSON.stringify({
+        days: 8,
+        format: "md",
+        whiteboards: ["[fx-vpn]"],
+      }),
     });
     const j = await r.json();
     expect(j.output).toMatch(/View bugs in Bugzilla/);
@@ -34,7 +38,11 @@ describe("functions/api/status.ts", () => {
     const discover = await mf.dispatchFetch("http://local/api/status", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ mode: "discover", days: 8, whiteboards: ["[fx-vpn]"] }),
+      body: JSON.stringify({
+        mode: "discover",
+        days: 8,
+        whiteboards: ["[fx-vpn]"],
+      }),
     });
     const d = await discover.json();
     expect(d.total).toBeGreaterThan(0);
