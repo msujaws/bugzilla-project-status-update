@@ -290,6 +290,7 @@ async function runSnazzyStream(body) {
           ensurePhase(name, name);
           if (typeof evt.total === "number") {
             setPhasePct(name, 0, evt.total || 1);
+            setPhaseText(name, `${name}: 0/${evt.total}`);
           } else {
             setPhaseIndeterminate(name);
           }
@@ -299,12 +300,18 @@ async function runSnazzyStream(body) {
           const name = String(evt.phase || "phase");
           if (typeof evt.total === "number") {
             setPhasePct(name, Number(evt.current) || 0, Number(evt.total) || 1);
+            setPhaseText(
+              name,
+              `${name}: ${Number(evt.current) || 0}/${Number(evt.total) || 1}`
+            );
           } else {
             setPhaseIndeterminate(name);
           }
           break;
         }
         case "done": {
+          setPhaseText("openai", "openai: done");
+          completePhase("openai");
           lastMarkdown = (evt.output || "").trim();
           lastHTML = markdownToHtml(lastMarkdown);
           setResultIframe(lastHTML);

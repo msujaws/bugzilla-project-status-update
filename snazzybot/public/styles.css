@@ -108,6 +108,8 @@ header p {
   box-shadow: var(--shadow);
   padding: 18px;
   backdrop-filter: blur(8px);
+  /* prevent grid overflow from long content */
+  min-width: 0;
 }
 
 .grid {
@@ -118,7 +120,8 @@ header p {
 
 @media (min-width: 840px) {
   .grid {
-    grid-template-columns: 1.1fr 0.9fr;
+    /* allow tracks to shrink even with long content */
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
   }
 }
 
@@ -279,6 +282,9 @@ button:disabled {
   max-height: 220px;
   overflow: auto;
   white-space: pre-wrap;
+  /* extra safety so long tokens never blow out the column */
+  max-width: 100%;
+  word-break: break-word;
 }
 
 .log .line {
@@ -300,6 +306,7 @@ button:disabled {
 
 details {
   margin-top: 10px;
+  max-width: 100%;
 }
 
 summary {
