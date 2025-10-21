@@ -80,8 +80,9 @@ function isoDaysAgo(days: number): string {
   return d.toISOString();
 }
 
-function isSecurityRestricted(groups?: string[]): boolean {
-  return !!groups?.some((g) => /security/i.test(g));
+export function isRestricted(groups?: string[]): boolean {
+  return !!groups?.some((g) => /security/i.test(g)) ||
+         !!groups?.some((g) => /confidential/i.test(g));
 }
 
 function describeError(error: unknown): string {
@@ -650,8 +651,8 @@ export async function generateStatus(
   const union = [...byComponents, ...byWhiteboards, ...byIds].filter(
     (b) => !seen.has(b.id) && seen.add(b.id)
   );
-  const securityFiltered = union.filter((b) => isSecurityRestricted(b.groups));
-  let candidates = union.filter((b) => !isSecurityRestricted(b.groups));
+  const securityFiltered = union.filter((b) => isRestricted(b.groups));
+  let candidates = union.filter((b) => !isRestricted(b.groups));
 
   if (isDebug) {
     dlog(`union candidates: ${union.length}`);
@@ -895,7 +896,7 @@ export async function discoverCandidates(
   const union = [...byComponents, ...byWhiteboards, ...byIds].filter(
     (b) => !seen.has(b.id) && seen.add(b.id)
   );
-  const candidates = union.filter((b) => !isSecurityRestricted(b.groups));
+  const candidates = union.filter((b) => !isRestricted(b.groups));
 
   hooks.info?.(`Candidates after initial query: ${candidates.length}`);
   return { sinceISO, candidates };
