@@ -6,6 +6,16 @@ type Env = {
   BUGZILLA_API_KEY: string;
 };
 
+const toErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+};
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!env.OPENAI_API_KEY || !env.BUGZILLA_API_KEY) {
     return new Response(
@@ -92,8 +102,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           }),
           { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } }
         );
-      } catch (error: any) {
-        return new Response(JSON.stringify({ error: error?.message || String(error) }), {
+      } catch (error: unknown) {
+        return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
           status: 500,
           headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
         });
@@ -120,8 +130,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           JSON.stringify({ qualifiedIds, nextCursor, total }),
           { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } }
         );
-      } catch (error: any) {
-        return new Response(JSON.stringify({ error: error?.message || String(error) }), {
+      } catch (error: unknown) {
+        return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
           status: 500,
           headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
         });
@@ -134,8 +144,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           status: 200,
           headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
         });
-      } catch (error: any) {
-        return new Response(JSON.stringify({ error: error?.message || String(error) }), {
+      } catch (error: unknown) {
+        return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
           status: 500,
           headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
         });
@@ -152,8 +162,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           "cache-control": "no-store",
         },
       });
-    } catch (error: any) {
-      return new Response(JSON.stringify({ error: error?.message || String(error) }), {
+    } catch (error: unknown) {
+      return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
         status: 500,
         headers: {
           "content-type": "application/json; charset=utf-8",
@@ -168,16 +178,21 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const ts = new TransformStream();
   const writer = ts.writable.getWriter();
 
-  const write = (obj: any) =>
-    writer.write(enc.encode(JSON.stringify(obj) + "\n"));
+  const write = (obj: Record<string, unknown>) => {
+    void writer.write(enc.encode(JSON.stringify(obj) + "\n"));
+  };
 
   (async () => {
     try {
       const hooks = {
         info: (msg: string) => write({ kind: "info", msg }),
         warn: (msg: string) => write({ kind: "warn", msg }),
-        phase: (name: string, meta?: Record<string, unknown>) =>
-          write({ kind: "phase", name, ...meta }),
+        phase: (name: string, meta?: Record<string, unknown>) => {
+          const payload = meta
+            ? { kind: "phase", name, ...meta }
+            : { kind: "phase", name };
+          write(payload);
+        },
         progress: (name: string, current: number, total?: number) =>
           write({ kind: "progress", phase: name, current, total }),
       };
@@ -186,8 +201,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
       const { output } = await generateStatus(params, envConfig, hooks);
       write({ kind: "done", output });
-    } catch (error: any) {
-      write({ kind: "error", msg: error?.message || String(error) });
+    } catch (error: unknown) {
+      write({ kind: "error", msg: toErrorMessage(error) });
     } finally {
       await writer.close();
     }

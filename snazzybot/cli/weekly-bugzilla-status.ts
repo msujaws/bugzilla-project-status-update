@@ -68,7 +68,7 @@ const env = BUGZILLA_HOST
 const hooks = {
   info: (m: string) => console.error("[INFO]", m),
   warn: (m: string) => console.error("[WARN]", m),
-  phase: (n: string, meta?: any) =>
+  phase: (n: string, meta?: Record<string, unknown>) =>
     console.error(`[INFO] Phase: ${n}`, meta ? JSON.stringify(meta) : ""),
   progress: (n: string, cur: number, tot?: number) =>
     console.error(
@@ -78,7 +78,7 @@ const hooks = {
     ),
 };
 
-(async () => {
+async function main() {
   try {
     const components: ProductComponent[] = (argv.component || []).map(
       (s: string) => {
@@ -120,4 +120,6 @@ const hooks = {
     console.error("ERROR:", msg || error);
     process.exitCode = 1;
   }
-})();
+}
+
+await main();

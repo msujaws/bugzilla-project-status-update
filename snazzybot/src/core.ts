@@ -84,11 +84,24 @@ function isSecurityRestricted(groups?: string[]): boolean {
   return !!groups?.some((g) => /security/i.test(g));
 }
 
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 // ---------- Bugzilla helpers (REST) ----------
 // --- Simple 24h memory cache for Node / local dev (per-process) ---
 const ONE_DAY_S = 24 * 60 * 60;
 const ONE_DAY_MS = ONE_DAY_S * 1000;
-const memCache = new Map<string, { exp: number; json: any }>();
+const memCache = new Map<string, { exp: number; json: unknown }>();
+type GlobalWithCaches = typeof globalThis & { caches?: CacheStorage };
+const getDefaultCache = (): Cache | undefined =>
+  (globalThis as GlobalWithCaches).caches?.default;
 
 async function bzGet(
   env: EnvLike,
@@ -109,7 +122,7 @@ async function bzGet(
   const bypass = !!env.SNAZZY_SKIP_CACHE;
 
   // Cloudflare Cache first (if available)
-  const cfCache = (globalThis as any).caches?.default;
+  const cfCache = getDefaultCache();
   if (!bypass && cfCache) {
     const cached = await cfCache.match(key);
     if (cached) {
@@ -140,7 +153,9 @@ async function bzGet(
     // Ignore failures; caching is opportunistic
     try {
       await cfCache.put(key, resp);
-    } catch {}
+    } catch (error) {
+      console.warn("Failed to cache Bugzilla response", error);
+    }
   } else if (!bypass) {
     memCache.set(key, { exp: Date.now() + ONE_DAY_MS, json });
   }
@@ -236,7 +251,7 @@ async function fetchByIds(env: EnvLike, ids: number[], sinceISO: string) {
 async function bzGetHistorySingle(env: EnvLike, id: number): Promise<BugHistory> {
   const host = env.BUGZILLA_HOST || "https://bugzilla.mozilla.org";
   const bypass = !!env.SNAZZY_SKIP_CACHE;
-  const cfCache = (globalThis as any).caches?.default;
+  const cfCache = getDefaultCache();
 
   const url = new URL(`${host}/rest/bug/${id}/history`);
   url.searchParams.set("api_key", env.BUGZILLA_API_KEY);
@@ -265,7 +280,9 @@ async function bzGetHistorySingle(env: EnvLike, id: number): Promise<BugHistory>
           },
         })
       );
-    } catch {}
+    } catch (error) {
+      console.warn(`Failed to cache history for bug ${id}`, error);
+    }
   } else if (!bypass) {
     memCache.set(key, { exp: Date.now() + ONE_DAY_MS, json });
   }
@@ -295,8 +312,8 @@ async function fetchHistoriesRobust(
       try {
         const payload = await bzGetHistorySingle(env, id);
         if (payload?.bugs?.length) out.push(payload.bugs[0]);
-      } catch (error) {
-        hooks.warn?.(`Skipping history for #${id} (${(error as Error)?.message || error})`);
+      } catch (error: unknown) {
+        hooks.warn?.(`Skipping history for #${id} (${describeError(error)})`);
       } finally {
         handled++;
         hooks.progress?.("histories", handled, ids.length);
@@ -613,10 +630,10 @@ export async function generateStatus(
     dlog(
       `source counts → metabug children: ${idsFromMetabugs.length}, byComponents: ${byComponents.length}, byWhiteboards: ${byWhiteboards.length}`
     );
-    const sample = (arr: any[], n = 8) =>
+    const sample = (arr: Bug[], n = 8) =>
       arr
         .slice(0, n)
-        .map((b: any) => b.id ?? b)
+        .map((bug) => bug.id)
         .join(", ");
     if (byComponents.length > 0)
       dlog(`byComponents sample IDs: ${sample(byComponents)}`);
@@ -708,7 +725,9 @@ export async function generateStatus(
 
   if (isDebug) {
     // Summarize reasons
-    const entries = [...reasonCounts.entries()].sort((a, b) => b[1] - a[1]);
+    const entries = [...reasonCounts.entries()].toSorted(
+      (a, b) => b[1] - a[1]
+    );
     if (entries.length > 0) {
       dlog(`non-qualified reasons (top):`);
       for (const [why, count] of entries) {
@@ -892,11 +911,16 @@ export async function qualifyHistoryPage(
   debug = false
 ): Promise<{
   qualifiedIds: number[];
-  nextCursor: number | null;
+  nextCursor: number | undefined;
   total: number;
 }> {
-  const start = Math.max(0, cursor | 0);
-  const end = Math.min(candidates.length, start + Math.max(1, pageSize | 0));
+  const normalizedCursor = Number.isFinite(cursor) ? Math.trunc(cursor) : 0;
+  const normalizedPageSize = Math.max(
+    1,
+    Number.isFinite(pageSize) ? Math.trunc(pageSize) : 0
+  );
+  const start = Math.max(0, normalizedCursor);
+  const end = Math.min(candidates.length, start + normalizedPageSize);
   const slice = candidates.slice(start, end);
   hooks.phase?.("histories", { total: slice.length });
 
@@ -917,7 +941,7 @@ export async function qualifyHistoryPage(
     if (ok) qualified.push(b.id);
   }
 
-  const nextCursor = end < candidates.length ? end : null;
+  const nextCursor = end < candidates.length ? end : undefined;
   if (debug)
     hooks.info?.(
       `[debug] page qualified=${qualified.length} (cursor ${start}→${end}/${candidates.length})`

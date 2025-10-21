@@ -1,6 +1,6 @@
 import { markdownToHtml } from "./lib/markdown.js";
 
-const $ = (id) => document.getElementById(id);
+const $ = (id) => document.querySelector(`#${id}`);
 
 // ===== Emoji Confetti Engine (no deps) =====
 const reduceMotion = globalThis.matchMedia(
@@ -55,7 +55,7 @@ function burstEmojis(mode = "normal") {
       rot: Math.random() * Math.PI * 2,
       vr: (Math.random() - 0.5) * 0.2,
       size: 18 + Math.random() * 10,
-      emoji: EMOJI[(Math.random() * EMOJI.length) | 0],
+      emoji: EMOJI[Math.trunc(Math.random() * EMOJI.length)],
       t0: start,
     };
   });
@@ -236,6 +236,19 @@ function resetUIBeforeRun() {
   setResultIframe("<em>Waiting for results…</em>");
 }
 
+async function postStatusJSON(payload) {
+  const res = await fetch("/api/status", {
+    method: "POST",
+    headers: { "content-type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || res.statusText || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 // Streaming runner (NDJSON) -------------------------------------------------
 async function runSnazzyStream(body) {
   const runBtn = $("run");
@@ -352,10 +365,9 @@ async function runSnazzyStream(body) {
       out.textContent = `ERROR: ${message || "Unknown error"}`;
     }
     setActionsEnabled(Boolean(lastMarkdown));
-    $("spin")?.style && ( $("spin").style.display = "none" );
+    if (spin) spin.style.display = "none";
   } finally {
-    const runBtn = $("run");
-    if (runBtn) runBtn.disabled = false;
+    runBtn.disabled = false;
   }
 }
 
@@ -363,6 +375,7 @@ async function runSnazzyStream(body) {
 async function runSnazzyPaged(body) {
   const runBtn = $("run");
   const spin = $("spin");
+  const out = $("out");
   if (!runBtn || !spin) return;
 
   runBtn.disabled = true;
@@ -372,24 +385,11 @@ async function runSnazzyPaged(body) {
 
   resetUIBeforeRun();
 
-  const callJSON = async (payload) => {
-    const res = await fetch("/api/status", {
-      method: "POST",
-      headers: { "content-type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || res.statusText || `HTTP ${res.status}`);
-    }
-    return res.json();
-  };
-
   try {
     // 1) Discover all candidates (counts & compact metadata)
     spin.style.display = "inline-flex";
     spin.textContent = "⏳ Discovering…";
-    const discover = await callJSON({ ...body, mode: "discover" });
+    const discover = await postStatusJSON({ ...body, mode: "discover" });
     const total = discover.total || 0;
     log("info", `Candidates: ${total}`);
 
@@ -402,7 +402,7 @@ async function runSnazzyPaged(body) {
       spin.textContent = `⏳ Histories ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`;
       setPhaseText("histories", `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`);
       setPhasePct("histories", Math.min(cursor + step, total), total);
-      const page = await callJSON({ ...body, mode: "page", cursor, pageSize: step });
+      const page = await postStatusJSON({ ...body, mode: "page", cursor, pageSize: step });
       for (const id of (page.qualifiedIds || [])) qualified.add(id);
       cursor = page.nextCursor;
     }
@@ -413,14 +413,13 @@ async function runSnazzyPaged(body) {
     spin.textContent = "⏳ Summarizing…";
     ensurePhase("openai", "openai");
     setPhaseIndeterminate("openai");
-    const final = await callJSON({ ...body, mode: "finalize", ids: [...qualified] });
+    const final = await postStatusJSON({ ...body, mode: "finalize", ids: [...qualified] });
     lastMarkdown = final.output || "";
     lastHTML = markdownToHtml(lastMarkdown);
     setResultIframe(lastHTML);
     completePhase("openai");
     setActionsEnabled(Boolean(lastMarkdown));
     spin.style.display = "none";
-    const out = $("out");
     if (out) out.style.display = "none";
     burstEmojis(currentVoice);
   } catch (error) {
@@ -438,6 +437,13 @@ async function runSnazzyPaged(body) {
   }
 }
 
+const setFieldValue = (id, value) => {
+  const el = $(id);
+  if (el && value !== undefined && "value" in el) {
+    el.value = value;
+  }
+};
+
 // Wire inputs ---------------------------------------------------------------
 const runButton = $("run");
 if (runButton) {
@@ -447,7 +453,7 @@ if (runButton) {
         const [product, component] = s
           .split(":")
           .map((x) => (x ? x.trim() : ""));
-        return product && component ? { product, component } : null;
+        return product && component ? { product, component } : undefined;
       })
       .filter(Boolean);
     const metabugs = parseLines($("metabugs")?.value || "")
@@ -471,7 +477,7 @@ if (runButton) {
     sp.set("debug", String(debug));
     if (skipCache) sp.set("nocache", "1");
     else sp.delete("nocache");
-    history.replaceState(null, "", `?${sp.toString()}`);
+    history.replaceState(undefined, "", `?${sp.toString()}`);
 
     currentVoice = voice;
     const payload = {
@@ -496,19 +502,15 @@ if (runButton) {
 
 function hydrateFromURL() {
   const sp = new URLSearchParams(location.search);
-  const set = (id, v) => {
-    const el = $(id);
-    if (el && v != undefined) el.value = v;
-  };
-  if (sp.has("components")) set("components", sp.get("components") || "");
-  if (sp.has("whiteboards")) set("whiteboards", sp.get("whiteboards") || "");
-  if (sp.has("metabugs")) set("metabugs", sp.get("metabugs") || "");
-  if (sp.has("days")) set("days", sp.get("days") || "7");
-  if (sp.has("voice")) set("voice", sp.get("voice") || "normal");
-  if (sp.has("aud")) set("audience", sp.get("aud") || "technical");
+  if (sp.has("components")) setFieldValue("components", sp.get("components") || "");
+  if (sp.has("whiteboards")) setFieldValue("whiteboards", sp.get("whiteboards") || "");
+  if (sp.has("metabugs")) setFieldValue("metabugs", sp.get("metabugs") || "");
+  if (sp.has("days")) setFieldValue("days", sp.get("days") || "7");
+  if (sp.has("voice")) setFieldValue("voice", sp.get("voice") || "normal");
+  if (sp.has("aud")) setFieldValue("audience", sp.get("aud") || "technical");
   if (sp.has("debug"))
-    set("debug", sp.get("debug") === "true" ? "true" : "false");
-  if (sp.has("nocache")) set("cache", "false");
+    setFieldValue("debug", sp.get("debug") === "true" ? "true" : "false");
+  if (sp.has("nocache")) setFieldValue("cache", "false");
 }
 hydrateFromURL();
 
