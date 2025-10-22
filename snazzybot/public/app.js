@@ -425,15 +425,39 @@ async function runSnazzyPaged(body) {
     completePhase("histories");
     log("info", `Qualified (history): ${qualified.size}`);
 
-    // 3) Finalize (OpenAI + output)
-    spin.textContent = "⏳ Summarizing…";
-    ensurePhase("openai", "openai");
-    setPhaseIndeterminate("openai");
+    // 3) Gather patch context
+    const qualifiedIds = [...qualified];
+    const includePatchContext = body.includePatchContext !== false;
+    if (includePatchContext) {
+      spin.textContent = "⏳ Preparing patch context…";
+      ensurePhase("patch-context", "patch-context");
+      if (qualifiedIds.length > 0) {
+        setPhasePct("patch-context", 0, qualifiedIds.length);
+        setPhaseText(
+          "patch-context",
+          `patch-context: 0/${qualifiedIds.length}`
+        );
+      } else {
+        setPhaseIndeterminate("patch-context");
+      }
+    } else {
+      spin.textContent = "⏳ Summarizing…";
+      ensurePhase("openai", "openai");
+      setPhaseIndeterminate("openai");
+    }
+    // 4) Finalize (OpenAI + output)
     const final = await postStatusJSON({
       ...body,
       mode: "finalize",
-      ids: [...qualified],
+      ids: qualifiedIds,
     });
+    if (includePatchContext) {
+      completePhase("patch-context");
+      setPhaseText("patch-context", "patch-context: done");
+      spin.textContent = "⏳ Summarizing…";
+    }
+    ensurePhase("openai", "openai");
+    setPhaseIndeterminate("openai");
     lastMarkdown = final.output || "";
     lastHTML = markdownToHtml(lastMarkdown);
     setResultIframe(lastHTML);
@@ -454,6 +478,9 @@ async function runSnazzyPaged(body) {
             ? error
             : "";
       out.textContent = `ERROR: ${message || "Unknown error"}`;
+    }
+    if (body.includePatchContext !== false) {
+      setPhaseIndeterminate("patch-context");
     }
     spin.style.display = "none";
   } finally {
@@ -494,6 +521,8 @@ if (runButton) {
     const audience = $("audience")?.value || "technical";
     const debug = $("debug")?.value === "true";
     const skipCache = $("cache")?.value === "false";
+    const includePatchContext =
+      ($("patch-context")?.value || "include") !== "omit";
 
     const sp = new URLSearchParams();
     // Store raw textarea strings; they're newline-safe in params.
@@ -506,6 +535,11 @@ if (runButton) {
     sp.set("debug", String(debug));
     if (skipCache) sp.set("nocache", "1");
     else sp.delete("nocache");
+    if (includePatchContext) {
+      sp.delete("pc");
+    } else {
+      sp.set("pc", "0");
+    }
     history.replaceState(undefined, "", `?${sp.toString()}`);
 
     currentVoice = voice;
@@ -519,6 +553,7 @@ if (runButton) {
       audience,
       debug,
       skipCache,
+      includePatchContext,
     };
     // If Debug = Yes, use streaming (shows live logs + progress)
     if (debug) {
@@ -542,6 +577,7 @@ function hydrateFromURL() {
   if (sp.has("debug"))
     setFieldValue("debug", sp.get("debug") === "true" ? "true" : "false");
   if (sp.has("nocache")) setFieldValue("cache", "false");
+  if (sp.get("pc") === "0") setFieldValue("patch-context", "omit");
 }
 hydrateFromURL();
 

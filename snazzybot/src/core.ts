@@ -3,6 +3,7 @@
 // Works in Node 18+ (global fetch) and Cloudflare Workers.
 
 import { escapeHtml, markdownToHtml } from "../public/lib/markdown.js";
+import { loadPatchContext, type CommitPatch } from "./patch.ts";
 
 export type ProductComponent = { product: string; component: string };
 export type GenerateParams = {
@@ -17,6 +18,8 @@ export type GenerateParams = {
   audience?: "technical" | "product" | "leadership";
   // Optional: directly summarize a known set of bug IDs
   ids?: number[];
+  /** When false, skip fetching GitHub commit patch context */
+  includePatchContext?: boolean;
 };
 
 export type EnvLike = {
@@ -109,7 +112,7 @@ const getDefaultCache = (): Cache | undefined =>
 async function bzGet(
   env: EnvLike,
   path: string,
-  params: Record<string, string | number | string[] | undefined> = {},
+  params: Record<string, string | number | string[] | undefined> = {}
 ) {
   const host = env.BUGZILLA_HOST || "https://bugzilla.mozilla.org";
   const url = new URL(`${host}/rest${path}`);
@@ -168,7 +171,7 @@ async function bzGet(
 async function fetchMetabugChildren(
   env: EnvLike,
   metabugIds: number[],
-  hooks: ProgressHooks,
+  hooks: ProgressHooks
 ) {
   if (metabugIds.length === 0) return [] as number[];
   hooks.info?.(`Fetching metabugs: ${metabugIds.join(", ")}`);
@@ -187,7 +190,7 @@ async function fetchMetabugChildren(
 async function fetchByComponents(
   env: EnvLike,
   pairs: ProductComponent[],
-  sinceISO: string,
+  sinceISO: string
 ) {
   const all: Bug[] = [];
   for (const pc of pairs) {
@@ -208,7 +211,7 @@ async function fetchByWhiteboards(
   env: EnvLike,
   tags: string[],
   sinceISO: string,
-  hooks: ProgressHooks,
+  hooks: ProgressHooks
 ) {
   if (tags.length === 0) return [] as Bug[];
   const all: Bug[] = [];
@@ -247,13 +250,13 @@ async function fetchByIds(env: EnvLike, ids: number[], sinceISO: string) {
     (b) =>
       ["RESOLVED", "VERIFIED", "CLOSED"].includes(b.status) &&
       b.resolution === "FIXED" &&
-      new Date(b.last_change_time) >= new Date(sinceISO),
+      new Date(b.last_change_time) >= new Date(sinceISO)
   );
 }
 
 async function bzGetHistorySingle(
   env: EnvLike,
-  id: number,
+  id: number
 ): Promise<BugHistory> {
   const host = env.BUGZILLA_HOST || "https://bugzilla.mozilla.org";
   const bypass = !!env.SNAZZY_SKIP_CACHE;
@@ -284,7 +287,7 @@ async function bzGetHistorySingle(
             "content-type": "application/json; charset=utf-8",
             "cache-control": "public, s-maxage=86400, max-age=0, immutable",
           },
-        }),
+        })
       );
     } catch (error) {
       console.warn(`Failed to cache history for bug ${id}`, error);
@@ -298,7 +301,7 @@ async function bzGetHistorySingle(
 async function fetchHistoriesRobust(
   env: EnvLike,
   ids: number[],
-  hooks: ProgressHooks,
+  hooks: ProgressHooks
 ) {
   if (ids.length === 0) return [] as BugHistory["bugs"];
 
@@ -364,7 +367,7 @@ function qualifiesByHistory(hb: BugHistory["bugs"][number], sinceISO: string) {
 // Debug-friendly variant that explains *why not qualified*
 function qualifiesByHistoryWhy(
   hb: BugHistory["bugs"][number],
-  sinceISO: string,
+  sinceISO: string
 ): { ok: boolean; why?: string } {
   const since = Date.parse(sinceISO);
   if (!hb?.history || hb.history.length === 0) {
@@ -447,27 +450,28 @@ async function openaiAssessAndSummarize(
   days: number,
   voice: "normal" | "pirate" | "snazzy-robot" = "normal",
   audience: "technical" | "product" | "leadership" = "technical",
+  patchContextByBug?: Map<number, CommitPatch[]>
 ) {
   const voiceHint =
     voice === "pirate"
       ? "Write in light, readable pirate-speak (sprinkle nautical words like ‘Ahoy’, ‘ship’, ‘crew’). Keep it professional, clear, and not overdone."
-      : voice === "snazzy-robot"
+      : (voice === "snazzy-robot"
         ? "Write as a friendly, upbeat robot narrator (light ‘beep boop’, ‘systems nominal’). Keep it human-readable and charming, not spammy."
-        : "Write in a clear, friendly, professional tone.";
+        : "Write in a clear, friendly, professional tone.");
 
   const audienceHint =
     audience === "technical"
       ? "Audience: engineers. Include specific technical details where valuable (file/feature areas, prefs/flags, APIs, perf metrics, platform scopes). Assume context; keep acronyms if common. Avoid business framing."
-      : audience === "leadership"
+      : (audience === "leadership"
         ? "Audience: leadership. Be high-level and concise. Focus on user/business impact, risks, timelines, and cross-team blockers. Avoid low-level tech details and code paths."
-        : "Audience: product managers. Emphasize user impact, product implications, rollout/experimentation notes, and notable tradeoffs. Include light technical context only when it clarifies impact.";
+        : "Audience: product managers. Emphasize user impact, product implications, rollout/experimentation notes, and notable tradeoffs. Include light technical context only when it clarifies impact.");
 
   const lengthHint =
     audience === "technical"
       ? "~220 words total."
-      : audience === "leadership"
+      : (audience === "leadership"
         ? "~120 words total."
-        : "~170 words total.";
+        : "~170 words total.");
   // System prompt: NO demo section request here (script appends its own later).
   const system =
     "You are an expert release PM creating a short, spoken weekly update.\n" +
@@ -476,7 +480,7 @@ async function openaiAssessAndSummarize(
     `${voiceHint}\n` +
     `${audienceHint}`;
 
-  const user = `Data window: last ${days} days.
+  let user = `Data window: last ${days} days.
 Bugs (done/fixed):
 ${JSON.stringify(
   bugs.map((b) => ({
@@ -484,7 +488,7 @@ ${JSON.stringify(
     summary: b.summary,
     product: b.product,
     component: b.component,
-  })),
+  }))
 )}
 
 Tasks:
@@ -499,6 +503,35 @@ Return JSON:
   ],
   "summary_md": string
 }`;
+
+  if (patchContextByBug && patchContextByBug.size > 0) {
+    const perBug: string[] = [];
+    for (const bug of bugs) {
+      const patches = patchContextByBug.get(bug.id);
+      if (!patches || patches.length === 0) continue;
+      const snippetLines: string[] = [];
+      for (const entry of patches) {
+        const parts = [`Commit: ${entry.commitUrl}`];
+        if (entry.error) {
+          parts.push(`Note: ${entry.error}`, `Message: ${entry.message}`);
+        } else {
+          parts.push(`Message: ${entry.message}`, `Patch:\n${entry.patch}`);
+        }
+        snippetLines.push(parts.join("\n"));
+      }
+      if (snippetLines.length === 0) continue;
+      const combined = snippetLines.join("\n\n");
+      const limit = 8000;
+      const truncated =
+        combined.length > limit
+          ? `${combined.slice(0, limit)}\n…[truncated]`
+          : combined;
+      perBug.push(`Bug ${bug.id}:\n${truncated}`);
+    }
+    if (perBug.length > 0) {
+      user += `\n\nPatch Context:\n${perBug.join("\n\n")}`;
+    }
+  }
 
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -537,8 +570,70 @@ Return JSON:
 export async function generateStatus(
   params: GenerateParams,
   env: EnvLike,
-  hooks: ProgressHooks = defaultHooks,
+  hooks: ProgressHooks = defaultHooks
 ): Promise<{ output: string; ids: number[] }> {
+  const includePatchContext = params.includePatchContext !== false;
+  const isDebug = !!params.debug;
+  const dlog = (m: string) => {
+    if (isDebug) hooks.info?.(`[debug] ${m}`);
+  };
+
+  const loadPatchContextsForBugs = async (bugList: Bug[]) => {
+    const patchMap = new Map<number, CommitPatch[]>();
+    if (!includePatchContext) {
+      if (isDebug) dlog("[patch] patch context disabled via settings");
+      return patchMap;
+    }
+    const seen = new Set<number>();
+    const uniqueBugs: Bug[] = [];
+    for (const bug of bugList) {
+      if (seen.has(bug.id)) continue;
+      seen.add(bug.id);
+      uniqueBugs.push(bug);
+    }
+
+    const total = uniqueBugs.length;
+    if (total === 0) {
+      if (isDebug) dlog(`[patch] no bugs provided for patch context lookup`);
+      return patchMap;
+    }
+
+    hooks.phase?.("patch-context", { total });
+    let completed = 0;
+    await Promise.all(
+      uniqueBugs.map(async (bug) => {
+        try {
+          const patches = await loadPatchContext(env, bug.id);
+          if (patches.length > 0) {
+            patchMap.set(bug.id, patches);
+            if (isDebug) {
+              const success = patches.filter((p) => !p.error).length;
+              const failures = patches.length - success;
+              dlog(
+                `[patch] bug #${bug.id} patch context loaded (${success}/${patches.length} fetched${failures > 0 ? `, ${failures} failed` : ""})`
+              );
+            }
+          } else if (isDebug) {
+            dlog(`[patch] bug #${bug.id} no patch context found`);
+          }
+        } catch (error) {
+          const msg = describeError(error);
+          hooks.warn?.(`Skipping patch context for #${bug.id}: ${msg}`);
+          if (isDebug) dlog(`[patch] bug #${bug.id} error: ${msg}`);
+        } finally {
+          completed++;
+          hooks.progress?.("patch-context", completed, total);
+        }
+      })
+    );
+    if (isDebug) {
+      dlog(
+        `[patch] collected patch context for ${patchMap.size}/${total} bug(s)`
+      );
+    }
+    return patchMap;
+  };
+
   // If caller passes explicit IDs, skip discovery & history and just summarize.
   if (params.ids && params.ids.length > 0) {
     const days = params.days ?? 8;
@@ -569,7 +664,14 @@ export async function generateStatus(
       hooks.warn?.(
         `Trimming ${
           bugs.length - MAX_BUGS_FOR_OPENAI
-        } bug(s) before OpenAI call to stay within token limits`,
+        } bug(s) before OpenAI call to stay within token limits`
+      );
+    }
+
+    const patchContextByBug = await loadPatchContextsForBugs(limited);
+    if (isDebug) {
+      dlog(
+        `[patch] pre-qualified run collected context for ${patchContextByBug.size}/${limited.length} bug(s)`
       );
     }
 
@@ -581,13 +683,14 @@ export async function generateStatus(
       days,
       params.voice ?? "normal",
       params.audience ?? "product",
+      patchContextByBug
     );
 
     const demo = (ai.assessments || [])
       .filter((a) => Number(a.impact_score) >= 6 && a.demo_suggestion)
       .map(
         (a) =>
-          `- [Bug ${a.bug_id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${a.bug_id}): ${a.demo_suggestion}`,
+          `- [Bug ${a.bug_id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${a.bug_id}): ${a.demo_suggestion}`
       );
 
     let summary = (ai.summary_md || "").trim();
@@ -609,10 +712,6 @@ export async function generateStatus(
   const days = params.days ?? 8;
   const model = params.model ?? "gpt-5";
   const sinceISO = isoDaysAgo(days);
-  const isDebug = !!params.debug;
-  const dlog = (m: string) => {
-    if (isDebug) hooks.info?.(`[debug] ${m}`);
-  };
 
   const pcs = params.components ?? [];
   const wbs = params.whiteboards ?? [];
@@ -622,7 +721,7 @@ export async function generateStatus(
   if (wbs.length > 0) hooks.info?.(`Whiteboard filters: ${wbs.join(", ")}`);
   if (pcs.length > 0)
     hooks.info?.(
-      `Components: ${pcs.map((p) => `${p.product}:${p.component}`).join(", ")}`,
+      `Components: ${pcs.map((p) => `${p.product}:${p.component}`).join(", ")}`
     );
   if (meta.length > 0) hooks.info?.(`Metabugs: ${meta.join(", ")}`);
 
@@ -635,7 +734,7 @@ export async function generateStatus(
 
   if (isDebug) {
     dlog(
-      `source counts → metabug children: ${idsFromMetabugs.length}, byComponents: ${byComponents.length}, byWhiteboards: ${byWhiteboards.length}`,
+      `source counts → metabug children: ${idsFromMetabugs.length}, byComponents: ${byComponents.length}, byWhiteboards: ${byWhiteboards.length}`
     );
     const sample = (arr: Bug[], n = 8) =>
       arr
@@ -655,7 +754,7 @@ export async function generateStatus(
   // Union + security filter
   const seen = new Set<number>();
   const union = [...byComponents, ...byWhiteboards, ...byIds].filter(
-    (b) => !seen.has(b.id) && seen.add(b.id),
+    (b) => !seen.has(b.id) && seen.add(b.id)
   );
   const securityFiltered = union.filter((b) => isRestricted(b.groups));
   let candidates = union.filter((b) => !isRestricted(b.groups));
@@ -670,7 +769,7 @@ export async function generateStatus(
               .map((b) => b.id)
               .join(", ")})`
           : ""
-      }`,
+      }`
     );
     dlog(`candidates after security filter: ${candidates.length}`);
   }
@@ -681,7 +780,7 @@ export async function generateStatus(
   const histories = await fetchHistoriesRobust(
     env,
     candidates.map((b) => b.id),
-    hooks,
+    hooks
   );
   const byIdHistory = new Map<number, BugHistory["bugs"][number]>();
   for (const h of histories) byIdHistory.set(h.id, h);
@@ -707,8 +806,8 @@ export async function generateStatus(
       if (changes.length > 0) {
         hooks.info?.(
           `[debug] sample history #${b.id} first changes: ${JSON.stringify(
-            changes.slice(0, 2),
-          )}`,
+            changes.slice(0, 2)
+          )}`
         );
         shown++;
       }
@@ -738,14 +837,14 @@ export async function generateStatus(
       for (const [why, count] of entries) {
         const ids = reasonExamples.get(why) || [];
         dlog(
-          `  • ${why}: ${count}${ids.length > 0 ? ` (eg: ${ids.join(", ")})` : ""}`,
+          `  • ${why}: ${count}${ids.length > 0 ? ` (eg: ${ids.join(", ")})` : ""}`
         );
       }
     }
     // Coverage gap
     if (histories.length === candidates.length) {
       dlog(
-        `history coverage: ${histories.length}/${candidates.length} (complete)`,
+        `history coverage: ${histories.length}/${candidates.length} (complete)`
       );
     } else {
       const missing = candidates
@@ -755,7 +854,7 @@ export async function generateStatus(
       dlog(
         `history coverage: ${histories.length}/${candidates.length}${
           missing.length > 0 ? ` (no history for: ${missing.join(", ")})` : ""
-        }`,
+        }`
       );
     }
   }
@@ -769,11 +868,11 @@ export async function generateStatus(
         `qualified IDs: ${final
           .slice(0, 20)
           .map((b) => b.id)
-          .join(", ")}${final.length > 20 ? " …" : ""}`,
+          .join(", ")}${final.length > 20 ? " …" : ""}`
       );
     } else {
       dlog(
-        `no qualified bugs → check reasons above; also verify statuses/resolution and history window.`,
+        `no qualified bugs → check reasons above; also verify statuses/resolution and history window.`
       );
     }
   }
@@ -799,7 +898,7 @@ export async function generateStatus(
   if (final.length > MAX_BUGS_FOR_OPENAI) {
     trimmedCount = final.length - MAX_BUGS_FOR_OPENAI;
     hooks.warn?.(
-      `Trimming ${trimmedCount} bug(s) before OpenAI call to stay within token limits`,
+      `Trimming ${trimmedCount} bug(s) before OpenAI call to stay within token limits`
     );
     aiCandidates = final.slice(0, MAX_BUGS_FOR_OPENAI);
     if (isDebug)
@@ -807,18 +906,25 @@ export async function generateStatus(
         `OpenAI candidate IDs (trimmed to ${MAX_BUGS_FOR_OPENAI}): ${aiCandidates
           .slice(0, 30)
           .map((b) => b.id)
-          .join(", ")}${final.length > 30 ? " …" : ""}`,
+          .join(", ")}${final.length > 30 ? " …" : ""}`
       );
   } else if (isDebug) {
     dlog(
       `OpenAI candidate IDs (${aiCandidates.length}): ${aiCandidates
         .slice(0, 30)
         .map((b) => b.id)
-        .join(", ")}${aiCandidates.length > 30 ? " …" : ""}`,
+        .join(", ")}${aiCandidates.length > 30 ? " …" : ""}`
     );
   }
 
   // OpenAI (indeterminate step; caller shows spinner)
+  const patchContextByBug = await loadPatchContextsForBugs(aiCandidates);
+  if (isDebug) {
+    dlog(
+      `[patch] summary run collected context for ${patchContextByBug.size}/${aiCandidates.length} bug(s)`
+    );
+  }
+
   hooks.phase?.("openai");
   const ai = await openaiAssessAndSummarize(
     env,
@@ -827,6 +933,7 @@ export async function generateStatus(
     days,
     params.voice ?? "normal",
     params.audience ?? "technical",
+    patchContextByBug
   );
 
   // Build ONE canonical Demo suggestions section (no duplication)
@@ -834,7 +941,7 @@ export async function generateStatus(
     .filter((a) => Number(a.impact_score) >= 6 && a.demo_suggestion)
     .map(
       (a) =>
-        `- [Bug ${a.bug_id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${a.bug_id}): ${a.demo_suggestion}`,
+        `- [Bug ${a.bug_id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${a.bug_id}): ${a.demo_suggestion}`
     );
 
   let summary = (ai.summary_md || "").trim();
@@ -873,7 +980,7 @@ export async function generateStatus(
 export async function discoverCandidates(
   params: Omit<GenerateParams, "ids">,
   env: EnvLike,
-  hooks: ProgressHooks = defaultHooks,
+  hooks: ProgressHooks = defaultHooks
 ): Promise<{ sinceISO: string; candidates: Bug[] }> {
   const days = params.days ?? 8;
   const sinceISO = isoDaysAgo(days);
@@ -885,7 +992,7 @@ export async function discoverCandidates(
   if (wbs.length > 0) hooks.info?.(`Whiteboard filters: ${wbs.join(", ")}`);
   if (pcs.length > 0)
     hooks.info?.(
-      `Components: ${pcs.map((p) => `${p.product}:${p.component}`).join(", ")}`,
+      `Components: ${pcs.map((p) => `${p.product}:${p.component}`).join(", ")}`
     );
   if (meta.length > 0) hooks.info?.(`Metabugs: ${meta.join(", ")}`);
 
@@ -898,7 +1005,7 @@ export async function discoverCandidates(
   const byIds = await fetchByIds(env, idsFromMetabugs, sinceISO);
   const seen = new Set<number>();
   const union = [...byComponents, ...byWhiteboards, ...byIds].filter(
-    (b) => !seen.has(b.id) && seen.add(b.id),
+    (b) => !seen.has(b.id) && seen.add(b.id)
   );
   const candidates = union.filter((b) => !isRestricted(b.groups));
 
@@ -913,7 +1020,7 @@ export async function qualifyHistoryPage(
   cursor: number,
   pageSize: number,
   hooks: ProgressHooks = defaultHooks,
-  debug = false,
+  debug = false
 ): Promise<{
   qualifiedIds: number[];
   nextCursor: number | undefined;
@@ -922,7 +1029,7 @@ export async function qualifyHistoryPage(
   const normalizedCursor = Number.isFinite(cursor) ? Math.trunc(cursor) : 0;
   const normalizedPageSize = Math.max(
     1,
-    Number.isFinite(pageSize) ? Math.trunc(pageSize) : 0,
+    Number.isFinite(pageSize) ? Math.trunc(pageSize) : 0
   );
   const start = Math.max(0, normalizedCursor);
   const end = Math.min(candidates.length, start + normalizedPageSize);
@@ -933,7 +1040,7 @@ export async function qualifyHistoryPage(
   const histories = await fetchHistoriesRobust(
     env,
     slice.map((b) => b.id),
-    hooks,
+    hooks
   );
   const byIdHistory = new Map<number, BugHistory["bugs"][number]>();
   for (const h of histories) byIdHistory.set(h.id, h);
@@ -949,7 +1056,7 @@ export async function qualifyHistoryPage(
   const nextCursor = end < candidates.length ? end : undefined;
   if (debug)
     hooks.info?.(
-      `[debug] page qualified=${qualified.length} (cursor ${start}→${end}/${candidates.length})`,
+      `[debug] page qualified=${qualified.length} (cursor ${start}→${end}/${candidates.length})`
     );
   return { qualifiedIds: qualified, nextCursor, total: candidates.length };
 }

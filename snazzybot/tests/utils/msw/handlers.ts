@@ -85,4 +85,24 @@ export const handlers = [
       });
     },
   ),
+
+  // Bugzilla XML (default: no pulsebot comment)
+  http.get("https://bugzilla.mozilla.org/show_bug.cgi", ({ request }) => {
+    const url = new URL(request.url);
+    const id = url.searchParams.get("id") ?? "0";
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<bugzilla>
+  <bug>
+    <bug_id>${id}</bug_id>
+    <long_desc>
+      <who name="Someone">dev@example.com</who>
+      <bug_when>2025-01-01 00:00:00</bug_when>
+      <thetext>No automation comment available.</thetext>
+    </long_desc>
+  </bug>
+</bugzilla>`;
+    return HttpResponse.text(xml, {
+      headers: { "content-type": "text/xml; charset=utf-8" },
+    });
+  }),
 ];

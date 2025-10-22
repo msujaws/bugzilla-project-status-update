@@ -47,6 +47,7 @@ describe("CLI weekly-bugzilla-status", () => {
     expect(generateStatus).toHaveBeenCalledWith(
       expect.objectContaining({
         components: [{ product: "Core", component: "Audio/Video: cubeb" }],
+        includePatchContext: true,
       }),
       expect.any(Object),
       expect.any(Object)
@@ -88,6 +89,7 @@ describe("CLI weekly-bugzilla-status", () => {
         components: [{ product: "Firefox", component: "General" }],
         days: 3,
         format: "md",
+        includePatchContext: true,
       }),
       expect.objectContaining({
         BUGZILLA_API_KEY: "bz",
@@ -96,6 +98,34 @@ describe("CLI weekly-bugzilla-status", () => {
       expect.any(Object)
     );
     expect(spyLog).toHaveBeenCalledWith("OK");
+  });
+
+  it("disables patch context when --no-patch-context supplied", async () => {
+    process.env = {
+      ...ORIG_ENV,
+      BUGZILLA_API_KEY: "bz",
+      OPENAI_API_KEY: "openai",
+    };
+    process.argv = ["node", "cli", "--no-patch-context"];
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const mod = (await import("../../src/core.js")) as {
+      generateStatus: ReturnType<typeof vi.fn>;
+    };
+    const { generateStatus } = mod;
+
+    vi.resetModules();
+    await import("../../cli/weekly-bugzilla-status.ts");
+
+    expect(generateStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        includePatchContext: false,
+      }),
+      expect.any(Object),
+      expect.any(Object)
+    );
   });
 
   it("rejects bad --component strings", async () => {

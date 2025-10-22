@@ -3,10 +3,13 @@ import { makeMiniflare } from "../utils/miniflare";
 
 describe("functions/api/status.ts", () => {
   it("returns 500 when env keys missing", async () => {
-    const mf = await makeMiniflare({
-      OPENAI_API_KEY: "",
-      BUGZILLA_API_KEY: "",
-    });
+    const mf = await makeMiniflare(
+      {
+        OPENAI_API_KEY: "",
+        BUGZILLA_API_KEY: "",
+      },
+      { forceFallback: true },
+    );
     const r = await mf.dispatchFetch("http://local/api/status", {
       method: "POST",
       body: "{}",
@@ -18,7 +21,7 @@ describe("functions/api/status.ts", () => {
   });
 
   it("oneshot mode returns output with link", async () => {
-    const mf = await makeMiniflare();
+    const mf = await makeMiniflare({}, { forceFallback: true });
     const r = await mf.dispatchFetch("http://local/api/status", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -34,7 +37,7 @@ describe("functions/api/status.ts", () => {
   });
 
   it("paging protocol: discover → page → finalize", async () => {
-    const mf = await makeMiniflare();
+    const mf = await makeMiniflare({}, { forceFallback: true });
     const discover = await mf.dispatchFetch("http://local/api/status", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -77,7 +80,7 @@ describe("functions/api/status.ts", () => {
   });
 
   it("streaming NDJSON emits start → phase/progress → done", async () => {
-    const mf = await makeMiniflare();
+    const mf = await makeMiniflare({}, { forceFallback: true });
     const r = await mf.dispatchFetch("http://local/api/status?stream=1", {
       method: "POST",
       headers: {

@@ -40,6 +40,11 @@ const argv = yargs(hideBin(process.argv))
     default: "technical",
     desc: "Tailor summary depth and framing",
   })
+  .option("patch-context", {
+    type: "boolean",
+    default: true,
+    desc: "Include GitHub commit patch context (use --no-patch-context to skip)",
+  })
   .help()
   .strict()
   .parseSync();
@@ -112,6 +117,7 @@ async function main() {
         debug: argv.debug,
         voice: argv.voice,
         audience: argv.audience,
+        includePatchContext: argv["patch-context"],
       },
       env,
       hooks
@@ -122,9 +128,9 @@ async function main() {
     const msg =
       error instanceof Error
         ? error.message
-        : typeof error === "string"
+        : (typeof error === "string"
           ? error
-          : "";
+          : "");
     console.error("ERROR:", msg || error);
     process.exitCode = 1;
   }

@@ -20,6 +20,27 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "CLI: Firefox:General 5 days",
+      "type": "pwa-node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "cli",
+        "--",
+        "--component",
+        "Firefox:General",
+        "--days",
+        "5",
+        "--format",
+        "md"
+      ],
+      "cwd": "${workspaceFolder}/snazzybot",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "envFile": "${workspaceFolder}/snazzybot/.env"
     }
   ]
 }

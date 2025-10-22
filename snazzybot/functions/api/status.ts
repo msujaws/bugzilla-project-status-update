@@ -48,6 +48,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     voice = "normal",
     skipCache = false,
     audience = "technical",
+    includePatchContext = true,
     mode = "oneshot", // "discover" | "page" | "finalize" | "oneshot" (legacy)
     cursor = 0,
     pageSize = 35,
@@ -85,6 +86,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     debug,
     voice,
     audience,
+    includePatchContext,
   } as const;
 
   if (!wantsStream) {
