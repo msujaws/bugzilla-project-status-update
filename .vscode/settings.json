@@ -10,9 +10,6 @@
   "[typescriptreact]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": "explicit"
-  },
   "eslint.enable": true,
   "eslint.experimental.useFlatConfig": true,
   "eslint.workingDirectories": [

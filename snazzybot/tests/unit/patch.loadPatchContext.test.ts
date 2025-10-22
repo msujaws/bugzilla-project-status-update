@@ -115,7 +115,7 @@ describe("loadPatchContext", () => {
   it("caches empty results for bugs without pulsebot comments", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     fetchSpy.mockImplementation(() =>
-      Promise.resolve(makeXmlResponse(noPulsebotXml))
+      Promise.resolve(makeXmlResponse(noPulsebotXml)),
     );
 
     const { loadPatchContext } = await import("../../src/patch.ts");
@@ -145,7 +145,7 @@ describe("loadPatchContext", () => {
         new Response("Not found", {
           status: 404,
           headers: { "content-type": "text/plain; charset=utf-8" },
-        })
+        }),
       );
     });
 
@@ -153,7 +153,7 @@ describe("loadPatchContext", () => {
     const res = await loadPatchContext(env, 42);
     expect(res).toHaveLength(1);
     expect(res[0]?.commitUrl).toBe(
-      "https://github.com/mozilla/example/commit/abcdef1234567890"
+      "https://github.com/mozilla/example/commit/abcdef1234567890",
     );
     expect(res[0]?.error).toMatch(/404/);
     expect(res[0]?.patch).toBe("");

@@ -3,6 +3,7 @@ import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import globals from "globals";
 import unicorn from "eslint-plugin-unicorn";
+import eslintConfigPrettier from "eslint-config-prettier";
 
 const commonUnicornRules = {
   "unicorn/filename-case": "off",
@@ -83,4 +84,5 @@ export default [
       ...commonUnicornRules,
     },
   },
+  eslintConfigPrettier, // must come last; turns off style rules that conflict with Prettier
 ];

@@ -79,7 +79,7 @@ const hooks = {
     console.error(
       `[INFO] ${n}: ${tot ? Math.round((cur / tot) * 100) : 0}% (${cur}/${
         tot ?? "?"
-      })`
+      })`,
     ),
 };
 
@@ -96,7 +96,7 @@ async function main() {
           throw new Error(`Bad --component "${s}"`);
         }
         return { product, component };
-      }
+      },
     );
 
     const metabugs = (argv.metabug || [])
@@ -120,7 +120,7 @@ async function main() {
         includePatchContext: argv["patch-context"],
       },
       env,
-      hooks
+      hooks,
     );
 
     console.log(output);
@@ -128,9 +128,9 @@ async function main() {
     const msg =
       error instanceof Error
         ? error.message
-        : (typeof error === "string"
+        : typeof error === "string"
           ? error
-          : "");
+          : "";
     console.error("ERROR:", msg || error);
     process.exitCode = 1;
   }

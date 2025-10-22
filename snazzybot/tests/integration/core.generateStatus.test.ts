@@ -26,23 +26,23 @@ describe("core integration (with MSW mocks)", () => {
         whiteboards: ["[fx-vpn]"],
       },
       env,
-      hooks
+      hooks,
     );
     expect(ids).toEqual([1_987_802]);
     expect(output).toMatch(/View bugs in Bugzilla/);
     expect(hooks.phase).toHaveBeenCalledWith(
       "collect-whiteboards",
-      expect.objectContaining({ total: expect.any(Number) })
+      expect.objectContaining({ total: expect.any(Number) }),
     );
     expect(hooks.phase).toHaveBeenCalledWith(
       "patch-context",
-      expect.objectContaining({ total: expect.any(Number) })
+      expect.objectContaining({ total: expect.any(Number) }),
     );
     expect(
       hooks.info.mock.calls.some(
         (call) =>
-          typeof call[0] === "string" && call[0].includes("[debug] [patch]")
-      )
+          typeof call[0] === "string" && call[0].includes("[debug] [patch]"),
+      ),
     ).toBe(true);
   });
 
@@ -154,8 +154,8 @@ describe("core integration (with MSW mocks)", () => {
               },
             ],
           });
-        }
-      )
+        },
+      ),
     );
 
     const res = await generateStatus(
@@ -163,7 +163,7 @@ describe("core integration (with MSW mocks)", () => {
         days: 8,
         components: [{ product: "Firefox", component: "General" }],
       },
-      env
+      env,
     );
     expect(res.ids).toEqual([1_987_802]);
   });
@@ -186,7 +186,7 @@ describe("core integration (with MSW mocks)", () => {
               groups: [],
               depends_on: [],
               blocks: [],
-            })
+            }),
           );
           return HttpResponse.json({ bugs });
         }
@@ -248,8 +248,8 @@ describe("core integration (with MSW mocks)", () => {
               },
             ],
           });
-        }
-      )
+        },
+      ),
     );
 
     const res = await generateStatus(
@@ -258,7 +258,7 @@ describe("core integration (with MSW mocks)", () => {
         days: 8,
         format: "md",
       },
-      env
+      env,
     );
     expect(res.output).toMatch(/omitted from the AI summary/);
     expect(res.ids.length).toBe(65);
@@ -309,7 +309,7 @@ index e69de29..4b825dc 100644
       http.get(`${commitUrl}.patch`, () =>
         HttpResponse.text(patchBody, {
           headers: { "content-type": "text/plain; charset=utf-8" },
-        })
+        }),
       ),
       http.post(
         "https://api.openai.com/v1/chat/completions",
@@ -328,8 +328,8 @@ index e69de29..4b825dc 100644
               },
             ],
           });
-        }
-      )
+        },
+      ),
     );
 
     const envWithSkip = { ...env, SNAZZY_SKIP_CACHE: true };
@@ -339,7 +339,7 @@ index e69de29..4b825dc 100644
         days: 8,
         model: "gpt-5",
       },
-      envWithSkip
+      envWithSkip,
     );
 
     const payload = capturedOpenAi as

@@ -4,7 +4,7 @@ const $ = (id) => document.querySelector(`#${id}`);
 
 // ===== Emoji Confetti Engine (no deps) =====
 const reduceMotion = globalThis.matchMedia(
-  "(prefers-reduced-motion: reduce)"
+  "(prefers-reduced-motion: reduce)",
 ).matches;
 
 function burstEmojis(mode = "normal") {
@@ -322,7 +322,7 @@ async function runSnazzyStream(body) {
             setPhasePct(name, Number(evt.current) || 0, Number(evt.total) || 1);
             setPhaseText(
               name,
-              `${name}: ${Number(evt.current) || 0}/${Number(evt.total) || 1}`
+              `${name}: ${Number(evt.current) || 0}/${Number(evt.total) || 1}`,
             );
           } else {
             setPhaseIndeterminate(name);
@@ -410,7 +410,7 @@ async function runSnazzyPaged(body) {
       spin.textContent = `⏳ Histories ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`;
       setPhaseText(
         "histories",
-        `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`
+        `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`,
       );
       setPhasePct("histories", Math.min(cursor + step, total), total);
       const page = await postStatusJSON({
@@ -435,7 +435,7 @@ async function runSnazzyPaged(body) {
         setPhasePct("patch-context", 0, qualifiedIds.length);
         setPhaseText(
           "patch-context",
-          `patch-context: 0/${qualifiedIds.length}`
+          `patch-context: 0/${qualifiedIds.length}`,
         );
       } else {
         setPhaseIndeterminate("patch-context");
@@ -632,7 +632,7 @@ if (downloadMdBtn) {
     download(
       "snazzybot-status.md",
       lastMarkdown,
-      "text/markdown;charset=utf-8"
+      "text/markdown;charset=utf-8",
     );
   });
 }

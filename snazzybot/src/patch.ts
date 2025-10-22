@@ -61,7 +61,7 @@ const toCacheKey = (host: string, bugId: number): string =>
 
 const readCache = async (
   key: string,
-  bypass: boolean
+  bypass: boolean,
 ): Promise<CachePayload | undefined> => {
   if (bypass) return undefined;
   const cfCache = getDefaultCache();
@@ -84,7 +84,7 @@ const readCache = async (
 const writeCache = async (
   key: string,
   payload: CachePayload,
-  bypass: boolean
+  bypass: boolean,
 ) => {
   if (bypass) return;
   const cfCache = getDefaultCache();
@@ -97,7 +97,7 @@ const writeCache = async (
             "content-type": "application/json; charset=utf-8",
             "cache-control": `public, s-maxage=${ONE_DAY_S}, max-age=0, immutable`,
           },
-        })
+        }),
       );
     } catch (error) {
       console.warn("Failed to write patch context to cache", error);
@@ -122,7 +122,7 @@ const extractLastPulsebotComment = (parsed: unknown) => {
     ? longDescRaw
     : [longDescRaw].filter(Boolean);
   const pulsebot = longDescs.filter(
-    (desc) => normalizeEmail((desc as { who?: unknown }).who) === "pulsebot"
+    (desc) => normalizeEmail((desc as { who?: unknown }).who) === "pulsebot",
   );
   if (pulsebot.length === 0) return;
   return pulsebot.at(-1);
@@ -145,7 +145,7 @@ const parsePatchMessage = (patch: string): string => {
 
 export async function loadPatchContext(
   env: EnvLike,
-  bugId: number
+  bugId: number,
 ): Promise<CommitPatch[]> {
   const host = env.BUGZILLA_HOST || "https://bugzilla.mozilla.org";
   const key = toCacheKey(host, bugId);
@@ -155,7 +155,7 @@ export async function loadPatchContext(
   if (cached) return cached.patches;
 
   const xmlResp = await fetch(
-    `${host}/show_bug.cgi?ctype=xml&id=${encodeURIComponent(bugId)}`
+    `${host}/show_bug.cgi?ctype=xml&id=${encodeURIComponent(bugId)}`,
   );
   if (!xmlResp.ok) {
     throw new Error(`Bugzilla XML ${xmlResp.status}: ${await xmlResp.text()}`);

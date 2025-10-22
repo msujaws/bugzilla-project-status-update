@@ -31,14 +31,16 @@ describe("CLI weekly-bugzilla-status", () => {
     await import("../../cli/weekly-bugzilla-status.ts");
 
     expect(
-      spyError.mock.calls.map((call) => call.join(" ")).join("\n")
+      spyError.mock.calls.map((call) => call.join(" ")).join("\n"),
     ).toMatch(/missing BUGZILLA_API_KEY or OPENAI_API_KEY/i);
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
   it("parses component names that include colons", async () => {
     process.env = { BUGZILLA_API_KEY: "x", OPENAI_API_KEY: "y" };
-    const coreModule = (await import("../../src/core.js")) as typeof import("../../src/core.js");
+    const coreModule = (await import(
+      "../../src/core.js"
+    )) as typeof import("../../src/core.js");
     const { generateStatus } = coreModule;
     const argvBak = process.argv;
     process.argv = ["node", "cli", "--component", "Core:Audio/Video: cubeb"];
@@ -50,7 +52,7 @@ describe("CLI weekly-bugzilla-status", () => {
         includePatchContext: true,
       }),
       expect.any(Object),
-      expect.any(Object)
+      expect.any(Object),
     );
     spyLog.mockRestore();
     process.argv = argvBak;
@@ -95,7 +97,7 @@ describe("CLI weekly-bugzilla-status", () => {
         BUGZILLA_API_KEY: "bz",
         OPENAI_API_KEY: "openai",
       }),
-      expect.any(Object)
+      expect.any(Object),
     );
     expect(spyLog).toHaveBeenCalledWith("OK");
   });
@@ -124,7 +126,7 @@ describe("CLI weekly-bugzilla-status", () => {
         includePatchContext: false,
       }),
       expect.any(Object),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -142,7 +144,7 @@ describe("CLI weekly-bugzilla-status", () => {
     await import("../../cli/weekly-bugzilla-status.ts");
 
     expect(spyErr.mock.calls.map((call) => call.join(" ")).join("\n")).toMatch(
-      /Bad --component/i
+      /Bad --component/i,
     );
     expect(process.exitCode).toBe(1);
   });
