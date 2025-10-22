@@ -4,7 +4,7 @@ const $ = (id) => document.querySelector(`#${id}`);
 
 // ===== Emoji Confetti Engine (no deps) =====
 const reduceMotion = globalThis.matchMedia(
-  "(prefers-reduced-motion: reduce)",
+  "(prefers-reduced-motion: reduce)"
 ).matches;
 
 function burstEmojis(mode = "normal") {
@@ -322,7 +322,7 @@ async function runSnazzyStream(body) {
             setPhasePct(name, Number(evt.current) || 0, Number(evt.total) || 1);
             setPhaseText(
               name,
-              `${name}: ${Number(evt.current) || 0}/${Number(evt.total) || 1}`,
+              `${name}: ${Number(evt.current) || 0}/${Number(evt.total) || 1}`
             );
           } else {
             setPhaseIndeterminate(name);
@@ -410,7 +410,7 @@ async function runSnazzyPaged(body) {
       spin.textContent = `⏳ Histories ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`;
       setPhaseText(
         "histories",
-        `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`,
+        `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`
       );
       setPhasePct("histories", Math.min(cursor + step, total), total);
       const page = await postStatusJSON({
@@ -474,9 +474,14 @@ if (runButton) {
   runButton.addEventListener("click", () => {
     const components = parseLines($("components")?.value || "")
       .map((s) => {
-        const [product, component] = s
-          .split(":")
-          .map((x) => (x ? x.trim() : ""));
+        const colon = s.indexOf(":");
+        if (colon === -1 || colon === s.length - 1) {
+          throw new Error(`Bad component "${s}"`);
+        }
+        const [product, component] = [s.slice(0, colon), s.slice(colon + 1)];
+        if (!product || !component) {
+          throw new Error(`Bad component "${s}"`);
+        }
         return product && component ? { product, component } : undefined;
       })
       .filter(Boolean);
@@ -591,7 +596,7 @@ if (downloadMdBtn) {
     download(
       "snazzybot-status.md",
       lastMarkdown,
-      "text/markdown;charset=utf-8",
+      "text/markdown;charset=utf-8"
     );
   });
 }

@@ -74,7 +74,7 @@ const hooks = {
     console.error(
       `[INFO] ${n}: ${tot ? Math.round((cur / tot) * 100) : 0}% (${cur}/${
         tot ?? "?"
-      })`,
+      })`
     ),
 };
 
@@ -82,12 +82,16 @@ async function main() {
   try {
     const components: ProductComponent[] = (argv.component || []).map(
       (s: string) => {
-        const [product, component] = s.split(":").map((x) => x.trim());
+        const colon = s.indexOf(":");
+        if (colon === -1 || colon === s.length - 1) {
+          throw new Error(`Bad --component "${s}"`);
+        }
+        const [product, component] = [s.slice(0, colon), s.slice(colon + 1)];
         if (!product || !component) {
           throw new Error(`Bad --component "${s}"`);
         }
         return { product, component };
-      },
+      }
     );
 
     const metabugs = (argv.metabug || [])
@@ -110,7 +114,7 @@ async function main() {
         audience: argv.audience,
       },
       env,
-      hooks,
+      hooks
     );
 
     console.log(output);
