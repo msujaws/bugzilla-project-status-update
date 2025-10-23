@@ -1,5 +1,12 @@
 import { XMLParser } from "fast-xml-parser";
-import type { EnvLike } from "./core.ts";
+import type { EnvLike } from "./status/types.ts";
+import {
+  createExpiringMemoryCache,
+  DAY_IN_MILLISECONDS,
+  DAY_IN_SECONDS,
+  getDefaultCache,
+} from "./utils/cache.ts";
+import { describeError } from "./utils/errors.ts";
 
 export type CommitPatch = {
   commitUrl: string;
@@ -13,14 +20,7 @@ type CachePayload = {
   patches: CommitPatch[];
 };
 
-const ONE_DAY_S = 24 * 60 * 60;
-const ONE_DAY_MS = ONE_DAY_S * 1000;
-const memCache = new Map<string, { exp: number; data: CachePayload }>();
-
-type GlobalWithCaches = typeof globalThis & { caches?: CacheStorage };
-
-const getDefaultCache = (): Cache | undefined =>
-  (globalThis as GlobalWithCaches).caches?.default;
+const memCache = createExpiringMemoryCache<CachePayload>(DAY_IN_MILLISECONDS);
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -31,16 +31,6 @@ const parser = new XMLParser({
 
 const commitRegex =
   /https?:\/\/github\.com\/[\w.-]+\/[\w.-]+\/commit\/[0-9a-f]{7,40}/gi;
-
-const describeError = (error: unknown): string => {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-};
 
 const normalizeText = (value: unknown): string => {
   if (typeof value === "string") return value;
@@ -76,9 +66,7 @@ const readCache = async (
     }
     return undefined;
   }
-  const entry = memCache.get(key);
-  if (entry && entry.exp > Date.now()) return entry.data;
-  return undefined;
+  return memCache.get(key);
 };
 
 const writeCache = async (
@@ -95,7 +83,7 @@ const writeCache = async (
         new Response(JSON.stringify(payload), {
           headers: {
             "content-type": "application/json; charset=utf-8",
-            "cache-control": `public, s-maxage=${ONE_DAY_S}, max-age=0, immutable`,
+            "cache-control": `public, s-maxage=${DAY_IN_SECONDS}, max-age=0, immutable`,
           },
         }),
       );
@@ -104,7 +92,7 @@ const writeCache = async (
     }
     return;
   }
-  memCache.set(key, { exp: Date.now() + ONE_DAY_MS, data: payload });
+  memCache.set(key, payload);
 };
 
 const extractLastPulsebotComment = (parsed: unknown) => {
