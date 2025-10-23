@@ -42,7 +42,7 @@ const argv = yargs(hideBin(process.argv))
   })
   .option("patch-context", {
     type: "boolean",
-    default: true,
+    default: false,
     desc: "Include GitHub commit patch context (use --no-patch-context to skip)",
   })
   .help()
@@ -79,7 +79,7 @@ const hooks = {
     console.error(
       `[INFO] ${n}: ${tot ? Math.round((cur / tot) * 100) : 0}% (${cur}/${
         tot ?? "?"
-      })`,
+      })`
     ),
 };
 
@@ -96,7 +96,7 @@ async function main() {
           throw new Error(`Bad --component "${s}"`);
         }
         return { product, component };
-      },
+      }
     );
 
     const metabugs = (argv.metabug || [])
@@ -120,7 +120,7 @@ async function main() {
         includePatchContext: argv["patch-context"],
       },
       env,
-      hooks,
+      hooks
     );
 
     console.log(output);
