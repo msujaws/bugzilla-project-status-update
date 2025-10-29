@@ -4,6 +4,12 @@ import type { Bug, EnvLike } from "./types.ts";
 type VoiceOption = "normal" | "pirate" | "snazzy-robot";
 type AudienceOption = "technical" | "product" | "leadership";
 
+type SummarizeOptions = {
+  patchContextByBug?: Map<number, CommitPatch[]>;
+  groupByAssignee?: boolean;
+  singleAssignee?: boolean;
+};
+
 const technicalAudienceHint = `
 Audience: engineers. Include specific technical details where valuable (file/feature areas, prefs/flags, APIs, perf metrics, platform scopes). Assume context; keep acronyms if common. Avoid business framing.
 Refer to each bug's assignee using the provided \`assignee.name\` (fall back to the email handle if the name is missing). Start every sentence with that assignee so the update credits the correct person.
@@ -17,12 +23,44 @@ Rosa Kim [added a dedicated switch_to_parent_frame method to the WebDriver Class
 Mateo Singh updated the network.getData command to [return response bodies for data: scheme requests](https://bugzil.la/1900453).\n
 Priya Iqbal fixed a bug where [different requests could reuse the same id](https://bugzil.la/1900453), which broke targeted commands like network.provideResponse and network.getData.\n
 `;
+const technicalAudienceHintGrouped = `
+Audience: engineers. Include specific technical details where valuable (file/feature areas, prefs/flags, APIs, perf metrics, platform scopes). Assume context; keep acronyms if common. Avoid business framing.
+Group the summary by assignee: for each assignee, emit a Markdown h2 heading like \`## Rosa Kim\` followed by bullet points describing each of their bugs. Use inline Markdown links so the spoken summary can call out the bug ID. The heading already credits the assignee—do not repeat their name inside every bullet.
+Keep the tone crisp and technical; highlight concrete fixes, affected surfaces, and any measurable impact. Summaries should stay within the requested length budget overall.
+`;
+const technicalAudienceHintSingle = `
+Audience: engineers. Include specific technical details where valuable (file/feature areas, prefs/flags, APIs, perf metrics, platform scopes). Assume context; keep acronyms if common. Avoid business framing.
+All bugs belong to a single assignee; mention their name once near the start, then describe each bug's impact without repeating their name in every sentence. Keep one concise sentence per bug with inline Markdown links for IDs.
+Maintain a crisp, technical tone and highlight concrete fixes, affected surfaces, and measurable impact.
+`;
 const leadershipAudienceHint = `
 Audience: leadership. Be high-level and concise. Focus on user/business impact, risks, timelines, and cross-team blockers. Avoid low-level tech details and code paths.
 `;
 const productAudienceHint = `
 Audience: product managers. Emphasize user impact, product implications, rollout/experimentation notes, and notable tradeoffs. Include light technical context only when it clarifies impact.
 `;
+
+const buildAudienceHint = (
+  audience: AudienceOption,
+  options: { groupByAssignee: boolean; singleAssignee: boolean },
+) => {
+  const { groupByAssignee, singleAssignee } = options;
+  if (audience === "technical") {
+    if (groupByAssignee && singleAssignee) return technicalAudienceHintSingle;
+    if (groupByAssignee) return technicalAudienceHintGrouped;
+    return technicalAudienceHint;
+  }
+  let base =
+    audience === "leadership" ? leadershipAudienceHint : productAudienceHint;
+  if (groupByAssignee && singleAssignee) {
+    base += `
+All bugs belong to a single assignee; mention their name once near the start, then cover each bug without repeating it.`;
+  } else if (groupByAssignee) {
+    base += `
+Group the summary by assignee with Markdown \`## Name\` headings and bullets so ownership is obvious without repeating the name.`;
+  }
+  return base;
+};
 
 export type SummarizerResult = {
   assessments: Array<{
@@ -41,8 +79,14 @@ export async function summarizeWithOpenAI(
   days: number,
   voice: VoiceOption,
   audience: AudienceOption,
-  patchContextByBug?: Map<number, CommitPatch[]>
+  options: SummarizeOptions = {},
 ): Promise<SummarizerResult> {
+  const {
+    patchContextByBug,
+    groupByAssignee = false,
+    singleAssignee = false,
+  } = options;
+
   const voiceHint =
     voice === "pirate"
       ? "Write in light, readable pirate-speak (sprinkle nautical words like ‘Ahoy’, ‘ship’, ‘crew’). Keep it professional, clear, and not overdone."
@@ -50,12 +94,10 @@ export async function summarizeWithOpenAI(
         ? "Write as a friendly, upbeat robot narrator (light ‘beep boop’, ‘systems nominal’). Keep it human-readable and charming, not spammy."
         : "Write in a clear, friendly, professional tone.";
 
-  const audienceHint =
-    audience === "technical"
-      ? technicalAudienceHint
-      : audience === "leadership"
-        ? leadershipAudienceHint
-        : productAudienceHint;
+  const audienceHint = buildAudienceHint(audience, {
+    groupByAssignee,
+    singleAssignee,
+  });
 
   const lengthHint =
     audience === "technical"
@@ -91,6 +133,12 @@ export async function summarizeWithOpenAI(
     };
   });
 
+  const summaryInstruction = groupByAssignee
+    ? singleAssignee
+      ? "In assessments, credit each bug's assignee by name. In the summary, mention the assignee once near the start and describe each bug without repeating their name."
+      : "In assessments, credit each bug's assignee by name. In the summary, group bugs under Markdown headings for each assignee (use `## Name`) and list their bugs as bullets without repeating the assignee's name inside each bullet."
+    : "In both the assessments and the summary, credit the bug's assignee by name (use assignee.name; if missing, fall back to the assignee email handle).";
+
   let user = `Data window: last ${days} days.
 Bugs (done/fixed):
 ${JSON.stringify(bugPayload)}
@@ -99,7 +147,7 @@ Tasks:
 1) For each bug, provide an impact score 1-10 and a one-line reason.
 2) For bugs with score >= 6, suggest a one-sentence demo idea.
 3) Write a concise Markdown summary emphasizing user impact only.
-4) In both the assessments and the summary, credit the bug's assignee by name (use assignee.name; if missing, fall back to the assignee email handle).
+4) ${summaryInstruction}
 
 Return JSON:
 {

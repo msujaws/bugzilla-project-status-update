@@ -226,7 +226,11 @@ export async function generateStatus(
       days,
       voice,
       audience,
-      patchContext,
+      {
+        patchContextByBug: patchContext,
+        groupByAssignee: assignees.length > 0,
+        singleAssignee: assignees.length === 1,
+      },
     );
 
     const demo = (ai.assessments || [])
@@ -422,7 +426,11 @@ export async function generateStatus(
     days,
     voice,
     audience,
-    patchContext,
+    {
+      patchContextByBug: patchContext,
+      groupByAssignee: assignees.length > 0,
+      singleAssignee: assignees.length === 1,
+    },
   );
 
   const demo = (ai.assessments || [])
