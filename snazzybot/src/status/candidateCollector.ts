@@ -1,10 +1,6 @@
 import { BugzillaClient } from "./bugzillaClient.ts";
 import { isRestricted } from "./rules.ts";
-import type {
-  Bug,
-  ProductComponent,
-  ProgressHooks,
-} from "./types.ts";
+import type { Bug, ProductComponent, ProgressHooks } from "./types.ts";
 
 export type CandidateCollection = {
   union: Bug[];
@@ -35,8 +31,7 @@ export async function collectCandidates(
     metabugs = [],
     assignees = [],
     debugLog,
-  } =
-    options;
+  } = options;
 
   const [metabugChildren, byComponents, byWhiteboards, byAssignees] =
     await Promise.all([
@@ -68,13 +63,16 @@ export async function collectCandidates(
 
   const byIds = await client.fetchBugsByIds(metabugChildren, sinceISO);
   if (debugLog) {
-    debugLog(
-      `byIds (filtered) count: ${byIds.length} (from metabug children)`,
-    );
+    debugLog(`byIds (filtered) count: ${byIds.length} (from metabug children)`);
   }
 
   const seen = new Set<number>();
-  const union = [...byComponents, ...byWhiteboards, ...byAssignees, ...byIds].filter((bug) => {
+  const union = [
+    ...byComponents,
+    ...byWhiteboards,
+    ...byAssignees,
+    ...byIds,
+  ].filter((bug) => {
     if (seen.has(bug.id)) return false;
     seen.add(bug.id);
     return true;

@@ -84,7 +84,7 @@ const hooks = {
     console.error(
       `[INFO] ${n}: ${tot ? Math.round((cur / tot) * 100) : 0}% (${cur}/${
         tot ?? "?"
-      })`
+      })`,
     ),
 };
 
@@ -109,7 +109,7 @@ async function main() {
           return { product };
         }
         return { product, component };
-      }
+      },
     );
 
     const metabugs = (argv.metabug || [])
@@ -137,7 +137,7 @@ async function main() {
         includePatchContext: argv["patch-context"],
       },
       env,
-      hooks
+      hooks,
     );
 
     console.log(output);

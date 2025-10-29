@@ -31,7 +31,7 @@ describe("CLI weekly-bugzilla-status", () => {
     await import("../../cli/weekly-bugzilla-status.ts");
 
     expect(
-      spyError.mock.calls.map((call) => call.join(" ")).join("\n")
+      spyError.mock.calls.map((call) => call.join(" ")).join("\n"),
     ).toMatch(/missing BUGZILLA_API_KEY or OPENAI_API_KEY/i);
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
@@ -52,7 +52,7 @@ describe("CLI weekly-bugzilla-status", () => {
         includePatchContext: false,
       }),
       expect.any(Object),
-      expect.any(Object)
+      expect.any(Object),
     );
     spyLog.mockRestore();
     process.argv = argvBak;
@@ -97,7 +97,7 @@ describe("CLI weekly-bugzilla-status", () => {
         BUGZILLA_API_KEY: "bz",
         OPENAI_API_KEY: "openai",
       }),
-      expect.any(Object)
+      expect.any(Object),
     );
     expect(spyLog).toHaveBeenCalledWith("OK");
   });
@@ -127,7 +127,7 @@ describe("CLI weekly-bugzilla-status", () => {
         includePatchContext: false,
       }),
       expect.any(Object),
-      expect.any(Object)
+      expect.any(Object),
     );
     expect(spyLog).toHaveBeenCalledWith("OK");
   });
@@ -156,7 +156,7 @@ describe("CLI weekly-bugzilla-status", () => {
         includePatchContext: false,
       }),
       expect.any(Object),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -174,7 +174,7 @@ describe("CLI weekly-bugzilla-status", () => {
     await import("../../cli/weekly-bugzilla-status.ts");
 
     expect(spyErr.mock.calls.map((call) => call.join(" ")).join("\n")).toMatch(
-      /Bad --component/i
+      /Bad --component/i,
     );
     expect(process.exitCode).toBe(1);
   });

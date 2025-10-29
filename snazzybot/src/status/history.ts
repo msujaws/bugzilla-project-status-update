@@ -65,5 +65,8 @@ export function qualifiesByHistoryWhy(
     }
   }
   if (!sawRecent) return { ok: false, why: "no recent history in window" };
-  return { ok: false, why: "no qualifying transitions (bug_status/resolution)" };
+  return {
+    ok: false,
+    why: "no qualifying transitions (bug_status/resolution)",
+  };
 }

@@ -69,10 +69,7 @@ describe("core integration (with MSW mocks)", () => {
         ],
       }),
     );
-    expect(url.searchParams.getAll("product")).toEqual([
-      "DevTools",
-      "Firefox",
-    ]);
+    expect(url.searchParams.getAll("product")).toEqual(["DevTools", "Firefox"]);
     expect(url.searchParams.getAll("component")).toEqual(["General"]);
   });
 

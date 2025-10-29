@@ -73,7 +73,7 @@ const logWindowContext = (
   components: string[],
   whiteboards: string[],
   metabugs: number[],
-  assignees: string[]
+  assignees: string[],
 ) => {
   hooks.info?.(`Window: last ${days} days (since ${sinceISO})`);
   if (whiteboards.length > 0) {
@@ -92,7 +92,7 @@ const logWindowContext = (
 
 const summarizeCandidateReasons = (
   collection: CandidateCollection,
-  debugLog?: (message: string) => void
+  debugLog?: (message: string) => void,
 ) => {
   if (!debugLog) return;
   debugLog(`union candidates: ${collection.union.length}`);
@@ -104,7 +104,7 @@ const summarizeCandidateReasons = (
             .map((bug) => bug.id)
             .join(", ")})`
         : ""
-    }`
+    }`,
   );
   debugLog(`candidates after security filter: ${collection.candidates.length}`);
 };
@@ -113,12 +113,12 @@ const emitHistoryCoverage = (
   candidates: Bug[],
   histories: BugHistoryEntry[],
   byIdHistory: Map<number, BugHistoryEntry>,
-  debugLog?: (message: string) => void
+  debugLog?: (message: string) => void,
 ) => {
   if (!debugLog) return;
   if (histories.length === candidates.length) {
     debugLog(
-      `history coverage: ${histories.length}/${candidates.length} (complete)`
+      `history coverage: ${histories.length}/${candidates.length} (complete)`,
     );
   } else {
     const missing = candidates
@@ -128,7 +128,7 @@ const emitHistoryCoverage = (
     debugLog(
       `history coverage: ${histories.length}/${candidates.length}${
         missing.length > 0 ? ` (no history for: ${missing.join(", ")})` : ""
-      }`
+      }`,
     );
   }
 };
@@ -136,7 +136,7 @@ const emitHistoryCoverage = (
 const logReasonBreakdown = (
   reasonCounts: Map<string, number>,
   reasonExamples: Map<string, number[]>,
-  debugLog?: (message: string) => void
+  debugLog?: (message: string) => void,
 ) => {
   if (!debugLog) return;
   const entries = [...reasonCounts.entries()].toSorted((a, b) => b[1] - a[1]);
@@ -145,7 +145,7 @@ const logReasonBreakdown = (
   for (const [why, count] of entries) {
     const ids = reasonExamples.get(why) || [];
     debugLog(
-      `  • ${why}: ${count}${ids.length > 0 ? ` (eg: ${ids.join(", ")})` : ""}`
+      `  • ${why}: ${count}${ids.length > 0 ? ` (eg: ${ids.join(", ")})` : ""}`,
     );
   }
 };
@@ -153,7 +153,7 @@ const logReasonBreakdown = (
 export async function generateStatus(
   params: GenerateParams,
   env: EnvLike,
-  hooks: ProgressHooks = defaultHooks
+  hooks: ProgressHooks = defaultHooks,
 ): Promise<{ output: string; ids: number[] }> {
   const includePatchContext = params.includePatchContext !== false;
   const isDebug = !!params.debug;
@@ -193,7 +193,7 @@ export async function generateStatus(
       hooks.warn?.(
         `Trimming ${
           bugs.length - MAX_BUGS_FOR_OPENAI
-        } bug(s) before OpenAI call to stay within token limits`
+        } bug(s) before OpenAI call to stay within token limits`,
       );
     }
 
@@ -203,7 +203,7 @@ export async function generateStatus(
     });
     if (debugLog) {
       debugLog(
-        `[patch] pre-qualified run collected context for ${patchContext.size}/${limited.length} bug(s)`
+        `[patch] pre-qualified run collected context for ${patchContext.size}/${limited.length} bug(s)`,
       );
     }
 
@@ -219,7 +219,7 @@ export async function generateStatus(
         patchContextByBug: patchContext,
         groupByAssignee: assignees.length > 0,
         singleAssignee: assignees.length === 1,
-      }
+      },
     );
 
     const demo = (ai.assessments || [])
@@ -231,7 +231,7 @@ export async function generateStatus(
       })
       .map(
         (assessment) =>
-          `- [Bug ${assessment.bug_id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${assessment.bug_id}): ${assessment.demo_suggestion}`
+          `- [Bug ${assessment.bug_id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${assessment.bug_id}): ${assessment.demo_suggestion}`,
       );
 
     const output = formatSummaryOutput({
@@ -259,11 +259,11 @@ export async function generateStatus(
     sinceISO,
     days,
     components.map((pc) =>
-      pc.component ? `${pc.product}:${pc.component}` : pc.product
+      pc.component ? `${pc.product}:${pc.component}` : pc.product,
     ),
     whiteboards,
     metabugs,
-    assignees
+    assignees,
   );
 
   const collection = await collectCandidates(client, hooks, sinceISO, {
@@ -277,7 +277,7 @@ export async function generateStatus(
 
   const histories = await client.fetchHistories(
     collection.candidates.map((bug) => bug.id),
-    hooks
+    hooks,
   );
   const byIdHistory = new Map(histories.map((entry) => [entry.id, entry]));
 
@@ -290,18 +290,18 @@ export async function generateStatus(
       const changes = Array.isArray(firstChanges) ? firstChanges : [];
       if (history?.history?.length && !Array.isArray(firstChanges)) {
         hooks.info?.(
-          `[debug] sample history #${bug.id} has non-array changes payload: ${JSON.stringify(firstChanges)}`
+          `[debug] sample history #${bug.id} has non-array changes payload: ${JSON.stringify(firstChanges)}`,
         );
       } else if (!history?.history?.length) {
         hooks.info?.(
-          `[debug] sample history #${bug.id} has no history entries within fetched payload`
+          `[debug] sample history #${bug.id} has no history entries within fetched payload`,
         );
       }
       if (changes.length > 0) {
         hooks.info?.(
           `[debug] sample history #${bug.id} first changes: ${JSON.stringify(
-            changes.slice(0, 2)
-          )}`
+            changes.slice(0, 2),
+          )}`,
         );
         shown++;
       }
@@ -348,11 +348,11 @@ export async function generateStatus(
         `qualified IDs: ${final
           .slice(0, 20)
           .map((bug) => bug.id)
-          .join(", ")}${final.length > 20 ? " …" : ""}`
+          .join(", ")}${final.length > 20 ? " …" : ""}`,
       );
     } else {
       debugLog(
-        "no qualified bugs → check reasons above; also verify statuses/resolution and history window."
+        "no qualified bugs → check reasons above; also verify statuses/resolution and history window.",
       );
     }
   }
@@ -379,7 +379,7 @@ export async function generateStatus(
   if (final.length > MAX_BUGS_FOR_OPENAI) {
     trimmedCount = final.length - MAX_BUGS_FOR_OPENAI;
     hooks.warn?.(
-      `Trimming ${trimmedCount} bug(s) before OpenAI call to stay within token limits`
+      `Trimming ${trimmedCount} bug(s) before OpenAI call to stay within token limits`,
     );
     aiCandidates = final.slice(0, MAX_BUGS_FOR_OPENAI);
     if (debugLog) {
@@ -387,7 +387,7 @@ export async function generateStatus(
         `OpenAI candidate IDs (trimmed to ${MAX_BUGS_FOR_OPENAI}): ${aiCandidates
           .slice(0, 30)
           .map((bug) => bug.id)
-          .join(", ")}${final.length > 30 ? " …" : ""}`
+          .join(", ")}${final.length > 30 ? " …" : ""}`,
       );
     }
   } else if (debugLog) {
@@ -395,7 +395,7 @@ export async function generateStatus(
       `OpenAI candidate IDs (${aiCandidates.length}): ${aiCandidates
         .slice(0, 30)
         .map((bug) => bug.id)
-        .join(", ")}${aiCandidates.length > 30 ? " …" : ""}`
+        .join(", ")}${aiCandidates.length > 30 ? " …" : ""}`,
     );
   }
 
@@ -403,11 +403,11 @@ export async function generateStatus(
     env,
     aiCandidates,
     hooks,
-    { includePatchContext, debugLog }
+    { includePatchContext, debugLog },
   );
   if (debugLog) {
     debugLog(
-      `[patch] summary run collected context for ${patchContext.size}/${aiCandidates.length} bug(s)`
+      `[patch] summary run collected context for ${patchContext.size}/${aiCandidates.length} bug(s)`,
     );
   }
 
@@ -423,7 +423,7 @@ export async function generateStatus(
       patchContextByBug: patchContext,
       groupByAssignee: assignees.length > 0,
       singleAssignee: assignees.length === 1,
-    }
+    },
   );
 
   const demo = (ai.assessments || [])
@@ -433,7 +433,7 @@ export async function generateStatus(
     })
     .map(
       (assessment) =>
-        `- [Bug ${assessment.bug_id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${assessment.bug_id}): ${assessment.demo_suggestion}`
+        `- [Bug ${assessment.bug_id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${assessment.bug_id}): ${assessment.demo_suggestion}`,
     );
 
   const link = buildBuglistURL({
@@ -459,7 +459,7 @@ export async function generateStatus(
 export async function discoverCandidates(
   params: Omit<GenerateParams, "ids">,
   env: EnvLike,
-  hooks: ProgressHooks = defaultHooks
+  hooks: ProgressHooks = defaultHooks,
 ): Promise<{ sinceISO: string; candidates: Bug[] }> {
   const client = new BugzillaClient(env);
   const days = params.days ?? 8;
@@ -476,11 +476,11 @@ export async function discoverCandidates(
     sinceISO,
     days,
     components.map((pc) =>
-      pc.component ? `${pc.product}:${pc.component}` : pc.product
+      pc.component ? `${pc.product}:${pc.component}` : pc.product,
     ),
     whiteboards,
     metabugs,
-    assignees
+    assignees,
   );
 
   const collection = await collectCandidates(client, hooks, sinceISO, {
@@ -490,7 +490,7 @@ export async function discoverCandidates(
     assignees,
   });
   hooks.info?.(
-    `Candidates after initial query: ${collection.candidates.length}`
+    `Candidates after initial query: ${collection.candidates.length}`,
   );
   return { sinceISO, candidates: collection.candidates };
 }
@@ -502,7 +502,7 @@ export async function qualifyHistoryPage(
   cursor: number,
   pageSize: number,
   hooks: ProgressHooks = defaultHooks,
-  debug = false
+  debug = false,
 ): Promise<{
   qualifiedIds: number[];
   nextCursor: number | undefined;
@@ -512,7 +512,7 @@ export async function qualifyHistoryPage(
   const normalizedCursor = Number.isFinite(cursor) ? Math.trunc(cursor) : 0;
   const normalizedPageSize = Math.max(
     1,
-    Number.isFinite(pageSize) ? Math.trunc(pageSize) : 1
+    Number.isFinite(pageSize) ? Math.trunc(pageSize) : 1,
   );
   const start = Math.max(0, normalizedCursor);
   const end = Math.min(candidates.length, start + normalizedPageSize);
@@ -521,7 +521,7 @@ export async function qualifyHistoryPage(
 
   const histories = await client.fetchHistories(
     slice.map((bug) => bug.id),
-    hooks
+    hooks,
   );
   const byIdHistory = new Map(histories.map((entry) => [entry.id, entry]));
 
@@ -537,7 +537,7 @@ export async function qualifyHistoryPage(
   const nextCursor = end < candidates.length ? end : undefined;
   if (debug) {
     hooks.info?.(
-      `[debug] page qualified=${qualified.length} (cursor ${start}→${end}/${candidates.length})`
+      `[debug] page qualified=${qualified.length} (cursor ${start}→${end}/${candidates.length})`,
     );
   }
 

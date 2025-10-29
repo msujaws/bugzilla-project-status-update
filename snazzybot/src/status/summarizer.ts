@@ -42,7 +42,7 @@ Audience: product managers. Emphasize user impact, product implications, rollout
 
 const buildAudienceHint = (
   audience: AudienceOption,
-  options: { groupByAssignee: boolean; singleAssignee: boolean }
+  options: { groupByAssignee: boolean; singleAssignee: boolean },
 ) => {
   const { groupByAssignee, singleAssignee } = options;
   if (audience === "technical") {
@@ -79,7 +79,7 @@ export async function summarizeWithOpenAI(
   days: number,
   voice: VoiceOption,
   audience: AudienceOption,
-  options: SummarizeOptions = {}
+  options: SummarizeOptions = {},
 ): Promise<SummarizerResult> {
   const {
     patchContextByBug,

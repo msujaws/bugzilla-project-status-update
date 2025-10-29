@@ -31,10 +31,7 @@ const BUG_FIELDS = [
 
 const requestCache = createExpiringMemoryCache<unknown>(DAY_IN_MILLISECONDS);
 
-type BugQueryParams = Record<
-  string,
-  string | number | string[] | undefined
->;
+type BugQueryParams = Record<string, string | number | string[] | undefined>;
 
 export class BugzillaClient {
   private readonly host: string;
@@ -188,9 +185,7 @@ export class BugzillaClient {
     assignees: string[],
     sinceISO: string,
   ): Promise<Bug[]> {
-    const emails = assignees
-      .map((email) => email?.trim())
-      .filter(Boolean);
+    const emails = assignees.map((email) => email?.trim()).filter(Boolean);
     if (emails.length === 0) return [];
     const { bugs } = await this.get<{ bugs: Bug[] }>(`/bug`, {
       assigned_to: emails,
@@ -237,9 +232,7 @@ export class BugzillaClient {
   ): Promise<BugHistoryEntry[]> {
     if (ids.length === 0) return [];
     hooks.phase?.("histories", { total: ids.length });
-    hooks.info?.(
-      "History mode: per-ID /rest/bug/<id>/history (concurrency=8)",
-    );
+    hooks.info?.("History mode: per-ID /rest/bug/<id>/history (concurrency=8)");
 
     const out: BugHistoryEntry[] = [];
     const CONCURRENCY = 8;
@@ -251,14 +244,14 @@ export class BugzillaClient {
         const index = cursor++;
         const id = ids[index];
         try {
-          const payload = await this.get<BugHistoryPayload>(`/bug/${id}/history`);
+          const payload = await this.get<BugHistoryPayload>(
+            `/bug/${id}/history`,
+          );
           if (payload?.bugs?.length) {
             out.push(payload.bugs[0]);
           }
         } catch (error) {
-          hooks.warn?.(
-            `Skipping history for #${id} (${describeError(error)})`,
-          );
+          hooks.warn?.(`Skipping history for #${id} (${describeError(error)})`);
         } finally {
           handled++;
           hooks.progress?.("histories", handled, ids.length);
