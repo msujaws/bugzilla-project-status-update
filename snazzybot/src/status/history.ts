@@ -10,7 +10,8 @@ export function qualifiesByHistory(
     if (when < since) continue;
     let statusProgress = false;
     let fixed = false;
-    for (const change of history.changes) {
+    const changes = Array.isArray(history.changes) ? history.changes : [];
+    for (const change of changes) {
       const field = change.field_name?.toLowerCase();
       if (
         (field === "status" || field === "bug_status") &&
@@ -44,7 +45,8 @@ export function qualifiesByHistoryWhy(
     sawRecent = true;
     let statusProgress = false;
     let fixed = false;
-    for (const change of history.changes) {
+    const changes = Array.isArray(history.changes) ? history.changes : [];
+    for (const change of changes) {
       const field = change.field_name?.toLowerCase();
       if (
         (field === "status" || field === "bug_status") &&

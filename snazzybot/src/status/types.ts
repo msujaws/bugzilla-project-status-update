@@ -35,6 +35,14 @@ export type Bug = {
   component: string;
   status: string;
   resolution?: string;
+  assigned_to?: string;
+  assigned_to_detail?: {
+    id?: number;
+    name?: string;
+    real_name?: string;
+    nick?: string;
+    display_name?: string;
+  };
   last_change_time: string;
   groups?: string[];
   depends_on?: number[];
@@ -49,9 +57,17 @@ export type BugHistoryChange = {
 
 export type BugHistoryEntry = {
   id: number;
+  assigned_to?: string;
+  assigned_to_detail?: {
+    id?: number;
+    name?: string;
+    real_name?: string;
+    nick?: string;
+    display_name?: string;
+  };
   history: Array<{
     when: string;
-    changes: BugHistoryChange[];
+    changes?: BugHistoryChange[];
   }>;
 };
 

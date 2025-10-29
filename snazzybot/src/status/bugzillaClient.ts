@@ -21,6 +21,8 @@ const BUG_FIELDS = [
   "component",
   "status",
   "resolution",
+  "assigned_to",
+  "assigned_to_detail",
   "last_change_time",
   "groups",
   "depends_on",
@@ -215,9 +217,7 @@ export class BugzillaClient {
         const index = cursor++;
         const id = ids[index];
         try {
-          const payload = await this.get<BugHistoryPayload>(
-            `/bug/${id}/history`,
-          );
+          const payload = await this.get<BugHistoryPayload>(`/bug/${id}/history`);
           if (payload?.bugs?.length) {
             out.push(payload.bugs[0]);
           }

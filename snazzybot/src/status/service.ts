@@ -279,7 +279,17 @@ export async function generateStatus(
     for (const bug of collection.candidates) {
       if (shown >= 3) break;
       const history = byIdHistory.get(bug.id);
-      const changes = history?.history?.[0]?.changes || [];
+      const firstChanges = history?.history?.[0]?.changes;
+      const changes = Array.isArray(firstChanges) ? firstChanges : [];
+      if (history?.history?.length && !Array.isArray(firstChanges)) {
+        hooks.info?.(
+          `[debug] sample history #${bug.id} has non-array changes payload: ${JSON.stringify(firstChanges)}`,
+        );
+      } else if (!history?.history?.length) {
+        hooks.info?.(
+          `[debug] sample history #${bug.id} has no history entries within fetched payload`,
+        );
+      }
       if (changes.length > 0) {
         hooks.info?.(
           `[debug] sample history #${bug.id} first changes: ${JSON.stringify(
