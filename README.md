@@ -25,6 +25,7 @@ BUGZILLA_API_KEY="..." OPENAI_API_KEY="..." \
 ```
 
 Key flags:
+
 - `--component "Product:Component"` (repeatable) to scope by components
 - `--whiteboard "[tag]"` (repeatable) to match whiteboard substrings
 - `--metabug 12345` (repeatable) to include metabug children
