@@ -267,7 +267,9 @@ export async function generateStatus(
     hooks,
     sinceISO,
     days,
-    components.map((pc) => `${pc.product}:${pc.component}`),
+    components.map((pc) =>
+      pc.component ? `${pc.product}:${pc.component}` : pc.product,
+    ),
     whiteboards,
     metabugs,
     assignees,
@@ -484,7 +486,9 @@ export async function discoverCandidates(
     hooks,
     sinceISO,
     days,
-    components.map((pc) => `${pc.product}:${pc.component}`),
+    components.map((pc) =>
+      pc.component ? `${pc.product}:${pc.component}` : pc.product,
+    ),
     whiteboards,
     metabugs,
     assignees,

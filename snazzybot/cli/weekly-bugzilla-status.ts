@@ -92,13 +92,21 @@ async function main() {
   try {
     const components: ProductComponent[] = (argv.component || []).map(
       (s: string) => {
-        const colon = s.indexOf(":");
-        if (colon === -1 || colon === s.length - 1) {
+        const trimmed = s.trim();
+        if (!trimmed) {
           throw new Error(`Bad --component "${s}"`);
         }
-        const [product, component] = [s.slice(0, colon), s.slice(colon + 1)];
-        if (!product || !component) {
+        const colon = trimmed.indexOf(":");
+        if (colon === -1) {
+          return { product: trimmed };
+        }
+        const product = trimmed.slice(0, colon).trim();
+        const component = trimmed.slice(colon + 1).trim();
+        if (!product) {
           throw new Error(`Bad --component "${s}"`);
+        }
+        if (!component) {
+          return { product };
         }
         return { product, component };
       }

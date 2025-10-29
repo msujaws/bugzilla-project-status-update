@@ -102,6 +102,36 @@ describe("CLI weekly-bugzilla-status", () => {
     expect(spyLog).toHaveBeenCalledWith("OK");
   });
 
+  it("accepts product-only --component strings", async () => {
+    process.env = {
+      ...ORIG_ENV,
+      BUGZILLA_API_KEY: "bz",
+      OPENAI_API_KEY: "openai",
+    };
+    process.argv = ["node", "cli", "--component", "DevTools"];
+
+    const spyLog = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const mod = (await import("../../src/core.js")) as {
+      generateStatus: ReturnType<typeof vi.fn>;
+    };
+    const { generateStatus } = mod;
+
+    vi.resetModules();
+    await import("../../cli/weekly-bugzilla-status.ts");
+
+    expect(generateStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        components: [{ product: "DevTools" }],
+        includePatchContext: false,
+      }),
+      expect.any(Object),
+      expect.any(Object)
+    );
+    expect(spyLog).toHaveBeenCalledWith("OK");
+  });
+
   it("disables patch context when --no-patch-context supplied", async () => {
     process.env = {
       ...ORIG_ENV,
@@ -136,7 +166,7 @@ describe("CLI weekly-bugzilla-status", () => {
       BUGZILLA_API_KEY: "bz",
       OPENAI_API_KEY: "openai",
     };
-    process.argv = ["node", "cli", "--component", "BadFormatOnlyProduct"];
+    process.argv = ["node", "cli", "--component", ":MissingProduct"];
 
     const spyErr = vi.spyOn(console, "error").mockImplementation(() => {});
 

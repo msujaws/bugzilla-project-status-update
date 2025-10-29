@@ -16,9 +16,24 @@ export function buildBuglistURL(args: {
   url.searchParams.set("chfieldto", "Now");
   if (args.ids?.length) url.searchParams.set("bug_id", args.ids.join(","));
   if (args.components?.length) {
+    const productOnly = new Set<string>();
     for (const pc of args.components) {
-      url.searchParams.append("product", pc.product);
-      url.searchParams.append("component", pc.component);
+      const product = pc.product?.trim();
+      const component = pc.component?.trim();
+      if (product && !component) {
+        productOnly.add(product);
+      }
+    }
+    for (const product of productOnly) {
+      url.searchParams.append("product", product);
+    }
+    for (const pc of args.components) {
+      const product = pc.product?.trim();
+      const component = pc.component?.trim();
+      if (!product || !component) continue;
+      if (productOnly.has(product)) continue;
+      url.searchParams.append("product", product);
+      url.searchParams.append("component", component);
     }
   }
   let filterIndex = 1;

@@ -1,4 +1,4 @@
-export type ProductComponent = { product: string; component: string };
+export type ProductComponent = { product: string; component?: string };
 
 export type GenerateParams = {
   components?: ProductComponent[];

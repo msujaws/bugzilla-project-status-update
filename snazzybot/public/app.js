@@ -501,15 +501,21 @@ if (runButton) {
   runButton.addEventListener("click", () => {
     const components = parseLines($("components")?.value || "")
       .map((s) => {
-        const colon = s.indexOf(":");
-        if (colon === -1 || colon === s.length - 1) {
+        const trimmed = s.trim();
+        if (!trimmed) return;
+        const colon = trimmed.indexOf(":");
+        if (colon === -1) {
+          return { product: trimmed };
+        }
+        const product = trimmed.slice(0, colon).trim();
+        const component = trimmed.slice(colon + 1).trim();
+        if (!product) {
           throw new Error(`Bad component "${s}"`);
         }
-        const [product, component] = [s.slice(0, colon), s.slice(colon + 1)];
-        if (!product || !component) {
-          throw new Error(`Bad component "${s}"`);
+        if (!component) {
+          return { product };
         }
-        return product && component ? { product, component } : undefined;
+        return { product, component };
       })
       .filter(Boolean);
     const metabugs = parseLines($("metabugs")?.value || "")

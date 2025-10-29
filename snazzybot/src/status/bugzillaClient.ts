@@ -130,10 +130,26 @@ export class BugzillaClient {
   ): Promise<Bug[]> {
     if (pairs.length === 0) return [];
     const results: Bug[] = [];
+    const productOnly = new Set<string>();
     for (const pair of pairs) {
+      const product = pair.product?.trim();
+      const component = pair.component?.trim();
+      if (product && !component) {
+        productOnly.add(product);
+      }
+    }
+    const seen = new Set<string>();
+    for (const pair of pairs) {
+      const product = pair.product?.trim();
+      const component = pair.component?.trim();
+      if (!product) continue;
+      if (component && productOnly.has(product)) continue;
+      const key = `${product}:::${component ?? "*"}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       const { bugs } = await this.get<{ bugs: Bug[] }>(`/bug`, {
-        product: pair.product,
-        component: pair.component,
+        product,
+        component: component || undefined,
         status: ["RESOLVED", "VERIFIED", "CLOSED"],
         resolution: "FIXED",
         last_change_time: sinceISO,

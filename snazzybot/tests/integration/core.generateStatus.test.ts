@@ -58,6 +58,24 @@ describe("core integration (with MSW mocks)", () => {
     expect(url).toContain("status_whiteboard");
   });
 
+  it("builds buglist URL for product-only filters", () => {
+    const url = new URL(
+      buildBuglistURL({
+        sinceISO: "2025-01-01T00:00:00Z",
+        components: [
+          { product: "DevTools" },
+          { product: "Firefox", component: "General" },
+          { product: "DevTools", component: "Debugger" },
+        ],
+      }),
+    );
+    expect(url.searchParams.getAll("product")).toEqual([
+      "DevTools",
+      "Firefox",
+    ]);
+    expect(url.searchParams.getAll("component")).toEqual(["General"]);
+  });
+
   it("builds buglist URL with assignee filters", () => {
     const url = new URL(
       buildBuglistURL({
