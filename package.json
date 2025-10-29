@@ -15,7 +15,8 @@
     "test:e2e": "npm run --prefix snazzybot test:e2e",
     "test:all": "npm run --prefix snazzybot test:all",
     "coverage": "npm run --prefix snazzybot coverage",
-    "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\""
+    "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
+    "verify": "npm run --prefix snazzybot test:all && npm run --prefix snazzybot lint"
   },
   "repository": {
     "type": "git",
