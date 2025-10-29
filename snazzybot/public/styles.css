@@ -319,7 +319,31 @@ summary {
   padding-bottom: 22px;
   color: var(--muted);
   font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
   text-align: center;
+}
+
+.footer .source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.footer .footer-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.footer .source-link svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+  transform: translateY(1px);
 }
 
 .pill {
