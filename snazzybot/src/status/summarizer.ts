@@ -42,7 +42,7 @@ Audience: product managers. Emphasize user impact, product implications, rollout
 
 const buildAudienceHint = (
   audience: AudienceOption,
-  options: { groupByAssignee: boolean; singleAssignee: boolean },
+  options: { groupByAssignee: boolean; singleAssignee: boolean }
 ) => {
   const { groupByAssignee, singleAssignee } = options;
   if (audience === "technical") {
@@ -79,7 +79,7 @@ export async function summarizeWithOpenAI(
   days: number,
   voice: VoiceOption,
   audience: AudienceOption,
-  options: SummarizeOptions = {},
+  options: SummarizeOptions = {}
 ): Promise<SummarizerResult> {
   const {
     patchContextByBug,
@@ -145,7 +145,7 @@ ${JSON.stringify(bugPayload)}
 
 Tasks:
 1) For each bug, provide an impact score 1-10 and a one-line reason.
-2) For bugs with score >= 6, suggest a one-sentence demo idea.
+2) For bugs with score >= 8, suggest a one-sentence demo idea.
 3) Write a concise Markdown summary emphasizing user impact only.
 4) ${summaryInstruction}
 
