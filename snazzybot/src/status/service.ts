@@ -76,6 +76,7 @@ const logWindowContext = (
   components: string[],
   whiteboards: string[],
   metabugs: number[],
+  assignees: string[],
 ) => {
   hooks.info?.(`Window: last ${days} days (since ${sinceISO})`);
   if (whiteboards.length > 0) {
@@ -86,6 +87,9 @@ const logWindowContext = (
   }
   if (metabugs.length > 0) {
     hooks.info?.(`Metabugs: ${metabugs.join(", ")}`);
+  }
+  if (assignees.length > 0) {
+    hooks.info?.(`Assignees: ${assignees.join(", ")}`);
   }
 };
 
@@ -164,6 +168,9 @@ export async function generateStatus(
   const isDebug = !!params.debug;
   const debugLog = debugLogger(isDebug, hooks);
   const client = new BugzillaClient(env);
+  const assignees = (params.assignees ?? [])
+    .map((email) => email?.trim())
+    .filter(Boolean);
 
   if (params.ids && params.ids.length > 0) {
     const days = params.days ?? 8;
@@ -186,6 +193,7 @@ export async function generateStatus(
       whiteboards,
       ids,
       components,
+      assignees,
       host: env.BUGZILLA_HOST,
     });
 
@@ -258,12 +266,14 @@ export async function generateStatus(
     components.map((pc) => `${pc.product}:${pc.component}`),
     whiteboards,
     metabugs,
+    assignees,
   );
 
   const collection = await collectCandidates(client, hooks, sinceISO, {
     components,
     whiteboards,
     metabugs,
+    assignees,
     debugLog,
   });
   summarizeCandidateReasons(collection, debugLog);
@@ -356,6 +366,7 @@ export async function generateStatus(
       whiteboards,
       ids: [],
       components,
+      assignees,
       host: env.BUGZILLA_HOST,
     });
     const body =
@@ -431,6 +442,7 @@ export async function generateStatus(
     whiteboards,
     ids: final.map((bug) => bug.id),
     components,
+    assignees,
     host: env.BUGZILLA_HOST,
   });
 
@@ -456,6 +468,9 @@ export async function discoverCandidates(
   const components = params.components ?? [];
   const whiteboards = params.whiteboards ?? [];
   const metabugs = params.metabugs ?? [];
+  const assignees = (params.assignees ?? [])
+    .map((email) => email?.trim())
+    .filter(Boolean);
 
   logWindowContext(
     hooks,
@@ -464,12 +479,14 @@ export async function discoverCandidates(
     components.map((pc) => `${pc.product}:${pc.component}`),
     whiteboards,
     metabugs,
+    assignees,
   );
 
   const collection = await collectCandidates(client, hooks, sinceISO, {
     components,
     whiteboards,
     metabugs,
+    assignees,
   });
   hooks.info?.(`Candidates after initial query: ${collection.candidates.length}`);
   return { sinceISO, candidates: collection.candidates };

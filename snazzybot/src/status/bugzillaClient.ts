@@ -168,6 +168,24 @@ export class BugzillaClient {
     return results;
   }
 
+  async fetchBugsByAssignees(
+    assignees: string[],
+    sinceISO: string,
+  ): Promise<Bug[]> {
+    const emails = assignees
+      .map((email) => email?.trim())
+      .filter(Boolean);
+    if (emails.length === 0) return [];
+    const { bugs } = await this.get<{ bugs: Bug[] }>(`/bug`, {
+      assigned_to: emails,
+      status: ["RESOLVED", "VERIFIED", "CLOSED"],
+      resolution: "FIXED",
+      last_change_time: sinceISO,
+      include_fields: BUG_FIELDS.join(","),
+    });
+    return bugs;
+  }
+
   async fetchBugsByIds(
     ids: number[],
     sinceISO?: string,

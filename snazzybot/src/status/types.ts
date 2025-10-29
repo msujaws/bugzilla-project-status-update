@@ -4,6 +4,7 @@ export type GenerateParams = {
   components?: ProductComponent[];
   metabugs?: number[];
   whiteboards?: string[];
+  assignees?: string[];
   days?: number;
   model?: string;
   format?: "md" | "html";

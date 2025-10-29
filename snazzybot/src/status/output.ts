@@ -3,6 +3,7 @@ import type { ProductComponent } from "./types.ts";
 export function buildBuglistURL(args: {
   sinceISO: string;
   whiteboards?: string[];
+  assignees?: string[];
   ids?: number[];
   components?: ProductComponent[];
   host?: string;
@@ -20,18 +21,35 @@ export function buildBuglistURL(args: {
       url.searchParams.append("component", pc.component);
     }
   }
-  if (args.whiteboards?.length) {
-    let idx = 1;
-    url.searchParams.set(`f${idx}`, "OP");
-    url.searchParams.set(`j${idx}`, "OR");
-    idx++;
-    for (const tag of args.whiteboards) {
-      url.searchParams.set(`f${idx}`, "status_whiteboard");
-      url.searchParams.set(`o${idx}`, "substring");
-      url.searchParams.set(`v${idx}`, tag);
-      idx++;
+  let filterIndex = 1;
+  const openGroup = (join: "OR" | "AND" = "OR") => {
+    url.searchParams.set(`f${filterIndex}`, "OP");
+    url.searchParams.set(`j${filterIndex}`, join);
+    filterIndex++;
+  };
+  const closeGroup = () => {
+    url.searchParams.set(`f${filterIndex}`, "CP");
+    filterIndex++;
+  };
+  if (args.assignees?.length) {
+    openGroup("OR");
+    for (const email of args.assignees) {
+      url.searchParams.set(`f${filterIndex}`, "assigned_to");
+      url.searchParams.set(`o${filterIndex}`, "equals");
+      url.searchParams.set(`v${filterIndex}`, email);
+      filterIndex++;
     }
-    url.searchParams.set(`f${idx}`, "CP");
+    closeGroup();
+  }
+  if (args.whiteboards?.length) {
+    openGroup("OR");
+    for (const tag of args.whiteboards) {
+      url.searchParams.set(`f${filterIndex}`, "status_whiteboard");
+      url.searchParams.set(`o${filterIndex}`, "substring");
+      url.searchParams.set(`v${filterIndex}`, tag);
+      filterIndex++;
+    }
+    closeGroup();
   }
   return url.toString();
 }

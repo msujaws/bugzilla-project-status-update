@@ -28,6 +28,7 @@ Key flags:
 - `--component "Product:Component"` (repeatable) to scope by components
 - `--whiteboard "[tag]"` (repeatable) to match whiteboard substrings
 - `--metabug 12345` (repeatable) to include metabug children
+- `--assignee dev@example.com` (repeatable) to focus on specific Bugzilla users
 - `--days 8` (default 8) to control the history window
 - `--format <md|html>` to choose the output wrapper
 - `--model gpt-5` (default) to select the summarization model

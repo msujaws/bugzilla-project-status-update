@@ -12,6 +12,7 @@ export type CandidateCollection = {
   restricted: Bug[];
   byComponents: Bug[];
   byWhiteboards: Bug[];
+  byAssignees: Bug[];
   byIds: Bug[];
   metabugChildren: number[];
 };
@@ -24,21 +25,30 @@ export async function collectCandidates(
     components?: ProductComponent[];
     whiteboards?: string[];
     metabugs?: number[];
+    assignees?: string[];
     debugLog?: (message: string) => void;
   },
 ): Promise<CandidateCollection> {
-  const { components = [], whiteboards = [], metabugs = [], debugLog } =
+  const {
+    components = [],
+    whiteboards = [],
+    metabugs = [],
+    assignees = [],
+    debugLog,
+  } =
     options;
 
-  const [metabugChildren, byComponents, byWhiteboards] = await Promise.all([
-    client.fetchMetabugChildren(metabugs, hooks),
-    client.fetchBugsByComponents(components, sinceISO),
-    client.fetchBugsByWhiteboards(whiteboards, sinceISO, hooks),
-  ]);
+  const [metabugChildren, byComponents, byWhiteboards, byAssignees] =
+    await Promise.all([
+      client.fetchMetabugChildren(metabugs, hooks),
+      client.fetchBugsByComponents(components, sinceISO),
+      client.fetchBugsByWhiteboards(whiteboards, sinceISO, hooks),
+      client.fetchBugsByAssignees(assignees, sinceISO),
+    ]);
 
   if (debugLog) {
     debugLog(
-      `source counts → metabug children: ${metabugChildren.length}, byComponents: ${byComponents.length}, byWhiteboards: ${byWhiteboards.length}`,
+      `source counts → metabug children: ${metabugChildren.length}, byComponents: ${byComponents.length}, byWhiteboards: ${byWhiteboards.length}, byAssignees: ${byAssignees.length}`,
     );
     const sample = (arr: Bug[], n = 8) =>
       arr
@@ -51,6 +61,9 @@ export async function collectCandidates(
     if (byWhiteboards.length > 0) {
       debugLog(`byWhiteboards sample IDs: ${sample(byWhiteboards)}`);
     }
+    if (byAssignees.length > 0) {
+      debugLog(`byAssignees sample IDs: ${sample(byAssignees)}`);
+    }
   }
 
   const byIds = await client.fetchBugsByIds(metabugChildren, sinceISO);
@@ -61,7 +74,7 @@ export async function collectCandidates(
   }
 
   const seen = new Set<number>();
-  const union = [...byComponents, ...byWhiteboards, ...byIds].filter((bug) => {
+  const union = [...byComponents, ...byWhiteboards, ...byAssignees, ...byIds].filter((bug) => {
     if (seen.has(bug.id)) return false;
     seen.add(bug.id);
     return true;
@@ -93,6 +106,7 @@ export async function collectCandidates(
     restricted,
     byComponents,
     byWhiteboards,
+    byAssignees,
     byIds,
     metabugChildren,
   };

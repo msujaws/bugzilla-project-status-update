@@ -516,6 +516,7 @@ if (runButton) {
       .map(Number)
       .filter((n) => Number.isFinite(n));
     const whiteboards = parseLines($("whiteboards")?.value || "");
+    const assignees = parseLines($("assignees")?.value || "");
     const days = Number($("days")?.value) || 8;
     const voice = $("voice")?.value || "normal";
     const audience = $("audience")?.value || "technical";
@@ -529,6 +530,7 @@ if (runButton) {
     sp.set("components", $("components")?.value || "");
     sp.set("whiteboards", $("whiteboards")?.value || "");
     sp.set("metabugs", $("metabugs")?.value || "");
+    sp.set("assignees", $("assignees")?.value || "");
     sp.set("days", String(days));
     sp.set("voice", voice);
     sp.set("aud", audience);
@@ -547,6 +549,7 @@ if (runButton) {
       components,
       metabugs,
       whiteboards,
+      assignees,
       days,
       format: "md",
       voice,
@@ -571,6 +574,8 @@ function hydrateFromURL() {
   if (sp.has("whiteboards"))
     setFieldValue("whiteboards", sp.get("whiteboards") || "");
   if (sp.has("metabugs")) setFieldValue("metabugs", sp.get("metabugs") || "");
+  if (sp.has("assignees"))
+    setFieldValue("assignees", sp.get("assignees") || "");
   if (sp.has("days")) setFieldValue("days", sp.get("days") || "7");
   if (sp.has("voice")) setFieldValue("voice", sp.get("voice") || "normal");
   if (sp.has("aud")) setFieldValue("audience", sp.get("aud") || "technical");

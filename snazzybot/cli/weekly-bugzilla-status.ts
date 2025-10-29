@@ -22,6 +22,11 @@ const argv = yargs(hideBin(process.argv))
   .option("component", { type: "string", array: true })
   .option("metabug", { type: "number", array: true })
   .option("whiteboard", { type: "string", array: true })
+  .option("assignee", {
+    type: "string",
+    array: true,
+    desc: "Bugzilla assignee email(s)",
+  })
   .option("days", { type: "number", default: 8 })
   .option("model", { type: "string", default: "gpt-5" })
   .option("format", { choices: ["md", "html"] as const, default: "md" })
@@ -102,6 +107,9 @@ async function main() {
     const metabugs = (argv.metabug || [])
       .map((n) => Math.trunc(Number(n)))
       .filter((n) => Number.isFinite(n) && n > 0);
+    const assignees = (argv.assignee || [])
+      .map((email: string) => email.trim())
+      .filter((email: string) => email.length > 0);
 
     const clampedDays = Number.isFinite(argv.days)
       ? Math.max(1, Math.floor(argv.days))
@@ -111,6 +119,7 @@ async function main() {
         components,
         metabugs,
         whiteboards: argv.whiteboard || [],
+        assignees,
         days: clampedDays,
         model: argv.model,
         format: argv.format,

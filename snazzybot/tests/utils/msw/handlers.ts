@@ -34,6 +34,7 @@ export const handlers = [
     const whiteboard = url.searchParams.get("whiteboard");
     const product = url.searchParams.getAll("product");
     const component = url.searchParams.getAll("component");
+    const assigned = url.searchParams.getAll("assigned_to");
 
     // Minimal DONE/FIXED bug
     const bug = {
@@ -49,6 +50,16 @@ export const handlers = [
       blocks: [],
     };
 
+    if (assigned.length > 0) {
+      const bugs = assigned.map((email, idx) => ({
+        ...bug,
+        id: 2_000_000 + idx,
+        summary: `[assignee] ${email}`,
+        assigned_to: email,
+        assigned_to_detail: { real_name: email.split("@")[0] || email },
+      }));
+      return HttpResponse.json({ bugs });
+    }
     if (ids) {
       return HttpResponse.json({ bugs: [bug] });
     }

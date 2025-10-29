@@ -58,6 +58,22 @@ describe("core integration (with MSW mocks)", () => {
     expect(url).toContain("status_whiteboard");
   });
 
+  it("builds buglist URL with assignee filters", () => {
+    const url = new URL(
+      buildBuglistURL({
+        sinceISO: "2025-01-01T00:00:00Z",
+        assignees: ["dev@example.com", "qa@example.com"],
+      }),
+    );
+    expect(url.searchParams.get("f1")).toBe("OP");
+    expect(url.searchParams.get("j1")).toBe("OR");
+    expect(url.searchParams.get("f2")).toBe("assigned_to");
+    expect(url.searchParams.get("v2")).toBe("dev@example.com");
+    expect(url.searchParams.get("f3")).toBe("assigned_to");
+    expect(url.searchParams.get("v3")).toBe("qa@example.com");
+    expect(url.searchParams.get("f4")).toBe("CP");
+  });
+
   it("filters out bugs without qualifying history transitions", async () => {
     server.use(
       http.get("https://bugzilla.mozilla.org/rest/bug", ({ request }) => {
@@ -262,6 +278,38 @@ describe("core integration (with MSW mocks)", () => {
     );
     expect(res.output).toMatch(/omitted from the AI summary/);
     expect(res.ids.length).toBe(65);
+  });
+
+  it("collects bugs by assignee email addresses", async () => {
+    const hooks = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      phase: vi.fn(),
+      progress: vi.fn(),
+    };
+    const { ids } = await generateStatus(
+      {
+        days: 8,
+        assignees: ["dev@example.com"],
+        debug: true,
+      },
+      env,
+      hooks,
+    );
+    const infoMessages = hooks.info.mock.calls.map((call) => call[0]);
+    expect(
+      infoMessages.some(
+        (msg) =>
+          typeof msg === "string" &&
+          msg.includes("Candidates after initial query:"),
+      ),
+    ).toBe(true);
+    expect(
+      infoMessages.some(
+        (msg) => typeof msg === "string" && msg.includes("Qualified bugs: 1"),
+      ),
+    ).toBe(true);
+    expect(ids).toEqual([2_000_000]);
   });
 
   it("includes patch context in OpenAI payload when available", async () => {
