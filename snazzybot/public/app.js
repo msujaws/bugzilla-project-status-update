@@ -1,10 +1,21 @@
 import { markdownToHtml } from "./lib/markdown.js";
 
 const $ = (id) => document.querySelector(`#${id}`);
+const defaultTitle = document.title;
+
+function resetTabTitle() {
+  document.title = defaultTitle;
+}
+
+function markResultsComplete() {
+  document.title = `Results ready - ${defaultTitle}`;
+}
+
+window.addEventListener("focus", resetTabTitle);
 
 // ===== Emoji Confetti Engine (no deps) =====
 const reduceMotion = globalThis.matchMedia(
-  "(prefers-reduced-motion: reduce)",
+  "(prefers-reduced-motion: reduce)"
 ).matches;
 
 function burstEmojis(mode = "normal") {
@@ -223,6 +234,7 @@ let currentVoice = "normal";
 // Helpers shared by both runners -------------------------------------------
 function resetUIBeforeRun() {
   const out = $("out");
+  resetTabTitle();
   if (out) {
     out.textContent = "";
     out.style.display = "none";
@@ -322,7 +334,7 @@ async function runSnazzyStream(body) {
             setPhasePct(name, Number(evt.current) || 0, Number(evt.total) || 1);
             setPhaseText(
               name,
-              `${name}: ${Number(evt.current) || 0}/${Number(evt.total) || 1}`,
+              `${name}: ${Number(evt.current) || 0}/${Number(evt.total) || 1}`
             );
           } else {
             setPhaseIndeterminate(name);
@@ -338,6 +350,7 @@ async function runSnazzyStream(body) {
           setActionsEnabled(Boolean(lastMarkdown));
           spin.style.display = "none";
           burstEmojis(currentVoice);
+          markResultsComplete();
           break;
         }
         case "error": {
@@ -410,7 +423,7 @@ async function runSnazzyPaged(body) {
       spin.textContent = `⏳ Histories ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`;
       setPhaseText(
         "histories",
-        `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`,
+        `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`
       );
       setPhasePct("histories", Math.min(cursor + step, total), total);
       const page = await postStatusJSON({
@@ -435,7 +448,7 @@ async function runSnazzyPaged(body) {
         setPhasePct("patch-context", 0, qualifiedIds.length);
         setPhaseText(
           "patch-context",
-          `patch-context: 0/${qualifiedIds.length}`,
+          `patch-context: 0/${qualifiedIds.length}`
         );
       } else {
         setPhaseIndeterminate("patch-context");
@@ -466,6 +479,7 @@ async function runSnazzyPaged(body) {
     spin.style.display = "none";
     if (out) out.style.display = "none";
     burstEmojis(currentVoice);
+    markResultsComplete();
   } catch (error) {
     console.error(error);
     setActionsEnabled(Boolean(lastMarkdown));
@@ -643,7 +657,7 @@ if (downloadMdBtn) {
     download(
       "snazzybot-status.md",
       lastMarkdown,
-      "text/markdown;charset=utf-8",
+      "text/markdown;charset=utf-8"
     );
   });
 }
