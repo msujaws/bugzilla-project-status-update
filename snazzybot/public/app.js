@@ -204,8 +204,11 @@ function setResultIframe(html) {
   const doc = `<!doctype html><html><head>
   <meta charset="utf-8" />
   <style>
-    body{font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Arial;padding:16px;color:rgb(170,176,214);}
-    a{color:#0f62fe}
+    body{
+      font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      padding:16px;color:rgb(170,176,214);}
+    a,a:visited{color:#aab0d6}
     h1,h2,h3{margin:0.6em 0 0.35em}
     ul{margin:0.4em 0 0.6em 1.2em}
     p{margin:0.6em 0;}

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>SnazzyBot — Bugzilla Auto-Summarization</title>
+    <title>SnazzyBot — Bugzilla Status Updates</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="/logo.png" sizes="any" />
     <link rel="stylesheet" href="/styles.css" />
@@ -52,10 +52,10 @@
       <header>
         <img src="/logo.png" alt="SnazzyBot logo" />
         <div>
-          <h1>SnazzyBot <span class="badge">AUTO-SUMMARIZATION</span></h1>
+          <h1>SnazzyBot <span class="badge">BUGZILLA STATUS UPDATES</span></h1>
           <p>
-            Weekly, user-impact–focused status updates from Bugzilla. Just pick
-            your sources and SnazzyBot does the rest.
+            User-impact–focused status updates from Bugzilla. Just pick your
+            sources and SnazzyBot does the rest.
           </p>
         </div>
       </header>
@@ -65,48 +65,39 @@
         <section class="card">
           <p class="kicker">Filters</p>
 
-          <div class="row-2">
-            <div>
-              <label for="components"
-                >Components
-                <span class="hint"
-                  >one per line: <code>Product:Component</code></span
-                ></label
-              >
-              <textarea
-                id="components"
-                rows="6"
-                placeholder="Firefox:General&#10;Fenix:Toolbar"
-              ></textarea>
-            </div>
-            <div>
-              <label for="whiteboards"
-                >Whiteboard tags <span class="hint">one per line</span></label
-              >
-              <textarea
-                id="whiteboards"
-                rows="6"
-                placeholder="[fx-vpn]&#10;[fidefe-sidebar]"
-              ></textarea>
-            </div>
-          </div>
-
-          <div style="margin-top: 14px">
-            <label for="metabugs"
+          <div class="filters-grid">
+            <label class="filter-label" for="components"
+              >Components
+              <span class="hint"
+                >one per line: <code>Product:Component</code> or
+                <code>Product</code></span
+              ></label
+            >
+            <label class="filter-label" for="whiteboards"
+              >Whiteboard tags <span class="hint">one per line</span></label
+            >
+            <textarea
+              id="components"
+              rows="6"
+              placeholder="Firefox:General&#10;DevTools"
+            ></textarea>
+            <textarea
+              id="whiteboards"
+              rows="6"
+              placeholder="[fx-vpn]&#10;[fidefe-sidebar]"
+            ></textarea>
+            <label class="filter-label filter-label--spaced" for="metabugs"
               >Metabug IDs
               <span class="hint">comma or newline separated</span></label
+            >
+            <label class="filter-label filter-label--spaced" for="assignees"
+              >Assignee emails <span class="hint">one per line</span></label
             >
             <textarea
               id="metabugs"
               rows="3"
               placeholder="1882882, 1993031"
             ></textarea>
-          </div>
-
-          <div style="margin-top: 14px">
-            <label for="assignees"
-              >Assignee emails <span class="hint">one per line</span></label
-            >
             <textarea
               id="assignees"
               rows="3"
@@ -158,14 +149,17 @@
             </div>
           </div>
 
-          <div class="actions">
-            <button id="run">Run SnazzyBot</button>
-          </div>
+          <div class="actions-row">
+            <div class="actions">
+              <button id="run">Run SnazzyBot</button>
+            </div>
 
-          <div class="status">
-            <div class="dot" aria-hidden="true"></div>
-            <div id="spin" class="pill" style="display: none">⏳ Working…</div>
-            <div id="quick-status" class="pill" style="display: none"></div>
+            <div class="status">
+              <div id="spin" class="pill" style="display: none">
+                ⏳ Working…
+              </div>
+              <div id="quick-status" class="pill" style="display: none"></div>
+            </div>
           </div>
 
           <div id="phases"></div>

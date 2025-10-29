@@ -31,13 +31,19 @@ body {
 
 body {
   margin: 0;
-  font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-  background: radial-gradient(
-      1200px 600px at 10% -10%,
-      #1a2047 0%,
-      transparent 60%
-    ),
+  font:
+    15px/1.55 ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    "Noto Sans",
+    "Apple Color Emoji",
+    "Segoe UI Emoji";
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #1a2047 0%, transparent 60%),
     radial-gradient(900px 500px at 90% 10%, #0f1540 0%, transparent 55%),
     radial-gradient(600px 300px at 50% 120%, #121735 0%, transparent 60%),
     var(--navy);
@@ -146,7 +152,9 @@ select {
   border-radius: 10px;
   padding: 10px 12px;
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 textarea:focus,
@@ -162,10 +170,25 @@ select:focus {
   grid-template-columns: 1fr 1fr 1fr;
 }
 
-.row-2 {
+.filters-grid {
   display: grid;
-  gap: 14px;
-  grid-template-columns: 1fr 1fr;
+  column-gap: 14px;
+  row-gap: 6px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.filters-grid .filter-label {
+  margin: 0;
+}
+
+.filters-grid .filter-label--spaced {
+  margin-top: 8px;
+}
+
+@media (min-width: 720px) {
+  .filters-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .actions {
@@ -173,6 +196,24 @@ select:focus {
   gap: 10px;
   flex-wrap: wrap;
   margin-block: 12px;
+}
+
+.actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.actions-row .actions {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.actions-row .status {
+  margin: 0;
+  flex: 1 1 240px;
 }
 
 button {
@@ -218,20 +259,12 @@ button:disabled {
 }
 
 .status {
-  margin-top: 16px;
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 10px;
   min-height: 22px;
   color: var(--muted);
-}
-
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--gold);
-  box-shadow: 0 0 10px var(--gold);
 }
 
 .progress {
@@ -368,13 +401,17 @@ summary {
   position: absolute;
   top: 0;
   height: 100%;
-  width: 40%;              /* chunk size; tweak as desired */
-  left: -40%;              /* start just off the left edge */
+  width: 40%; /* chunk size; tweak as desired */
+  left: -40%; /* start just off the left edge */
   animation: indet 2s ease-in-out infinite;
 }
 @keyframes indet {
-  from { left: -40%; }     /* fully off left */
-  to   { left: 100%; }     /* fully off right */
+  from {
+    left: -40%;
+  } /* fully off left */
+  to {
+    left: 100%;
+  } /* fully off right */
 }
 
 /* overlay for bursts */
