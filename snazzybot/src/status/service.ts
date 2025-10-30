@@ -429,7 +429,7 @@ export async function generateStatus(
   const demo = (ai.assessments || [])
     .filter((assessment) => {
       const score = Number(assessment.impact_score);
-      return Number.isFinite(score) && score >= 6 && assessment.demo_suggestion;
+      return Number.isFinite(score) && score >= 8 && assessment.demo_suggestion;
     })
     .map(
       (assessment) =>
