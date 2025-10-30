@@ -1,7 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeMiniflare } from "../utils/miniflare";
 
 describe("functions/api/status.ts", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date("2025-10-29T09:36:11Z") });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("returns 500 when env keys missing", async () => {
     const mf = await makeMiniflare(
       {

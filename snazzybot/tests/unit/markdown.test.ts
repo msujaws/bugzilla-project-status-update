@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   escapeHtml,
-  sanitizeHref,
-  applyInlineMarkdown,
   markdownToHtml,
-} from "../../public/lib/markdown.js";
+  sanitizeHref,
+} from "../../src/status/markdown.ts";
 
 describe("markdown helpers", () => {
   it("escapes HTML entities", () => {
@@ -14,27 +13,37 @@ describe("markdown helpers", () => {
   it("sanitizes href to safe targets", () => {
     expect(sanitizeHref("https://ok.test/x")).toBe("https://ok.test/x");
     expect(sanitizeHref("mailto:a@b.com")).toBe("mailto:a@b.com");
-    expect(sanitizeHref("javascript:alert(1)")).toBe("#"); // unsafe
+    expect(sanitizeHref("javascript:alert(1)")).toBe("#");
   });
 
-  it("protects code before italic/bold parsing", () => {
-    const md = "Use `a_b` and **bold _ok_**";
-    const html = applyInlineMarkdown(md);
-    expect(html).toMatchInlineSnapshot(
-      '"Use <code>a_b</code> and <strong>bold <em>ok</em></strong>"',
-    );
-  });
-
-  it("renders simple doc to HTML (headers, lists)", () => {
+  it("renders markdown with headings and lists", () => {
     const src = "# T\n\n- A\n- B\n1. X\n2. Y";
-    expect(markdownToHtml(src)).toMatchSnapshot();
+    expect(markdownToHtml(src)).toMatchInlineSnapshot(`
+"<h1>T</h1>
+<ul>
+<li>A</li>
+<li>B</li>
+</ul>
+<ol>
+<li>X</li>
+<li>Y</li>
+</ol>
+"
+`);
   });
 
-  it("leaves underscores inside links intact", () => {
-    const src =
-      "Check [hello_world](https://x.test?bug_id=12345&field_name=foo)";
-    const html = applyInlineMarkdown(src);
-    expect(html).toContain("hello_world");
-    expect(html).toContain('href="https://x.test?bug_id=12345&field_name=foo"');
+  it("escapes inline HTML content", () => {
+    const html = markdownToHtml("Danger <script>alert(1)</script>");
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+
+  it("adds target attributes to links", () => {
+    const html = markdownToHtml(
+      "See [Bugzilla](https://bugzilla.mozilla.org/show_bug.cgi?id=123)",
+    );
+    expect(html).toContain(
+      '<a href="https://bugzilla.mozilla.org/show_bug.cgi?id=123" target="_blank" rel="noopener noreferrer">',
+    );
   });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server } from "../utils/msw/node";
 import { generateStatus, buildBuglistURL } from "../../src/core.ts";
@@ -9,6 +9,14 @@ const env = {
 };
 
 describe("core integration (with MSW mocks)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date("2025-10-29T09:36:11Z") });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("qualifies bugs by history in-window and summarizes", async () => {
     const hooks = {
       info: vi.fn(),
@@ -200,59 +208,29 @@ describe("core integration (with MSW mocks)", () => {
   });
 
   it("adds trimming note when exceeding MAX_BUGS_FOR_OPENAI", async () => {
+    const ids = Array.from({ length: 65 }, (_, i) => 1000 + i);
+    server.resetHandlers();
     server.use(
       http.get("https://bugzilla.mozilla.org/rest/bug", ({ request }) => {
         const url = new URL(request.url);
         const idsParam = url.searchParams.get("id");
-        if (url.searchParams.has("product")) {
-          const bugs = Array.from({ length: 65 }, (_, i) => 1000 + i).map(
-            (id) => ({
-              id,
-              summary: `bug-${id}`,
-              product: url.searchParams.getAll("product")[0] || "Firefox",
-              component: url.searchParams.getAll("component")[0] || "General",
-              status: "RESOLVED",
-              resolution: "FIXED",
-              last_change_time: "2025-10-21T09:36:11Z",
-              groups: [],
-              depends_on: [],
-              blocks: [],
-            }),
-          );
-          return HttpResponse.json({ bugs });
+        if (!idsParam) {
+          return HttpResponse.json({ bugs: [] });
         }
-        if (idsParam) {
-          const ids = idsParam.split(",").map(Number);
-          return HttpResponse.json({
-            bugs: ids.map((id) => ({
-              id,
-              summary: `bug-${id}`,
-              product: "Firefox",
-              component: "General",
-              status: "RESOLVED",
-              resolution: "FIXED",
-              last_change_time: "2025-10-21T09:36:11Z",
-              groups: [],
-              depends_on: [],
-              blocks: [],
-            })),
-          });
-        }
+        const requested = idsParam.split(",").map(Number);
         return HttpResponse.json({
-          bugs: [
-            {
-              id: 1_987_802,
-              summary: "[a11y] Remove VPN toggle hover tooltip",
-              product: "Firefox",
-              component: "IP Protection",
-              status: "RESOLVED",
-              resolution: "FIXED",
-              last_change_time: "2025-10-21T09:36:11Z",
-              groups: [],
-              depends_on: [],
-              blocks: [],
-            },
-          ],
+          bugs: requested.map((id) => ({
+            id,
+            summary: `bug-${id}`,
+            product: "Firefox",
+            component: "General",
+            status: "RESOLVED",
+            resolution: "FIXED",
+            last_change_time: "2025-10-21T09:36:11Z",
+            groups: [],
+            depends_on: [],
+            blocks: [],
+          })),
         });
       }),
       http.get(
@@ -285,7 +263,7 @@ describe("core integration (with MSW mocks)", () => {
 
     const res = await generateStatus(
       {
-        components: [{ product: "Firefox", component: "General" }],
+        ids,
         days: 8,
         format: "md",
       },

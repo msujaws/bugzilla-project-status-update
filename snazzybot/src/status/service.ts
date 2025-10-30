@@ -1,4 +1,4 @@
-import { escapeHtml, markdownToHtml } from "../../public/lib/markdown.js";
+import { escapeHtml, markdownToHtml } from "./markdown.ts";
 import { isoDaysAgo } from "../utils/time.ts";
 import { BugzillaClient } from "./bugzillaClient.ts";
 import {
@@ -41,10 +41,9 @@ const formatSummaryOutput = (args: {
   summaryMd: string;
   demo: string[];
   trimmedCount: number;
-  format: "md" | "html";
   link: string;
 }) => {
-  const { summaryMd, demo, trimmedCount, format, link } = args;
+  const { summaryMd, demo, trimmedCount, link } = args;
   let summary = (summaryMd || "").trim().replace(DEMO_SECTION_REGEX, "").trim();
 
   if (demo.length > 0) {
@@ -57,13 +56,12 @@ const formatSummaryOutput = (args: {
     summary += `\n\n_Note: ${trimmedCount} additional ${noun} ${verb} omitted from the AI summary due to size limits._`;
   }
 
-  if (format === "html") {
-    return (
-      markdownToHtml(summary) +
-      `\n<p><a href="${escapeHtml(link)}">View bugs in Bugzilla</a></p>`
-    );
-  }
-  return `${summary}\n\n[View bugs in Bugzilla](${link})`;
+  const markdown = `${summary}\n\n[View bugs in Bugzilla](${link})`;
+  const html =
+    markdownToHtml(summary) +
+    `\n<p><a href="${escapeHtml(link)}">View bugs in Bugzilla</a></p>`;
+
+  return { markdown, html };
 };
 
 const logWindowContext = (
@@ -154,7 +152,7 @@ export async function generateStatus(
   params: GenerateParams,
   env: EnvLike,
   hooks: ProgressHooks = defaultHooks,
-): Promise<{ output: string; ids: number[] }> {
+): Promise<{ output: string; html: string; ids: number[] }> {
   const includePatchContext = params.includePatchContext !== false;
   const isDebug = !!params.debug;
   const debugLog = debugLogger(isDebug, hooks);
@@ -234,15 +232,16 @@ export async function generateStatus(
           `- [Bug ${assessment.bug_id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${assessment.bug_id}): ${assessment.demo_suggestion}`,
       );
 
-    const output = formatSummaryOutput({
+    const { markdown, html } = formatSummaryOutput({
       summaryMd: ai.summary_md ?? "",
       demo,
       trimmedCount: Math.max(0, bugs.length - limited.length),
-      format: params.format ?? "md",
       link,
     });
 
-    return { output, ids };
+    const output = (params.format ?? "md") === "html" ? html : markdown;
+
+    return { output, html, ids };
   }
 
   const days = params.days ?? 8;
@@ -366,12 +365,12 @@ export async function generateStatus(
       assignees,
       host: env.BUGZILLA_HOST,
     });
-    const body =
-      params.format === "html"
-        ? `<p><em>No user-impacting changes in the last ${days} days.</em></p><p><a href="${link}">View bugs in Bugzilla</a></p>`
-        : `_No user-impacting changes in the last ${days} days._\n\n[View bugs in Bugzilla](${link})`;
+    const markdownBody = `_No user-impacting changes in the last ${days} days._\n\n[View bugs in Bugzilla](${link})`;
+    const escapedLink = escapeHtml(link);
+    const htmlBody = `<p><em>No user-impacting changes in the last ${days} days.</em></p><p><a href="${escapedLink}">View bugs in Bugzilla</a></p>`;
     if (debugLog) debugLog(`buglist link for manual inspection: ${link}`);
-    return { output: body, ids: [] };
+    const output = (params.format ?? "md") === "html" ? htmlBody : markdownBody;
+    return { output, html: htmlBody, ids: [] };
   }
 
   let aiCandidates = final;
@@ -445,15 +444,16 @@ export async function generateStatus(
     host: env.BUGZILLA_HOST,
   });
 
-  const output = formatSummaryOutput({
+  const { markdown, html } = formatSummaryOutput({
     summaryMd: ai.summary_md ?? "",
     demo,
     trimmedCount,
-    format: params.format ?? "md",
     link,
   });
 
-  return { output, ids: final.map((bug) => bug.id) };
+  const output = (params.format ?? "md") === "html" ? html : markdown;
+
+  return { output, html, ids: final.map((bug) => bug.id) };
 }
 
 export async function discoverCandidates(

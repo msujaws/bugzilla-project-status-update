@@ -12,13 +12,7 @@ const commonUnicornRules = {
 
 export default [
   {
-    ignores: [
-      "public/lib/markdown.js",
-      "node_modules",
-      "dist",
-      ".wrangler",
-      "coverage",
-    ],
+    ignores: ["node_modules", "dist", ".wrangler", "coverage"],
   },
   {
     files: ["**/*.ts"],

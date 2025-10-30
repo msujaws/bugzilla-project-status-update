@@ -1,7 +1,34 @@
-import { markdownToHtml } from "./lib/markdown.js";
-
 const $ = (id) => document.querySelector(`#${id}`);
 const defaultTitle = document.title;
+
+const escapeHtml = (text = "") =>
+  text.replaceAll(/[&<>"']/g, (ch) => {
+    switch (ch) {
+      case "&": {
+        return "&amp;";
+      }
+      case "<": {
+        return "&lt;";
+      }
+      case ">": {
+        return "&gt;";
+      }
+      case '"': {
+        return "&quot;";
+      }
+      case "'": {
+        return "&#39;";
+      }
+      default: {
+        return ch;
+      }
+    }
+  });
+
+const fallbackMarkdownToHtml = (markdown) => {
+  if (!markdown) return "";
+  return `<pre>${escapeHtml(markdown).replaceAll(/\r?\n/g, "<br />")}</pre>`;
+};
 
 function resetTabTitle() {
   document.title = defaultTitle;
@@ -347,8 +374,16 @@ async function runSnazzyStream(body) {
         case "done": {
           setPhaseText("openai", "openai: done");
           completePhase("openai");
-          lastMarkdown = (evt.output || "").trim();
-          lastHTML = markdownToHtml(lastMarkdown);
+          lastMarkdown =
+            typeof evt.output === "string" ? evt.output.trim() : "";
+          const html = typeof evt.html === "string" ? evt.html : "";
+          if (html) {
+            lastHTML = html;
+          } else if (body.format === "html") {
+            lastHTML = lastMarkdown;
+          } else {
+            lastHTML = fallbackMarkdownToHtml(lastMarkdown);
+          }
           setResultIframe(lastHTML);
           setActionsEnabled(Boolean(lastMarkdown));
           spin.style.display = "none";
@@ -474,8 +509,14 @@ async function runSnazzyPaged(body) {
     }
     ensurePhase("openai", "openai");
     setPhaseIndeterminate("openai");
-    lastMarkdown = final.output || "";
-    lastHTML = markdownToHtml(lastMarkdown);
+    lastMarkdown = typeof final.output === "string" ? final.output.trim() : "";
+    if (typeof final.html === "string" && final.html) {
+      lastHTML = final.html;
+    } else if (body.format === "html") {
+      lastHTML = lastMarkdown;
+    } else {
+      lastHTML = fallbackMarkdownToHtml(lastMarkdown);
+    }
     setResultIframe(lastHTML);
     completePhase("openai");
     setActionsEnabled(Boolean(lastMarkdown));

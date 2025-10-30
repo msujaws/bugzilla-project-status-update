@@ -20,7 +20,7 @@ flowchart TD
     History[status/history]
     PatchStage[status/patchStage]
     Summarizer[status/summarizer]
-    Markdown[public/lib/markdown.js]
+    Markdown[status/markdown]
     CacheUtils[utils/cache]
 
     CLI --> StatusService
