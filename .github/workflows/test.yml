@@ -16,6 +16,8 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Install root deps
+        run: npm ci --prefer-offline --no-audit
       - name: Install deps
         run: npm ci --prefer-offline --no-audit
         working-directory: snazzybot
