@@ -244,7 +244,15 @@ function setResultIframe(html) {
     h1,h2,h3{margin:0.6em 0 0.35em}
     ul{margin:0.4em 0 0.6em 1.2em}
     p{margin:0.6em 0;}
-    code{background:#f2f4f8;padding:2px 5px;border-radius:6px}
+    code {
+      font-size: 0.95em;
+      font-family: ui-monospace, monospace;
+      background: transparent;
+      color: #cfcfcf;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+      padding: 0.1em 0.4em;
+    }
   </style>
 </head><body>${safeHtml}</body></html>`;
   frame.srcdoc = doc;
