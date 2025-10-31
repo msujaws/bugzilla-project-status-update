@@ -10,6 +10,15 @@ type Env = {
   BUGZILLA_API_KEY: string;
 };
 
+const CONTENT_SECURITY_POLICY =
+  "default-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' https: data:; font-src 'self' data:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+
+const withSecurityHeaders = (headers: HeadersInit = {}) => {
+  const merged = new Headers(headers);
+  merged.set("content-security-policy", CONTENT_SECURITY_POLICY);
+  return merged;
+};
+
 const toErrorMessage = (error: unknown): string => {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -28,10 +37,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       }),
       {
         status: 500,
-        headers: {
+        headers: withSecurityHeaders({
           "content-type": "application/json; charset=utf-8",
           "cache-control": "no-store",
-        },
+        }),
       },
     );
   }
@@ -113,19 +122,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           }),
           {
             status: 200,
-            headers: {
+            headers: withSecurityHeaders({
               "content-type": "application/json; charset=utf-8",
               "cache-control": "no-store",
-            },
+            }),
           },
         );
       } catch (error: unknown) {
         return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
           status: 500,
-          headers: {
+          headers: withSecurityHeaders({
             "content-type": "application/json; charset=utf-8",
             "cache-control": "no-store",
-          },
+          }),
         });
       }
     }
@@ -153,19 +162,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           JSON.stringify({ qualifiedIds, nextCursor, total }),
           {
             status: 200,
-            headers: {
+            headers: withSecurityHeaders({
               "content-type": "application/json; charset=utf-8",
               "cache-control": "no-store",
-            },
+            }),
           },
         );
       } catch (error: unknown) {
         return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
           status: 500,
-          headers: {
+          headers: withSecurityHeaders({
             "content-type": "application/json; charset=utf-8",
             "cache-control": "no-store",
-          },
+          }),
         });
       }
     }
@@ -177,18 +186,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         );
         return new Response(JSON.stringify({ output, html }), {
           status: 200,
-          headers: {
+          headers: withSecurityHeaders({
             "content-type": "application/json; charset=utf-8",
             "cache-control": "no-store",
-          },
+          }),
         });
       } catch (error: unknown) {
         return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
           status: 500,
-          headers: {
+          headers: withSecurityHeaders({
             "content-type": "application/json; charset=utf-8",
             "cache-control": "no-store",
-          },
+          }),
         });
       }
     }
@@ -198,18 +207,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       const { output, html } = await generateStatus(params, envConfig);
       return new Response(JSON.stringify({ output, html }), {
         status: 200,
-        headers: {
+        headers: withSecurityHeaders({
           "content-type": "application/json; charset=utf-8",
           "cache-control": "no-store",
-        },
+        }),
       });
     } catch (error: unknown) {
       return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
         status: 500,
-        headers: {
+        headers: withSecurityHeaders({
           "content-type": "application/json; charset=utf-8",
           "cache-control": "no-store",
-        },
+        }),
       });
     }
   }
@@ -251,9 +260,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   return new Response(ts.readable, {
     status: 200,
-    headers: {
+    headers: withSecurityHeaders({
       "content-type": "application/x-ndjson; charset=utf-8",
       "cache-control": "no-store",
-    },
+    }),
   });
 };
