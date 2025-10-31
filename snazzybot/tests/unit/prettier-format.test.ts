@@ -29,6 +29,8 @@ describe("tooling", () => {
         "./**/*.{css,html,js,jsx,json,mjs,cjs,ts,tsx,md}",
         "--ignore-path",
         ".gitignore",
+        "--ignore-path",
+        ".prettierignore",
       ],
       {
         cwd: REPO_ROOT,

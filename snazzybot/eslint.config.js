@@ -12,7 +12,7 @@ const commonUnicornRules = {
 
 export default [
   {
-    ignores: ["node_modules", "dist", ".wrangler", "coverage"],
+    ignores: ["node_modules", "dist", ".wrangler", "coverage", "public/vendor"],
   },
   {
     files: ["**/*.ts"],

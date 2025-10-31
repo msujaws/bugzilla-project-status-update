@@ -1,3 +1,5 @@
+import DOMPurify from "./vendor/dompurify.js";
+
 const $ = (id) => document.querySelector(`#${id}`);
 const defaultTitle = document.title;
 
@@ -226,8 +228,11 @@ function download(filename, content, mime) {
 }
 
 function setResultIframe(html) {
+  const safeHtml = DOMPurify.sanitize(html ?? "", {
+    USE_PROFILES: { html: true },
+  });
   const frame = $("resultFrame");
-  if (!frame) return;
+  if (!frame) return safeHtml;
   const doc = `<!doctype html><html><head>
   <meta charset="utf-8" />
   <style>
@@ -241,7 +246,7 @@ function setResultIframe(html) {
     p{margin:0.6em 0;}
     code{background:#f2f4f8;padding:2px 5px;border-radius:6px}
   </style>
-</head><body>${html}</body></html>`;
+</head><body>${safeHtml}</body></html>`;
   frame.srcdoc = doc;
 
   const onload = () => {
@@ -254,6 +259,7 @@ function setResultIframe(html) {
   };
   frame.addEventListener("load", onload);
   setTimeout(onload, 50);
+  return safeHtml;
 }
 
 // State for copy buttons ----------------------------------------------------
@@ -384,7 +390,7 @@ async function runSnazzyStream(body) {
           } else {
             lastHTML = fallbackMarkdownToHtml(lastMarkdown);
           }
-          setResultIframe(lastHTML);
+          lastHTML = setResultIframe(lastHTML);
           setActionsEnabled(Boolean(lastMarkdown));
           spin.style.display = "none";
           burstEmojis(currentVoice);
@@ -517,7 +523,7 @@ async function runSnazzyPaged(body) {
     } else {
       lastHTML = fallbackMarkdownToHtml(lastMarkdown);
     }
-    setResultIframe(lastHTML);
+    lastHTML = setResultIframe(lastHTML);
     completePhase("openai");
     setActionsEnabled(Boolean(lastMarkdown));
     spin.style.display = "none";
