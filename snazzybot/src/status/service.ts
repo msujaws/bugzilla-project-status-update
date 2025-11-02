@@ -1,29 +1,30 @@
-import { escapeHtml, markdownToHtml } from "./markdown.ts";
 import { isoDaysAgo } from "../utils/time.ts";
 import { BugzillaClient } from "./bugzillaClient.ts";
+import { runRecipe, type RecipeStep } from "./stateMachine.ts";
+import { collectCandidates } from "./candidateCollector.ts";
+import { qualifiesByHistory } from "./history.ts";
 import {
-  collectCandidates,
-  type CandidateCollection,
-} from "./candidateCollector.ts";
-import { qualifiesByHistory, qualifiesByHistoryWhy } from "./history.ts";
-import { loadPatchContextsForBugs } from "./patchStage.ts";
-import { buildBuglistURL } from "./output.ts";
-import { summarizeWithOpenAI } from "./summarizer.ts";
-import type {
-  Bug,
-  BugHistoryEntry,
-  EnvLike,
-  GenerateParams,
-  ProgressHooks,
-} from "./types.ts";
+  type AudienceOption,
+  type StatusContext,
+  type StatusStepName,
+  type VoiceOption,
+} from "./context.ts";
+import {
+  collectCandidatesStep,
+  fetchHistoriesStep,
+  fetchPrequalifiedStep,
+  filterByHistoryStep,
+  formatOutputStep,
+  handleEmptyStep,
+  limitOpenAiStep,
+  loadPatchContextStep,
+  logWindowStep,
+  summarizeOpenAiStep,
+} from "./steps/index.ts";
+import { logWindowContext } from "./recipeHelpers.ts";
+import type { Bug, EnvLike, GenerateParams, ProgressHooks } from "./types.ts";
 
-const MAX_BUGS_FOR_OPENAI = 60;
 const defaultHooks: ProgressHooks = {};
-
-type AudienceOption = "technical" | "product" | "leadership";
-type VoiceOption = "normal" | "pirate" | "snazzy-robot";
-
-const DEMO_SECTION_REGEX = /(^|\n)+#{0,2}\s*Demo suggestions[\s\S]*$/i;
 
 const defaultAudience = (idsProvided: boolean, audience?: AudienceOption) => {
   if (audience) return audience;
@@ -37,116 +38,31 @@ const defaultModel = (model?: string) => model ?? "gpt-5";
 const debugLogger = (enabled: boolean, hooks: ProgressHooks) =>
   enabled ? (message: string) => hooks.info?.(`[debug] ${message}`) : undefined;
 
-const formatSummaryOutput = (args: {
-  summaryMd: string;
-  demo: string[];
-  trimmedCount: number;
-  link: string;
-}) => {
-  const { summaryMd, demo, trimmedCount, link } = args;
-  let summary = (summaryMd || "").trim().replace(DEMO_SECTION_REGEX, "").trim();
-
-  if (demo.length > 0) {
-    summary += `\n\n## Demo suggestions\n` + demo.join("\n");
+function createStatusRecipe(
+  context: StatusContext,
+): RecipeStep<StatusStepName, StatusContext>[] {
+  if (context.params.ids && context.params.ids.length > 0) {
+    return [
+      fetchPrequalifiedStep,
+      limitOpenAiStep,
+      loadPatchContextStep,
+      summarizeOpenAiStep,
+      formatOutputStep,
+    ];
   }
 
-  if (trimmedCount > 0) {
-    const noun = trimmedCount === 1 ? "bug" : "bugs";
-    const verb = trimmedCount === 1 ? "was" : "were";
-    summary += `\n\n_Note: ${trimmedCount} additional ${noun} ${verb} omitted from the AI summary due to size limits._`;
-  }
-
-  const markdown = `${summary}\n\n[View bugs in Bugzilla](${link})`;
-  const html =
-    markdownToHtml(summary) +
-    `\n<p><a href="${escapeHtml(link)}">View bugs in Bugzilla</a></p>`;
-
-  return { markdown, html };
-};
-
-const logWindowContext = (
-  hooks: ProgressHooks,
-  sinceISO: string,
-  days: number,
-  components: string[],
-  whiteboards: string[],
-  metabugs: number[],
-  assignees: string[],
-) => {
-  hooks.info?.(`Window: last ${days} days (since ${sinceISO})`);
-  if (whiteboards.length > 0) {
-    hooks.info?.(`Whiteboard filters: ${whiteboards.join(", ")}`);
-  }
-  if (components.length > 0) {
-    hooks.info?.(`Components: ${components.join(", ")}`);
-  }
-  if (metabugs.length > 0) {
-    hooks.info?.(`Metabugs: ${metabugs.join(", ")}`);
-  }
-  if (assignees.length > 0) {
-    hooks.info?.(`Assignees: ${assignees.join(", ")}`);
-  }
-};
-
-const summarizeCandidateReasons = (
-  collection: CandidateCollection,
-  debugLog?: (message: string) => void,
-) => {
-  if (!debugLog) return;
-  debugLog(`union candidates: ${collection.union.length}`);
-  debugLog(
-    `security-restricted removed: ${collection.restricted.length}${
-      collection.restricted.length > 0
-        ? ` (sample: ${collection.restricted
-            .slice(0, 6)
-            .map((bug) => bug.id)
-            .join(", ")})`
-        : ""
-    }`,
-  );
-  debugLog(`candidates after security filter: ${collection.candidates.length}`);
-};
-
-const emitHistoryCoverage = (
-  candidates: Bug[],
-  histories: BugHistoryEntry[],
-  byIdHistory: Map<number, BugHistoryEntry>,
-  debugLog?: (message: string) => void,
-) => {
-  if (!debugLog) return;
-  if (histories.length === candidates.length) {
-    debugLog(
-      `history coverage: ${histories.length}/${candidates.length} (complete)`,
-    );
-  } else {
-    const missing = candidates
-      .map((bug) => bug.id)
-      .filter((id) => !byIdHistory.has(id))
-      .slice(0, 12);
-    debugLog(
-      `history coverage: ${histories.length}/${candidates.length}${
-        missing.length > 0 ? ` (no history for: ${missing.join(", ")})` : ""
-      }`,
-    );
-  }
-};
-
-const logReasonBreakdown = (
-  reasonCounts: Map<string, number>,
-  reasonExamples: Map<string, number[]>,
-  debugLog?: (message: string) => void,
-) => {
-  if (!debugLog) return;
-  const entries = [...reasonCounts.entries()].toSorted((a, b) => b[1] - a[1]);
-  if (entries.length === 0) return;
-  debugLog("non-qualified reasons (top):");
-  for (const [why, count] of entries) {
-    const ids = reasonExamples.get(why) || [];
-    debugLog(
-      `  • ${why}: ${count}${ids.length > 0 ? ` (eg: ${ids.join(", ")})` : ""}`,
-    );
-  }
-};
+  return [
+    logWindowStep,
+    collectCandidatesStep,
+    fetchHistoriesStep,
+    filterByHistoryStep,
+    handleEmptyStep,
+    limitOpenAiStep,
+    loadPatchContextStep,
+    summarizeOpenAiStep,
+    formatOutputStep,
+  ];
+}
 
 export async function generateStatus(
   params: GenerateParams,
@@ -160,89 +76,8 @@ export async function generateStatus(
   const assignees = (params.assignees ?? [])
     .map((email) => email?.trim())
     .filter(Boolean);
-
-  if (params.ids && params.ids.length > 0) {
-    const days = params.days ?? 8;
-    const sinceISO = isoDaysAgo(days);
-    const components = params.components ?? [];
-    const whiteboards = params.whiteboards ?? [];
-    const ids = [...params.ids];
-    const model = defaultModel(params.model);
-    const voice = defaultVoice(params.voice);
-    const audience = defaultAudience(true, params.audience);
-
-    hooks.info?.(`Summarizing ${ids.length} pre-qualified bugs…`);
-
-    const bugs = await client.fetchBugsByIds(ids, undefined, {
-      filterResolved: false,
-    });
-
-    const link = buildBuglistURL({
-      sinceISO,
-      whiteboards,
-      ids,
-      components,
-      assignees,
-      host: env.BUGZILLA_HOST,
-    });
-
-    const limited = bugs.slice(0, Math.min(bugs.length, MAX_BUGS_FOR_OPENAI));
-    if (bugs.length > MAX_BUGS_FOR_OPENAI) {
-      hooks.warn?.(
-        `Trimming ${
-          bugs.length - MAX_BUGS_FOR_OPENAI
-        } bug(s) before OpenAI call to stay within token limits`,
-      );
-    }
-
-    const patchContext = await loadPatchContextsForBugs(env, limited, hooks, {
-      includePatchContext,
-      debugLog,
-    });
-    if (debugLog) {
-      debugLog(
-        `[patch] pre-qualified run collected context for ${patchContext.size}/${limited.length} bug(s)`,
-      );
-    }
-
-    hooks.phase?.("openai");
-    const ai = await summarizeWithOpenAI(
-      env,
-      model,
-      limited,
-      days,
-      voice,
-      audience,
-      {
-        patchContextByBug: patchContext,
-        groupByAssignee: assignees.length > 0,
-        singleAssignee: assignees.length === 1,
-      },
-    );
-
-    const demo = (ai.assessments || [])
-      .filter((assessment) => {
-        const score = Number(assessment.impact_score);
-        return (
-          Number.isFinite(score) && score >= 8 && assessment.demo_suggestion
-        );
-      })
-      .map(
-        (assessment) =>
-          `- [Bug ${assessment.bug_id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${assessment.bug_id}): ${assessment.demo_suggestion}`,
-      );
-
-    const { markdown, html } = formatSummaryOutput({
-      summaryMd: ai.summary_md ?? "",
-      demo,
-      trimmedCount: Math.max(0, bugs.length - limited.length),
-      link,
-    });
-
-    const output = (params.format ?? "md") === "html" ? html : markdown;
-
-    return { output, html, ids };
-  }
+  const idsProvided =
+    Array.isArray(params.ids) && params.ids.length > 0 ? true : false;
 
   const days = params.days ?? 8;
   const sinceISO = isoDaysAgo(days);
@@ -251,209 +86,54 @@ export async function generateStatus(
   const metabugs = params.metabugs ?? [];
   const model = defaultModel(params.model);
   const voice = defaultVoice(params.voice);
-  const audience = defaultAudience(false, params.audience);
+  const audience = defaultAudience(idsProvided, params.audience);
+  const format = params.format ?? "md";
 
-  logWindowContext(
+  const context: StatusContext = {
+    params,
+    env,
     hooks,
-    sinceISO,
+    client,
+    includePatchContext,
+    isDebug,
+    debugLog,
     days,
-    components.map((pc) =>
-      pc.component ? `${pc.product}:${pc.component}` : pc.product,
-    ),
-    whiteboards,
-    metabugs,
-    assignees,
-  );
-
-  const collection = await collectCandidates(client, hooks, sinceISO, {
+    sinceISO,
     components,
     whiteboards,
     metabugs,
     assignees,
-    debugLog,
-  });
-  summarizeCandidateReasons(collection, debugLog);
-
-  const histories = await client.fetchHistories(
-    collection.candidates.map((bug) => bug.id),
-    hooks,
-  );
-  const byIdHistory = new Map(histories.map((entry) => [entry.id, entry]));
-
-  if (isDebug) {
-    let shown = 0;
-    for (const bug of collection.candidates) {
-      if (shown >= 3) break;
-      const history = byIdHistory.get(bug.id);
-      const firstChanges = history?.history?.[0]?.changes;
-      const changes = Array.isArray(firstChanges) ? firstChanges : [];
-      if (history?.history?.length && !Array.isArray(firstChanges)) {
-        hooks.info?.(
-          `[debug] sample history #${bug.id} has non-array changes payload: ${JSON.stringify(firstChanges)}`,
-        );
-      } else if (!history?.history?.length) {
-        hooks.info?.(
-          `[debug] sample history #${bug.id} has no history entries within fetched payload`,
-        );
-      }
-      if (changes.length > 0) {
-        hooks.info?.(
-          `[debug] sample history #${bug.id} first changes: ${JSON.stringify(
-            changes.slice(0, 2),
-          )}`,
-        );
-        shown++;
-      }
-    }
-  }
-
-  const reasonCounts = new Map<string, number>();
-  const reasonExamples = new Map<string, number[]>();
-  const bump = (why: string, id: number) => {
-    reasonCounts.set(why, (reasonCounts.get(why) ?? 0) + 1);
-    const list = reasonExamples.get(why) ?? [];
-    if (list.length < 6) list.push(id);
-    reasonExamples.set(why, list);
-  };
-
-  const allowed = new Set<number>();
-  for (const bug of collection.candidates) {
-    const history = byIdHistory.get(bug.id);
-    if (!history) {
-      if (isDebug) bump("no history returned for id", bug.id);
-      continue;
-    }
-    if (isDebug) {
-      const result = qualifiesByHistoryWhy(history, sinceISO);
-      if (result.ok) {
-        allowed.add(bug.id);
-      } else {
-        bump(result.why || "failed history qualification", bug.id);
-      }
-    } else if (qualifiesByHistory(history, sinceISO)) {
-      allowed.add(bug.id);
-    }
-  }
-
-  logReasonBreakdown(reasonCounts, reasonExamples, debugLog);
-  emitHistoryCoverage(collection.candidates, histories, byIdHistory, debugLog);
-
-  const final = collection.candidates.filter((bug) => allowed.has(bug.id));
-  hooks.info?.(`Qualified bugs: ${final.length}`);
-
-  if (debugLog) {
-    if (final.length > 0) {
-      debugLog(
-        `qualified IDs: ${final
-          .slice(0, 20)
-          .map((bug) => bug.id)
-          .join(", ")}${final.length > 20 ? " …" : ""}`,
-      );
-    } else {
-      debugLog(
-        "no qualified bugs → check reasons above; also verify statuses/resolution and history window.",
-      );
-    }
-  }
-
-  if (final.length === 0) {
-    const link = buildBuglistURL({
-      sinceISO,
-      whiteboards,
-      ids: [],
-      components,
-      assignees,
-      host: env.BUGZILLA_HOST,
-    });
-    const markdownBody = `_No user-impacting changes in the last ${days} days._\n\n[View bugs in Bugzilla](${link})`;
-    const escapedLink = escapeHtml(link);
-    const htmlBody = `<p><em>No user-impacting changes in the last ${days} days.</em></p><p><a href="${escapedLink}">View bugs in Bugzilla</a></p>`;
-    if (debugLog) debugLog(`buglist link for manual inspection: ${link}`);
-    const output = (params.format ?? "md") === "html" ? htmlBody : markdownBody;
-    return { output, html: htmlBody, ids: [] };
-  }
-
-  let aiCandidates = final;
-  let trimmedCount = 0;
-  if (final.length > MAX_BUGS_FOR_OPENAI) {
-    trimmedCount = final.length - MAX_BUGS_FOR_OPENAI;
-    hooks.warn?.(
-      `Trimming ${trimmedCount} bug(s) before OpenAI call to stay within token limits`,
-    );
-    aiCandidates = final.slice(0, MAX_BUGS_FOR_OPENAI);
-    if (debugLog) {
-      debugLog(
-        `OpenAI candidate IDs (trimmed to ${MAX_BUGS_FOR_OPENAI}): ${aiCandidates
-          .slice(0, 30)
-          .map((bug) => bug.id)
-          .join(", ")}${final.length > 30 ? " …" : ""}`,
-      );
-    }
-  } else if (debugLog) {
-    debugLog(
-      `OpenAI candidate IDs (${aiCandidates.length}): ${aiCandidates
-        .slice(0, 30)
-        .map((bug) => bug.id)
-        .join(", ")}${aiCandidates.length > 30 ? " …" : ""}`,
-    );
-  }
-
-  const patchContext = await loadPatchContextsForBugs(
-    env,
-    aiCandidates,
-    hooks,
-    { includePatchContext, debugLog },
-  );
-  if (debugLog) {
-    debugLog(
-      `[patch] summary run collected context for ${patchContext.size}/${aiCandidates.length} bug(s)`,
-    );
-  }
-
-  hooks.phase?.("openai");
-  const ai = await summarizeWithOpenAI(
-    env,
-    model,
-    aiCandidates,
-    days,
     voice,
     audience,
-    {
-      patchContextByBug: patchContext,
-      groupByAssignee: assignees.length > 0,
-      singleAssignee: assignees.length === 1,
-    },
-  );
+    model,
+    format,
+    candidates: [],
+    histories: [],
+    byIdHistory: new Map(),
+    finalBugs: [],
+    aiCandidates: [],
+    providedBugs: [],
+    trimmedCount: 0,
+    patchContext: new Map(),
+    ids: [],
+  };
 
-  const demo = (ai.assessments || [])
-    .filter((assessment) => {
-      const score = Number(assessment.impact_score);
-      return Number.isFinite(score) && score >= 8 && assessment.demo_suggestion;
-    })
-    .map(
-      (assessment) =>
-        `- [Bug ${assessment.bug_id}](https://bugzilla.mozilla.org/show_bug.cgi?id=${assessment.bug_id}): ${assessment.demo_suggestion}`,
+  const recipe = createStatusRecipe(context);
+  const { snapshots } = await runRecipe(recipe, context);
+
+  if (!context.output || !context.html) {
+    const failed = snapshots
+      .filter((snap) => snap.status === "failed")
+      .map((snap) => snap.name)
+      .join(", ");
+    throw new Error(
+      failed
+        ? `State machine failed in steps: ${failed}`
+        : "State machine recipe did not produce output",
     );
+  }
 
-  const link = buildBuglistURL({
-    sinceISO,
-    whiteboards,
-    ids: final.map((bug) => bug.id),
-    components,
-    assignees,
-    host: env.BUGZILLA_HOST,
-  });
-
-  const { markdown, html } = formatSummaryOutput({
-    summaryMd: ai.summary_md ?? "",
-    demo,
-    trimmedCount,
-    link,
-  });
-
-  const output = (params.format ?? "md") === "html" ? html : markdown;
-
-  return { output, html, ids: final.map((bug) => bug.id) };
+  return { output: context.output, html: context.html, ids: context.ids };
 }
 
 export async function discoverCandidates(
@@ -544,5 +224,5 @@ export async function qualifyHistoryPage(
   return { qualifiedIds: qualified, nextCursor, total: candidates.length };
 }
 
-export { isRestricted } from "./rules.ts";
 export { buildBuglistURL } from "./output.ts";
+export { isRestricted } from "./rules.ts";
