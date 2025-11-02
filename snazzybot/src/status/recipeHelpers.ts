@@ -5,7 +5,7 @@ import type { CandidateCollection } from "./candidateCollector.ts";
 import type { Bug, BugHistoryEntry, ProgressHooks } from "./types.ts";
 import type { StatusContext } from "./context.ts";
 
-const DEMO_SECTION_REGEX = /(^|\n)+#{0,2}\s*Demo suggestions[\s\S]*$/i;
+const DEMO_SECTION_REGEX = /(^|\n)+#{0,3}\s*Demo suggestions[\s\S]*$/i;
 
 export const formatSummaryOutput = (args: {
   summaryMd: string;
@@ -17,7 +17,7 @@ export const formatSummaryOutput = (args: {
   let summary = (summaryMd || "").trim().replace(DEMO_SECTION_REGEX, "").trim();
 
   if (demo.length > 0) {
-    summary += `\n\n## Demo suggestions\n` + demo.join("\n");
+    summary += `\n\n### Demo suggestions\n` + demo.join("\n");
   }
 
   if (trimmedCount > 0) {
