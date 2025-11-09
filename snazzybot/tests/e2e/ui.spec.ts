@@ -255,7 +255,9 @@ test.describe("SnazzyBot UI fixtures", () => {
   }) => {
     const fixture = fixtures.devtoolsStream;
     await setupStreamFixture(page, fixture);
-    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    if (test.info().project.use?.browserName !== "firefox") {
+      await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    }
     await page.addInitScript(() => {
       const copiedTexts: string[] = [];
       Object.defineProperty(globalThis, "__copiedTexts", {

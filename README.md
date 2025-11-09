@@ -55,7 +55,7 @@ This serves the assets in `snazzybot/public` and proxies API calls through the l
 cd snazzybot
 npm ci
 npm run test:watch
-npm run test:e2e
+npm run test:e2e # runs Chromium and Firefox
 ```
 
 When working from the repository root (for example via VS Code's built-in test runner), you can also use:
@@ -63,7 +63,7 @@ When working from the repository root (for example via VS Code's built-in test r
 ```bash
 npm run test
 npm run test:watch
-npm run test:e2e
+npm run test:e2e # runs Chromium and Firefox
 npm run test:all
 npm run coverage
 ```

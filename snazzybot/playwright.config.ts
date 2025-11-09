@@ -13,10 +13,11 @@ export default defineConfig({
   },
   projects: [
     { name: "chromium", use: { browserName: "chromium" } },
+    { name: "firefox", use: { browserName: "firefox" } },
     {
-      name: "chromium-slow",
+      name: "firefox-slow",
       use: {
-        browserName: "chromium",
+        browserName: "firefox",
         headless: false,
         launchOptions: { slowMo: 500 },
       },
