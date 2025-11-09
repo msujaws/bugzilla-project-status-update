@@ -10,7 +10,7 @@
     "coverage": "vitest run --coverage",
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:slow": "playwright test --project=chromium-slow",
-    "test:all": "npm run test && npm run test:e2e",
+    "test:all": "npm run test && npm run test:e2e && npm run lint",
     "cli": "tsx cli/weekly-bugzilla-status.ts",
     "lint": "eslint . --ext .ts,.js",
     "lint:fix": "eslint . --ext .ts,.js --fix"

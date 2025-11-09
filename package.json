@@ -13,7 +13,7 @@
     "test": "npm run --prefix snazzybot test",
     "test:watch": "npm run --prefix snazzybot test:watch",
     "test:e2e": "npm run --prefix snazzybot test:e2e",
-    "test:all": "npm run --prefix snazzybot test:all",
+    "test:all": "npm run --prefix snazzybot test:all && npm run --prefix snazzybot lint",
     "coverage": "npm run --prefix snazzybot coverage",
     "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
     "verify": "npm run --prefix snazzybot test:all && npm run --prefix snazzybot lint"
