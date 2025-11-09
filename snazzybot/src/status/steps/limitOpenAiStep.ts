@@ -23,6 +23,7 @@ export const limitOpenAiStep: RecipeStep<StatusStepName, StatusContext> = {
             .slice(0, 30)
             .map((bug) => bug.id)
             .join(", ")}${final.length > 30 ? " …" : ""}`,
+          { always: true },
         );
       }
     } else if (ctx.debugLog) {
@@ -31,6 +32,7 @@ export const limitOpenAiStep: RecipeStep<StatusStepName, StatusContext> = {
           .slice(0, 30)
           .map((bug) => bug.id)
           .join(", ")}${ctx.aiCandidates.length > 30 ? " …" : ""}`,
+        { always: true },
       );
     }
   },

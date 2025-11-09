@@ -2,7 +2,7 @@ import { escapeHtml, markdownToHtml } from "./markdown.ts";
 import { buildBuglistURL } from "./output.ts";
 import { summarizeWithOpenAI } from "./summarizer.ts";
 import type { CandidateCollection } from "./candidateCollector.ts";
-import type { Bug, BugHistoryEntry, ProgressHooks } from "./types.ts";
+import type { Bug, BugHistoryEntry, DebugLog, ProgressHooks } from "./types.ts";
 import type { StatusContext } from "./context.ts";
 
 const DEMO_SECTION_REGEX = /(^|\n)+#{0,3}\s*Demo suggestions[\s\S]*$/i;
@@ -60,10 +60,10 @@ export const logWindowContext = (
 
 export const summarizeCandidateReasons = (
   collection: CandidateCollection,
-  debugLog?: (message: string) => void,
+  debugLog?: DebugLog,
 ) => {
   if (!debugLog) return;
-  debugLog(`union candidates: ${collection.union.length}`);
+  debugLog(`union candidates: ${collection.union.length}`, { always: true });
   debugLog(
     `security-restricted removed: ${collection.restricted.length}${
       collection.restricted.length > 0
@@ -73,20 +73,27 @@ export const summarizeCandidateReasons = (
             .join(", ")})`
         : ""
     }`,
+    { always: true },
   );
-  debugLog(`candidates after security filter: ${collection.candidates.length}`);
+  debugLog(
+    `candidates after security filter: ${collection.candidates.length}`,
+    {
+      always: true,
+    },
+  );
 };
 
 export const emitHistoryCoverage = (
   candidates: Bug[],
   histories: BugHistoryEntry[],
   byIdHistory: Map<number, BugHistoryEntry>,
-  debugLog?: (message: string) => void,
+  debugLog?: DebugLog,
 ) => {
   if (!debugLog) return;
   if (histories.length === candidates.length) {
     debugLog(
       `history coverage: ${histories.length}/${candidates.length} (complete)`,
+      { always: true },
     );
   } else {
     const missing = candidates
@@ -97,6 +104,7 @@ export const emitHistoryCoverage = (
       `history coverage: ${histories.length}/${candidates.length}${
         missing.length > 0 ? ` (no history for: ${missing.join(", ")})` : ""
       }`,
+      { always: true },
     );
   }
 };
@@ -104,16 +112,17 @@ export const emitHistoryCoverage = (
 export const logReasonBreakdown = (
   reasonCounts: Map<string, number>,
   reasonExamples: Map<string, number[]>,
-  debugLog?: (message: string) => void,
+  debugLog?: DebugLog,
 ) => {
   if (!debugLog) return;
   const entries = [...reasonCounts.entries()].toSorted((a, b) => b[1] - a[1]);
   if (entries.length === 0) return;
-  debugLog("non-qualified reasons (top):");
+  debugLog("non-qualified reasons (top):", { always: true });
   for (const [why, count] of entries) {
     const ids = reasonExamples.get(why) || [];
     debugLog(
       `  • ${why}: ${count}${ids.length > 0 ? ` (eg: ${ids.join(", ")})` : ""}`,
+      { always: true },
     );
   }
 };

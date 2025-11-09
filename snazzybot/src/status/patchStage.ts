@@ -1,6 +1,6 @@
 import { loadPatchContext, type CommitPatch } from "../patch.ts";
 import { describeError } from "../utils/errors.ts";
-import type { Bug, EnvLike, ProgressHooks } from "./types.ts";
+import type { Bug, DebugLog, EnvLike, ProgressHooks } from "./types.ts";
 
 export async function loadPatchContextsForBugs(
   env: EnvLike,
@@ -8,7 +8,7 @@ export async function loadPatchContextsForBugs(
   hooks: ProgressHooks,
   options: {
     includePatchContext: boolean;
-    debugLog?: (message: string) => void;
+    debugLog?: DebugLog;
   },
 ): Promise<Map<number, CommitPatch[]>> {
   const { includePatchContext, debugLog } = options;

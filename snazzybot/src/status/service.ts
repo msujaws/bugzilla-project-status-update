@@ -22,7 +22,13 @@ import {
   summarizeOpenAiStep,
 } from "./steps/index.ts";
 import { logWindowContext } from "./recipeHelpers.ts";
-import type { Bug, EnvLike, GenerateParams, ProgressHooks } from "./types.ts";
+import type {
+  Bug,
+  DebugLog,
+  EnvLike,
+  GenerateParams,
+  ProgressHooks,
+} from "./types.ts";
 
 const defaultHooks: ProgressHooks = {};
 
@@ -35,8 +41,14 @@ const defaultVoice = (voice?: VoiceOption): VoiceOption => voice ?? "normal";
 
 const defaultModel = (model?: string) => model ?? "gpt-5";
 
-const debugLogger = (enabled: boolean, hooks: ProgressHooks) =>
-  enabled ? (message: string) => hooks.info?.(`[debug] ${message}`) : undefined;
+const debugLogger = (enabled: boolean, hooks: ProgressHooks): DebugLog => {
+  return (message, options) => {
+    if (!enabled && !options?.always) return;
+    const payload = `[status] ${message}`;
+    console.debug(payload);
+    if (enabled) hooks.info?.(`[debug] ${message}`);
+  };
+};
 
 function createStatusRecipe(
   context: StatusContext,

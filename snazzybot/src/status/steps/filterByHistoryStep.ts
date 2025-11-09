@@ -1,4 +1,4 @@
-import { qualifiesByHistory, qualifiesByHistoryWhy } from "../history.ts";
+import { qualifiesByHistoryWhy } from "../history.ts";
 import { logReasonBreakdown } from "../recipeHelpers.ts";
 import type { RecipeStep } from "../stateMachine.ts";
 import type { StatusContext, StatusStepName } from "../context.ts";
@@ -19,18 +19,28 @@ export const filterByHistoryStep: RecipeStep<StatusStepName, StatusContext> = {
     for (const bug of ctx.candidates) {
       const history = ctx.byIdHistory.get(bug.id);
       if (!history) {
-        if (ctx.isDebug) bump("no history returned for id", bug.id);
+        bump("no history returned for id", bug.id);
+        ctx.debugLog?.(
+          `[history] excluded #${bug.id}: no history returned for id`,
+          { always: true },
+        );
         continue;
       }
-      if (ctx.isDebug) {
-        const result = qualifiesByHistoryWhy(history, ctx.sinceISO);
-        if (result.ok) {
-          allowed.add(bug.id);
-        } else {
-          bump(result.why || "failed history qualification", bug.id);
-        }
-      } else if (qualifiesByHistory(history, ctx.sinceISO)) {
+      const result = qualifiesByHistoryWhy(history, ctx.sinceISO);
+      if (result.ok) {
         allowed.add(bug.id);
+        ctx.debugLog?.(
+          `[history] qualified #${bug.id}${
+            result.detail ? ` – ${result.detail}` : ""
+          }`,
+          { always: true },
+        );
+      } else {
+        const reason = result.why || "failed history qualification";
+        bump(reason, bug.id);
+        ctx.debugLog?.(`[history] excluded #${bug.id}: ${reason}`, {
+          always: true,
+        });
       }
     }
 
@@ -48,10 +58,12 @@ export const filterByHistoryStep: RecipeStep<StatusStepName, StatusContext> = {
             .slice(0, 20)
             .map((bug) => bug.id)
             .join(", ")}${final.length > 20 ? " …" : ""}`,
+          { always: true },
         );
       } else {
         ctx.debugLog(
           "no qualified bugs → check reasons above; also verify statuses/resolution and history window.",
+          { always: true },
         );
       }
     }

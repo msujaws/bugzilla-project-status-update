@@ -29,6 +29,11 @@ export type ProgressHooks = {
   warn?: (msg: string) => void;
 };
 
+export type DebugLog = (
+  message: string,
+  options?: { always?: boolean },
+) => void;
+
 export type Bug = {
   id: number;
   summary: string;

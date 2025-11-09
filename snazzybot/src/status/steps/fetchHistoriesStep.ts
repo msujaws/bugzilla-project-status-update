@@ -19,17 +19,17 @@ export const fetchHistoriesStep: RecipeStep<StatusStepName, StatusContext> = {
         const firstChanges = history?.history?.[0]?.changes;
         const changes = Array.isArray(firstChanges) ? firstChanges : [];
         if (history?.history?.length && !Array.isArray(firstChanges)) {
-          ctx.hooks.info?.(
-            `[debug] sample history #${bug.id} has non-array changes payload: ${JSON.stringify(firstChanges)}`,
+          ctx.debugLog?.(
+            `sample history #${bug.id} has non-array changes payload: ${JSON.stringify(firstChanges)}`,
           );
         } else if (!history?.history?.length) {
-          ctx.hooks.info?.(
-            `[debug] sample history #${bug.id} has no history entries within fetched payload`,
+          ctx.debugLog?.(
+            `sample history #${bug.id} has no history entries within fetched payload`,
           );
         }
         if (changes.length > 0) {
-          ctx.hooks.info?.(
-            `[debug] sample history #${bug.id} first changes: ${JSON.stringify(
+          ctx.debugLog?.(
+            `sample history #${bug.id} first changes: ${JSON.stringify(
               changes.slice(0, 2),
             )}`,
           );

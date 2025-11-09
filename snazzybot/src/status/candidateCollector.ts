@@ -1,6 +1,11 @@
 import { BugzillaClient } from "./bugzillaClient.ts";
 import { isRestricted } from "./rules.ts";
-import type { Bug, ProductComponent, ProgressHooks } from "./types.ts";
+import type {
+  Bug,
+  DebugLog,
+  ProductComponent,
+  ProgressHooks,
+} from "./types.ts";
 
 export type CandidateCollection = {
   union: Bug[];
@@ -22,7 +27,7 @@ export async function collectCandidates(
     whiteboards?: string[];
     metabugs?: number[];
     assignees?: string[];
-    debugLog?: (message: string) => void;
+    debugLog?: DebugLog;
   },
 ): Promise<CandidateCollection> {
   const {
@@ -44,6 +49,7 @@ export async function collectCandidates(
   if (debugLog) {
     debugLog(
       `source counts → metabug children: ${metabugChildren.length}, byComponents: ${byComponents.length}, byWhiteboards: ${byWhiteboards.length}, byAssignees: ${byAssignees.length}`,
+      { always: true },
     );
     const sample = (arr: Bug[], n = 8) =>
       arr
@@ -63,7 +69,12 @@ export async function collectCandidates(
 
   const byIds = await client.fetchBugsByIds(metabugChildren, sinceISO);
   if (debugLog) {
-    debugLog(`byIds (filtered) count: ${byIds.length} (from metabug children)`);
+    debugLog(
+      `byIds (filtered) count: ${byIds.length} (from metabug children)`,
+      {
+        always: true,
+      },
+    );
   }
 
   const seen = new Set<number>();
@@ -82,7 +93,16 @@ export async function collectCandidates(
   const candidates = union.filter((bug) => !isRestricted(bug.groups));
 
   if (debugLog) {
-    debugLog(`union candidates: ${union.length}`);
+    const totalBeforeDedupe =
+      byComponents.length +
+      byWhiteboards.length +
+      byAssignees.length +
+      byIds.length;
+    const deduped = totalBeforeDedupe - union.length;
+    debugLog(
+      `union candidates after dedupe: ${union.length} (removed ${deduped} overlap)`,
+      { always: true },
+    );
     debugLog(
       `security-restricted removed: ${restricted.length}${
         restricted.length > 0
@@ -92,8 +112,11 @@ export async function collectCandidates(
               .join(", ")})`
           : ""
       }`,
+      { always: true },
     );
-    debugLog(`candidates after security filter: ${candidates.length}`);
+    debugLog(`candidates after security filter: ${candidates.length}`, {
+      always: true,
+    });
   }
 
   hooks.info?.(`Candidates after initial query: ${candidates.length}`);

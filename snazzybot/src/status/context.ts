@@ -5,6 +5,7 @@ import type { SummarizerResult } from "./summarizer.ts";
 import type {
   Bug,
   BugHistoryEntry,
+  DebugLog,
   EnvLike,
   GenerateParams,
   ProductComponent,
@@ -35,7 +36,7 @@ export interface StatusContext {
   client: BugzillaClient;
   includePatchContext: boolean;
   isDebug: boolean;
-  debugLog?: (message: string) => void;
+  debugLog?: DebugLog;
   days: number;
   sinceISO: string;
   components: ProductComponent[];

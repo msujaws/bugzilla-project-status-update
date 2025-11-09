@@ -33,7 +33,7 @@ export function qualifiesByHistory(
 export function qualifiesByHistoryWhy(
   entry: BugHistoryEntry,
   sinceISO: string,
-): { ok: boolean; why?: string } {
+): { ok: boolean; why?: string; detail?: string } {
   const since = Date.parse(sinceISO);
   if (!entry?.history || entry.history.length === 0) {
     return { ok: false, why: "no history entries" };
@@ -45,6 +45,7 @@ export function qualifiesByHistoryWhy(
     sawRecent = true;
     let statusProgress = false;
     let fixed = false;
+    let detail: string | undefined;
     const changes = Array.isArray(history.changes) ? history.changes : [];
     for (const change of changes) {
       const field = change.field_name?.toLowerCase();
@@ -55,13 +56,15 @@ export function qualifiesByHistoryWhy(
           change.added === "CLOSED")
       ) {
         statusProgress = true;
+        detail = `status ${change.added} on ${history.when}`;
       }
       if (field === "resolution" && change.added === "FIXED") {
         fixed = true;
+        detail = `resolution FIXED on ${history.when}`;
       }
     }
     if (fixed || statusProgress) {
-      return { ok: true };
+      return { ok: true, detail };
     }
   }
   if (!sawRecent) return { ok: false, why: "no recent history in window" };

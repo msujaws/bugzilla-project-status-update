@@ -12,7 +12,9 @@ export const handleEmptyStep: RecipeStep<StatusStepName, StatusContext> = {
     ctx.html = htmlBody;
     ctx.ids = [];
     if (ctx.debugLog)
-      ctx.debugLog(`buglist link for manual inspection: ${link}`);
+      ctx.debugLog(`buglist link for manual inspection: ${link}`, {
+        always: true,
+      });
     return HALT;
   },
 };
