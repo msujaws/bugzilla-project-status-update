@@ -73,7 +73,7 @@ const summarizeBug = (bug: Bug) => ({
 });
 
 const normalizeAssignee = (bug: Bug) =>
-  nameOf(bug).replace(/["']/g, "").replace(/\s+/g, " ").trim();
+  nameOf(bug).replaceAll(/["']/g, "").replaceAll(/\s+/g, " ").trim();
 
 function pickValidPair(candidates: Bug[]): CandidatePick {
   const byAssignee = new Map<string, Bug[]>();
@@ -149,7 +149,18 @@ function buildLink(options: {
   });
 }
 
-async function gatherDevToolsStreamFixture(client: BugzillaClient) {
+type DevToolsSample = {
+  days: number;
+  sinceISO: string;
+  valid: Bug[];
+  security: Bug;
+  confidential: Bug;
+  recordedAt: string;
+};
+
+async function collectDevToolsSample(
+  client: BugzillaClient,
+): Promise<DevToolsSample> {
   const days = 21;
   const sinceISO = isoDaysAgo(days);
   const collection = await collectCandidates(client, {}, sinceISO, {
@@ -159,10 +170,19 @@ async function gatherDevToolsStreamFixture(client: BugzillaClient) {
     throw new Error("DevTools fixture requires at least four candidates");
   }
   const { valid, extras } = pickValidPair(collection.candidates);
-  const security = extras[0];
-  const confidential = extras[1];
   const recordedAt = new Date().toISOString();
+  return {
+    days,
+    sinceISO,
+    valid,
+    security: extras[0],
+    confidential: extras[1],
+    recordedAt,
+  };
+}
 
+function buildDevToolsStreamFixture(sample: DevToolsSample) {
+  const { days, sinceISO, valid, security, confidential, recordedAt } = sample;
   const summaryLines = [
     "## DevTools — Highlighted fixes",
     "",
@@ -174,7 +194,10 @@ async function gatherDevToolsStreamFixture(client: BugzillaClient) {
     `Security-restricted candidate omitted: Bug ${security.id} (${security.summary}).`,
     `Confidential candidate omitted: Bug ${confidential.id} (${confidential.summary}).`,
     "",
-    `_OpenAI fixture response generated for automated testing on ${recordedAt.slice(0, 10)}._`,
+    `_OpenAI fixture response generated for automated testing on ${recordedAt.slice(
+      0,
+      10,
+    )}._`,
   ].join("\n");
   const link = buildLink({
     sinceISO,
@@ -230,7 +253,7 @@ async function gatherDevToolsStreamFixture(client: BugzillaClient) {
   const meta = {
     sinceISO,
     days,
-    valid: valid.map(summarizeBug),
+    valid: valid.map((bug) => summarizeBug(bug)),
     invalid: [
       { reason: "security", ...summarizeBug(security) },
       { reason: "confidential", ...summarizeBug(confidential) },
@@ -245,6 +268,77 @@ async function gatherDevToolsStreamFixture(client: BugzillaClient) {
     requestBody,
     events,
     meta,
+  };
+}
+
+function buildDevToolsPatchFixture(sample: DevToolsSample) {
+  const { days, sinceISO, valid, recordedAt } = sample;
+  const summaryMd = [
+    "## DevTools — Patch-context candidates",
+    "",
+    `- Bug ${valid[0].id}: ${valid[0].summary} (Owner: ${nameOf(valid[0])})`,
+    `- Bug ${valid[1].id}: ${valid[1].summary} (Owner: ${nameOf(valid[1])})`,
+    "",
+    `_Fixture note:_ This run forces patch-context collection before summarizing the same two DevTools fixes.`,
+    "",
+    `_OpenAI fixture response generated for automated UI tests on ${recordedAt.slice(
+      0,
+      10,
+    )}._`,
+  ].join("\n");
+  const link = buildLink({
+    sinceISO,
+    components: [{ product: "DevTools" }],
+    ids: valid.map((bug) => bug.id),
+  });
+  const { markdown, html } = formatSummaryOutput({
+    summaryMd,
+    demo: [],
+    trimmedCount: 0,
+    link,
+  });
+
+  return {
+    name: "devtools-patch-context",
+    kind: "paged" as const,
+    recordedAt,
+    requestBody: {
+      ...DEFAULT_REQUEST,
+      components: [{ product: "DevTools" }],
+      metabugs: [],
+      whiteboards: [],
+      assignees: [],
+      days,
+      debug: false,
+      includePatchContext: true,
+      model: "gpt-5",
+    },
+    responses: {
+      discover: {
+        sinceISO,
+        total: valid.length,
+        candidates: valid.map((bug) => minifyCandidate(bug)),
+      },
+      pages: [
+        {
+          request: { cursor: 0, pageSize: 35 },
+          response: {
+            qualifiedIds: valid.map((bug) => bug.id),
+            total: valid.length,
+          },
+        },
+      ],
+      finalize: {
+        output: markdown,
+        html,
+      },
+    },
+    meta: {
+      sinceISO,
+      days,
+      recordedAt,
+      qualifiedIds: valid.map((bug) => bug.id),
+    },
   };
 }
 
@@ -287,7 +381,7 @@ async function gatherDevToolsEmptyFixture(client: BugzillaClient) {
       discover: {
         sinceISO,
         total: collection.candidates.length,
-        candidates: collection.candidates.map(minifyCandidate),
+        candidates: collection.candidates.map((bug) => minifyCandidate(bug)),
       },
       pages: [],
       finalize: {
@@ -354,7 +448,7 @@ async function gatherFxVpnFixture(client: BugzillaClient) {
 
   const discoverCandidates = collection.candidates
     .filter((bug) => bugs.some((b) => b.id === bug.id))
-    .map(minifyCandidate);
+    .map((bug) => minifyCandidate(bug));
 
   return {
     name: "fx-vpn-trio",
@@ -385,14 +479,18 @@ async function gatherFxVpnFixture(client: BugzillaClient) {
       sinceISO,
       days,
       recordedAt,
-      bugs: bugs.map(summarizeBug),
+      bugs: bugs.map((bug) => summarizeBug(bug)),
     },
   };
 }
 
 async function writeFixture(fixture: ScenarioFixture) {
   const target = path.join(fixturesDir, `${fixture.name}.json`);
-  await fs.writeFile(target, JSON.stringify(fixture, null, 2) + "\n", "utf8");
+  await fs.writeFile(
+    target,
+    JSON.stringify(fixture, undefined, 2) + "\n",
+    "utf8",
+  );
   console.log(`Wrote ${target}`);
 }
 
@@ -407,11 +505,13 @@ async function main() {
   };
   const client = new BugzillaClient(env);
   await ensureDir();
-  const fixtures = await Promise.all([
-    gatherDevToolsStreamFixture(client),
-    gatherDevToolsEmptyFixture(client),
-    gatherFxVpnFixture(client),
-  ]);
+  const devtoolsSample = await collectDevToolsSample(client);
+  const fixtures: ScenarioFixture[] = [
+    buildDevToolsStreamFixture(devtoolsSample),
+    buildDevToolsPatchFixture(devtoolsSample),
+    await gatherDevToolsEmptyFixture(client),
+    await gatherFxVpnFixture(client),
+  ];
   for (const fixture of fixtures) {
     await writeFixture(fixture);
   }

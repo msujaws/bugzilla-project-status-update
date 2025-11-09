@@ -1,7 +1,7 @@
 {
   "name": "devtools-stream-two-valid",
   "kind": "stream",
-  "recordedAt": "2025-11-08T11:37:54.379Z",
+  "recordedAt": "2025-11-09T13:51:26.145Z",
   "requestBody": {
     "format": "md",
     "voice": "normal",
@@ -27,7 +27,7 @@
     },
     {
       "kind": "info",
-      "msg": "[debug] Window: last 21 days (since 2025-10-18T11:37:53.307Z)"
+      "msg": "[debug] Window: last 21 days (since 2025-10-19T13:51:25.062Z)"
     },
     {
       "kind": "info",
@@ -51,12 +51,12 @@
     },
     {
       "kind": "done",
-      "output": "## DevTools — Highlighted fixes\n\n- Bug 1118592: Intermittent browser_tableWidget_mouse_interaction.js | Test timed out (Owner: Julian Descottes [:jdescottes])\n- Bug 1781328: Intermittent devtools/shared/commands/inspector/tests/browser_inspector_command_findNodeFrontFromSelectors.js | single tracking bug (Owner: Julian Descottes [:jdescottes])\n\n_Fixture note:_ Both fixes landed within the 21-day window and were authored by Julian Descottes [:jdescottes].\n\nSecurity-restricted candidate omitted: Bug 1020281 (Ability to create and send NEW requests in netmonitor.).\nConfidential candidate omitted: Bug 1165576 (Netmonitor theme refresh).\n\n_OpenAI fixture response generated for automated testing on 2025-11-08._\n\n[View bugs in Bugzilla](https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&resolution=FIXED&chfieldfrom=2025-10-18T11%3A37%3A53.307Z&chfieldto=Now&bug_id=1118592%2C1781328&product=DevTools)",
-      "html": "<h2>DevTools — Highlighted fixes</h2>\n<ul>\n<li>Bug 1118592: Intermittent browser_tableWidget_mouse_interaction.js | Test timed out (Owner: Julian Descottes [:jdescottes])</li>\n<li>Bug 1781328: Intermittent devtools/shared/commands/inspector/tests/browser_inspector_command_findNodeFrontFromSelectors.js | single tracking bug (Owner: Julian Descottes [:jdescottes])</li>\n</ul>\n<p><em>Fixture note:</em> Both fixes landed within the 21-day window and were authored by Julian Descottes [:jdescottes].</p>\n<p>Security-restricted candidate omitted: Bug 1020281 (Ability to create and send NEW requests in netmonitor.).\nConfidential candidate omitted: Bug 1165576 (Netmonitor theme refresh).</p>\n<p><em>OpenAI fixture response generated for automated testing on 2025-11-08.</em></p>\n\n<p><a href=\"https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&amp;resolution=FIXED&amp;chfieldfrom=2025-10-18T11%3A37%3A53.307Z&amp;chfieldto=Now&amp;bug_id=1118592%2C1781328&amp;product=DevTools\">View bugs in Bugzilla</a></p>"
+      "output": "## DevTools — Highlighted fixes\n\n- Bug 1118592: Intermittent browser_tableWidget_mouse_interaction.js | Test timed out (Owner: Julian Descottes [:jdescottes])\n- Bug 1781328: Intermittent devtools/shared/commands/inspector/tests/browser_inspector_command_findNodeFrontFromSelectors.js | single tracking bug (Owner: Julian Descottes [:jdescottes])\n\n_Fixture note:_ Both fixes landed within the 21-day window and were authored by Julian Descottes [:jdescottes].\n\nSecurity-restricted candidate omitted: Bug 1020281 (Ability to create and send NEW requests in netmonitor.).\nConfidential candidate omitted: Bug 1165576 (Netmonitor theme refresh).\n\n_OpenAI fixture response generated for automated testing on 2025-11-09._\n\n[View bugs in Bugzilla](https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&resolution=FIXED&chfieldfrom=2025-10-19T13%3A51%3A25.062Z&chfieldto=Now&bug_id=1118592%2C1781328&product=DevTools)",
+      "html": "<h2>DevTools — Highlighted fixes</h2>\n<ul>\n<li>Bug 1118592: Intermittent browser_tableWidget_mouse_interaction.js | Test timed out (Owner: Julian Descottes [:jdescottes])</li>\n<li>Bug 1781328: Intermittent devtools/shared/commands/inspector/tests/browser_inspector_command_findNodeFrontFromSelectors.js | single tracking bug (Owner: Julian Descottes [:jdescottes])</li>\n</ul>\n<p><em>Fixture note:</em> Both fixes landed within the 21-day window and were authored by Julian Descottes [:jdescottes].</p>\n<p>Security-restricted candidate omitted: Bug 1020281 (Ability to create and send NEW requests in netmonitor.).\nConfidential candidate omitted: Bug 1165576 (Netmonitor theme refresh).</p>\n<p><em>OpenAI fixture response generated for automated testing on 2025-11-09.</em></p>\n\n<p><a href=\"https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&amp;resolution=FIXED&amp;chfieldfrom=2025-10-19T13%3A51%3A25.062Z&amp;chfieldto=Now&amp;bug_id=1118592%2C1781328&amp;product=DevTools\">View bugs in Bugzilla</a></p>"
     }
   ],
   "meta": {
-    "sinceISO": "2025-10-18T11:37:53.307Z",
+    "sinceISO": "2025-10-19T13:51:25.062Z",
     "days": 21,
     "valid": [
       {
@@ -96,6 +96,6 @@
         "last_change_time": "2025-11-04T06:47:37Z"
       }
     ],
-    "recordedAt": "2025-11-08T11:37:54.379Z"
+    "recordedAt": "2025-11-09T13:51:26.145Z"
   }
 }

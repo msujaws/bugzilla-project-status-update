@@ -1,0 +1,65 @@
+{
+  "name": "devtools-patch-context",
+  "kind": "paged",
+  "recordedAt": "2025-11-09T13:51:26.145Z",
+  "requestBody": {
+    "format": "md",
+    "voice": "normal",
+    "audience": "technical",
+    "skipCache": false,
+    "includePatchContext": true,
+    "components": [
+      {
+        "product": "DevTools"
+      }
+    ],
+    "metabugs": [],
+    "whiteboards": [],
+    "assignees": [],
+    "days": 21,
+    "debug": false,
+    "model": "gpt-5"
+  },
+  "responses": {
+    "discover": {
+      "sinceISO": "2025-10-19T13:51:25.062Z",
+      "total": 2,
+      "candidates": [
+        {
+          "id": 1118592,
+          "last_change_time": "2025-10-27T06:31:32Z",
+          "product": "DevTools",
+          "component": "Framework"
+        },
+        {
+          "id": 1781328,
+          "last_change_time": "2025-10-20T06:37:00Z",
+          "product": "DevTools",
+          "component": "General"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "request": {
+          "cursor": 0,
+          "pageSize": 35
+        },
+        "response": {
+          "qualifiedIds": [1118592, 1781328],
+          "total": 2
+        }
+      }
+    ],
+    "finalize": {
+      "output": "## DevTools — Patch-context candidates\n\n- Bug 1118592: Intermittent browser_tableWidget_mouse_interaction.js | Test timed out (Owner: Julian Descottes [:jdescottes])\n- Bug 1781328: Intermittent devtools/shared/commands/inspector/tests/browser_inspector_command_findNodeFrontFromSelectors.js | single tracking bug (Owner: Julian Descottes [:jdescottes])\n\n_Fixture note:_ This run forces patch-context collection before summarizing the same two DevTools fixes.\n\n_OpenAI fixture response generated for automated UI tests on 2025-11-09._\n\n[View bugs in Bugzilla](https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&resolution=FIXED&chfieldfrom=2025-10-19T13%3A51%3A25.062Z&chfieldto=Now&bug_id=1118592%2C1781328&product=DevTools)",
+      "html": "<h2>DevTools — Patch-context candidates</h2>\n<ul>\n<li>Bug 1118592: Intermittent browser_tableWidget_mouse_interaction.js | Test timed out (Owner: Julian Descottes [:jdescottes])</li>\n<li>Bug 1781328: Intermittent devtools/shared/commands/inspector/tests/browser_inspector_command_findNodeFrontFromSelectors.js | single tracking bug (Owner: Julian Descottes [:jdescottes])</li>\n</ul>\n<p><em>Fixture note:</em> This run forces patch-context collection before summarizing the same two DevTools fixes.</p>\n<p><em>OpenAI fixture response generated for automated UI tests on 2025-11-09.</em></p>\n\n<p><a href=\"https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&amp;resolution=FIXED&amp;chfieldfrom=2025-10-19T13%3A51%3A25.062Z&amp;chfieldto=Now&amp;bug_id=1118592%2C1781328&amp;product=DevTools\">View bugs in Bugzilla</a></p>"
+    }
+  },
+  "meta": {
+    "sinceISO": "2025-10-19T13:51:25.062Z",
+    "days": 21,
+    "recordedAt": "2025-11-09T13:51:26.145Z",
+    "qualifiedIds": [1118592, 1781328]
+  }
+}

@@ -1,7 +1,7 @@
 {
   "name": "fx-vpn-trio",
   "kind": "paged",
-  "recordedAt": "2025-11-08T11:37:56.060Z",
+  "recordedAt": "2025-11-09T13:51:29.207Z",
   "requestBody": {
     "format": "md",
     "voice": "normal",
@@ -18,7 +18,7 @@
   },
   "responses": {
     "discover": {
-      "sinceISO": "2025-10-09T11:37:53.324Z",
+      "sinceISO": "2025-10-10T13:51:26.932Z",
       "total": 3,
       "candidates": [
         {
@@ -54,14 +54,14 @@
       }
     ],
     "finalize": {
-      "output": "## [fx-vpn] deployment-ready fixes\n\n- Bug 1976518: Move loading custom elements into IPProtectionPanel constructor (Owner: Fred Chasen [:fchasen])\n- Bug 1980185: Intermittent browser/components/ipprotection/tests/browser/browser_ipprotection_panel.js | single tracking bug (Owner: Fred Chasen [:fchasen])\n- Bug 1976546: Add userEnabled pref for IP Protection (Owner: Becca)\n\n_Fixture note:_ Bugs 1976518 and 1980185 share the same owner, while bug 1976546 documents work from a different engineer.\n\n_OpenAI fixture summary generated for automated UI tests on 2025-11-08._\n\n[View bugs in Bugzilla](https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&resolution=FIXED&chfieldfrom=2025-10-09T11%3A37%3A53.324Z&chfieldto=Now&bug_id=1976518%2C1980185%2C1976546&f1=OP&j1=OR&f2=status_whiteboard&o2=substring&v2=%5Bfx-vpn%5D&f3=CP)",
-      "html": "<h2>[fx-vpn] deployment-ready fixes</h2>\n<ul>\n<li>Bug 1976518: Move loading custom elements into IPProtectionPanel constructor (Owner: Fred Chasen [:fchasen])</li>\n<li>Bug 1980185: Intermittent browser/components/ipprotection/tests/browser/browser_ipprotection_panel.js | single tracking bug (Owner: Fred Chasen [:fchasen])</li>\n<li>Bug 1976546: Add userEnabled pref for IP Protection (Owner: Becca)</li>\n</ul>\n<p><em>Fixture note:</em> Bugs 1976518 and 1980185 share the same owner, while bug 1976546 documents work from a different engineer.</p>\n<p><em>OpenAI fixture summary generated for automated UI tests on 2025-11-08.</em></p>\n\n<p><a href=\"https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&amp;resolution=FIXED&amp;chfieldfrom=2025-10-09T11%3A37%3A53.324Z&amp;chfieldto=Now&amp;bug_id=1976518%2C1980185%2C1976546&amp;f1=OP&amp;j1=OR&amp;f2=status_whiteboard&amp;o2=substring&amp;v2=%5Bfx-vpn%5D&amp;f3=CP\">View bugs in Bugzilla</a></p>"
+      "output": "## [fx-vpn] deployment-ready fixes\n\n- Bug 1976518: Move loading custom elements into IPProtectionPanel constructor (Owner: Fred Chasen [:fchasen])\n- Bug 1980185: Intermittent browser/components/ipprotection/tests/browser/browser_ipprotection_panel.js | single tracking bug (Owner: Fred Chasen [:fchasen])\n- Bug 1976546: Add userEnabled pref for IP Protection (Owner: Becca)\n\n_Fixture note:_ Bugs 1976518 and 1980185 share the same owner, while bug 1976546 documents work from a different engineer.\n\n_OpenAI fixture summary generated for automated UI tests on 2025-11-09._\n\n[View bugs in Bugzilla](https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&resolution=FIXED&chfieldfrom=2025-10-10T13%3A51%3A26.932Z&chfieldto=Now&bug_id=1976518%2C1980185%2C1976546&f1=OP&j1=OR&f2=status_whiteboard&o2=substring&v2=%5Bfx-vpn%5D&f3=CP)",
+      "html": "<h2>[fx-vpn] deployment-ready fixes</h2>\n<ul>\n<li>Bug 1976518: Move loading custom elements into IPProtectionPanel constructor (Owner: Fred Chasen [:fchasen])</li>\n<li>Bug 1980185: Intermittent browser/components/ipprotection/tests/browser/browser_ipprotection_panel.js | single tracking bug (Owner: Fred Chasen [:fchasen])</li>\n<li>Bug 1976546: Add userEnabled pref for IP Protection (Owner: Becca)</li>\n</ul>\n<p><em>Fixture note:</em> Bugs 1976518 and 1980185 share the same owner, while bug 1976546 documents work from a different engineer.</p>\n<p><em>OpenAI fixture summary generated for automated UI tests on 2025-11-09.</em></p>\n\n<p><a href=\"https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&amp;resolution=FIXED&amp;chfieldfrom=2025-10-10T13%3A51%3A26.932Z&amp;chfieldto=Now&amp;bug_id=1976518%2C1980185%2C1976546&amp;f1=OP&amp;j1=OR&amp;f2=status_whiteboard&amp;o2=substring&amp;v2=%5Bfx-vpn%5D&amp;f3=CP\">View bugs in Bugzilla</a></p>"
     }
   },
   "meta": {
-    "sinceISO": "2025-10-09T11:37:53.324Z",
+    "sinceISO": "2025-10-10T13:51:26.932Z",
     "days": 30,
-    "recordedAt": "2025-11-08T11:37:56.060Z",
+    "recordedAt": "2025-11-09T13:51:29.207Z",
     "bugs": [
       {
         "id": 1976518,

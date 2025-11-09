@@ -1,7 +1,7 @@
 {
   "name": "devtools-empty",
   "kind": "paged",
-  "recordedAt": "2025-11-08T11:37:53.902Z",
+  "recordedAt": "2025-11-09T13:51:26.925Z",
   "requestBody": {
     "format": "md",
     "voice": "normal",
@@ -23,19 +23,19 @@
   },
   "responses": {
     "discover": {
-      "sinceISO": "2025-11-01T11:37:53.323Z",
+      "sinceISO": "2025-11-02T13:51:26.160Z",
       "total": 0,
       "candidates": []
     },
     "pages": [],
     "finalize": {
-      "output": "_No user-impacting DevTools changes detected in the last 7 days._\n\n[View bugs in Bugzilla](https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&resolution=FIXED&chfieldfrom=2025-11-01T11%3A37%3A53.323Z&chfieldto=Now&product=DevTools)",
-      "html": "<p><em>No user-impacting DevTools changes detected in the last 7 days.</em></p>\n\n<p><a href=\"https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&amp;resolution=FIXED&amp;chfieldfrom=2025-11-01T11%3A37%3A53.323Z&amp;chfieldto=Now&amp;product=DevTools\">View bugs in Bugzilla</a></p>"
+      "output": "_No user-impacting DevTools changes detected in the last 7 days._\n\n[View bugs in Bugzilla](https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&resolution=FIXED&chfieldfrom=2025-11-02T13%3A51%3A26.160Z&chfieldto=Now&product=DevTools)",
+      "html": "<p><em>No user-impacting DevTools changes detected in the last 7 days.</em></p>\n\n<p><a href=\"https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&amp;resolution=FIXED&amp;chfieldfrom=2025-11-02T13%3A51%3A26.160Z&amp;chfieldto=Now&amp;product=DevTools\">View bugs in Bugzilla</a></p>"
     }
   },
   "meta": {
-    "sinceISO": "2025-11-01T11:37:53.323Z",
+    "sinceISO": "2025-11-02T13:51:26.160Z",
     "days": 7,
-    "recordedAt": "2025-11-08T11:37:53.902Z"
+    "recordedAt": "2025-11-09T13:51:26.925Z"
   }
 }
