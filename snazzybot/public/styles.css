@@ -191,6 +191,40 @@ select:focus {
   }
 }
 
+@media (max-width: 719px) {
+  .filters-grid label[for="components"] {
+    order: 1;
+  }
+
+  .filters-grid textarea#components {
+    order: 2;
+  }
+
+  .filters-grid label[for="whiteboards"] {
+    order: 3;
+  }
+
+  .filters-grid textarea#whiteboards {
+    order: 4;
+  }
+
+  .filters-grid label[for="metabugs"] {
+    order: 5;
+  }
+
+  .filters-grid textarea#metabugs {
+    order: 6;
+  }
+
+  .filters-grid label[for="assignees"] {
+    order: 7;
+  }
+
+  .filters-grid textarea#assignees {
+    order: 8;
+  }
+}
+
 .actions {
   display: flex;
   gap: 10px;
