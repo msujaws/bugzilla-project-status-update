@@ -11,4 +11,15 @@ export default defineConfig({
     url: "http://127.0.0.1:4173",
     reuseExistingServer: !process.env.CI,
   },
+  projects: [
+    { name: "chromium", use: { browserName: "chromium" } },
+    {
+      name: "chromium-slow",
+      use: {
+        browserName: "chromium",
+        headless: false,
+        launchOptions: { slowMo: 500 },
+      },
+    },
+  ],
 });
