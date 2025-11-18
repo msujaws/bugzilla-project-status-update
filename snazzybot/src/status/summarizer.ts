@@ -13,14 +13,16 @@ type SummarizeOptions = {
 const technicalAudienceHint = `
 Audience: engineers. Include specific technical details where valuable (file/feature areas, prefs/flags, APIs, perf metrics, platform scopes). Assume context; keep acronyms if common. Avoid business framing.
 Refer to each bug's assignee using the provided \`assignee.name\` (fall back to the email handle if the name is missing). Start every sentence with that assignee so the update credits the correct person.
-Structure: one concise sentence per bug, optionally grouped as a tight paragraph. Use the inline Markdown link style from the samples so the spoken summary can call out the bug ID.
+Structure: one concise sentence per bug with a blank line separating each sentence so they render as distinct paragraphs. Use the inline Markdown link style from the samples so the spoken summary can call out the bug ID.
 Keep the tone crisp and technical; highlight concrete fixes, affected surfaces, and any measurable impact.
 
 Below is a sample Markdown output showing the intended style. Replace the names, bug descriptions, and IDs with real data from the payload—never emit placeholders like "[Name]". All Bugzilla links should use shorthand style of 'https://bugzil.la/<ID>', where ID is replaced with the bug's specific ID.
 
 Sample:
 Rosa Kim [added a dedicated switch_to_parent_frame method to the WebDriver Classic Python client and renamed switch_frame to switch_to_frame](https://bugzil.la/1900453) for spec alignment.\n
+\n
 Mateo Singh updated the network.getData command to [return response bodies for data: scheme requests](https://bugzil.la/1900453).\n
+\n
 Priya Iqbal fixed a bug where [different requests could reuse the same id](https://bugzil.la/1900453), which broke targeted commands like network.provideResponse and network.getData.\n
 `;
 const technicalAudienceHintGrouped = `
@@ -30,7 +32,7 @@ Keep the tone crisp and technical; highlight concrete fixes, affected surfaces, 
 `;
 const technicalAudienceHintSingle = `
 Audience: engineers. Include specific technical details where valuable (file/feature areas, prefs/flags, APIs, perf metrics, platform scopes). Assume context; keep acronyms if common. Avoid business framing.
-All bugs belong to a single assignee; mention their name once near the start, then describe each bug's impact without repeating their name in every sentence. Keep one concise sentence per bug with inline Markdown links for IDs.
+All bugs belong to a single assignee; mention their name once near the start, then describe each bug's impact without repeating their name in every sentence. Keep one concise sentence per bug with inline Markdown links for IDs, and leave a blank line between sentences so they render separately.
 Maintain a crisp, technical tone and highlight concrete fixes, affected surfaces, and measurable impact.
 `;
 const leadershipAudienceHint = `
@@ -106,12 +108,13 @@ export async function summarizeWithOpenAI(
         ? "~120 words total."
         : "~170 words total.";
 
-  const system =
-    "You are an expert release PM creating a short, spoken weekly update.\n" +
-    "Focus ONLY on user impact. Skip items with no obvious user impact.\n" +
-    `Keep the overall summary ${lengthHint} Output valid JSON only.\n` +
-    `${voiceHint}\n` +
-    `${audienceHint}`;
+const system =
+  "You are an expert release PM creating a short, spoken weekly update.\n" +
+  "Focus ONLY on user impact. Skip items with no obvious user impact.\n" +
+  "Separate each bug update with a blank line so Markdown renders them as distinct paragraphs.\n" +
+  `Keep the overall summary ${lengthHint} Output valid JSON only.\n` +
+  `${voiceHint}\n` +
+  `${audienceHint}`;
 
   const bugPayload = bugs.map((bug) => {
     const detail = bug.assigned_to_detail;
