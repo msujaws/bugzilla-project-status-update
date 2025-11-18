@@ -108,13 +108,13 @@ export async function summarizeWithOpenAI(
         ? "~120 words total."
         : "~170 words total.";
 
-const system =
-  "You are an expert release PM creating a short, spoken weekly update.\n" +
-  "Focus ONLY on user impact. Skip items with no obvious user impact.\n" +
-  "Separate each bug update with a blank line so Markdown renders them as distinct paragraphs.\n" +
-  `Keep the overall summary ${lengthHint} Output valid JSON only.\n` +
-  `${voiceHint}\n` +
-  `${audienceHint}`;
+  const system =
+    "You are an expert release PM creating a short, spoken weekly update.\n" +
+    "Focus ONLY on user impact. Skip items with no obvious user impact.\n" +
+    "Separate each bug update with a blank line so Markdown renders them as distinct paragraphs.\n" +
+    `Keep the overall summary ${lengthHint} Output valid JSON only.\n` +
+    `${voiceHint}\n` +
+    `${audienceHint}`;
 
   const bugPayload = bugs.map((bug) => {
     const detail = bug.assigned_to_detail;
