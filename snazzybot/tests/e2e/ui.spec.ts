@@ -47,6 +47,33 @@ const fixtures = {
   fxVpn: loadJson<PagedFixture>("fx-vpn-trio"),
 };
 
+const disallowedConsoleTypes = new Set(["warning", "error"]);
+const consoleErrorAllowlist = new WeakSet<Page>();
+const allowConsoleErrors = (page: Page) => {
+  consoleErrorAllowlist.add(page);
+};
+
+test.beforeEach(async ({ page }, testInfo) => {
+  page.on("console", (msg) => {
+    const type = msg.type();
+    if (!disallowedConsoleTypes.has(type)) return;
+    if (consoleErrorAllowlist.has(page)) return;
+    const location = msg.location();
+    const where = location.url
+      ? `${location.url}:${location.lineNumber ?? 0}:${location.columnNumber ?? 0}`
+      : "unknown location";
+    const message = `Browser console ${type}: ${msg.text()} (${where})`;
+    testInfo
+      .attach(`console-${type}`, { body: message, contentType: "text/plain" })
+      .catch(() => {});
+    throw new Error(message);
+  });
+});
+
+test.afterEach(async ({ page }) => {
+  consoleErrorAllowlist.delete(page);
+});
+
 const requestDays = (
   requestBody: Record<string, unknown>,
   fallback: number,
@@ -188,6 +215,7 @@ test.describe("SnazzyBot UI fixtures", () => {
   test("Streaming mode surfaces server errors and keeps copy disabled", async ({
     page,
   }) => {
+    allowConsoleErrors(page);
     await setupStreamRoute(page, [
       { kind: "start" },
       { kind: "error", msg: "Server exploded" },
@@ -203,6 +231,7 @@ test.describe("SnazzyBot UI fixtures", () => {
   });
 
   test("Paged discover failure shows the error banner", async ({ page }) => {
+    allowConsoleErrors(page);
     await page.route("**/api/status", async (route) => {
       const body = route.request().postDataJSON();
       if (body?.mode === "discover") {
