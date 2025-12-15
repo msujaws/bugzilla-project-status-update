@@ -17,6 +17,10 @@ export interface StepSnapshot<Name extends string> {
 
 export interface RunOptions<Name extends string, Context> {
   onTransition?: (snapshot: StepSnapshot<Name>, context: Context) => void;
+  /** Optional mapping of step names to friendly phase names */
+  phaseNames?: Partial<Record<Name, string>>;
+  /** Optional callback to emit phase notifications */
+  onPhase?: (phaseName: string, meta?: Record<string, unknown>) => void;
 }
 
 export interface RunResult<Name extends string, Context> {
@@ -38,11 +42,27 @@ export async function runRecipe<Name extends string, Context>(
     const snapshot = snapshots[index];
 
     snapshot.status = "running";
+
+    // Emit phase start notification if this step has a phase name configured
+    const phaseName =
+      options.phaseNames && options.onPhase
+        ? options.phaseNames[step.name]
+        : undefined;
+    if (phaseName && options.onPhase) {
+      options.onPhase(phaseName);
+    }
+
     options.onTransition?.({ ...snapshot }, context);
 
     try {
       const result = await step.run(context);
       snapshot.status = "succeeded";
+
+      // Emit phase completion notification
+      if (phaseName && options.onPhase) {
+        options.onPhase(phaseName, { complete: true });
+      }
+
       options.onTransition?.({ ...snapshot }, context);
       if (result === HALT) {
         break;
@@ -50,6 +70,12 @@ export async function runRecipe<Name extends string, Context>(
     } catch (error) {
       snapshot.status = "failed";
       snapshot.error = error;
+
+      // Emit phase failure notification
+      if (phaseName && options.onPhase) {
+        options.onPhase(phaseName, { complete: true, failed: true });
+      }
+
       options.onTransition?.({ ...snapshot }, context);
       throw error;
     }

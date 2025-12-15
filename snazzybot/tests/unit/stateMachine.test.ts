@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   HALT,
   runRecipe,
@@ -103,6 +103,230 @@ describe("state machine utility", () => {
       { name: "ok", status: "succeeded" },
       { name: "boom", status: "running" },
       { name: "boom", status: "failed" },
+    ]);
+  });
+
+  it("emits phases for steps with configured phase names", async () => {
+    type StepName = "step-a" | "step-b" | "step-c";
+    const context = { value: 0 };
+    const phaseEmissions: Array<{
+      name: string;
+      meta?: Record<string, unknown>;
+    }> = [];
+
+    const steps: RecipeStep<StepName, typeof context>[] = [
+      {
+        name: "step-a",
+        run: (ctx) => {
+          ctx.value += 1;
+        },
+      },
+      {
+        name: "step-b",
+        run: (ctx) => {
+          ctx.value += 2;
+        },
+      },
+      {
+        name: "step-c",
+        run: (ctx) => {
+          ctx.value += 3;
+        },
+      },
+    ];
+
+    await runRecipe(steps, context, {
+      phaseNames: {
+        "step-a": "Phase A",
+        "step-b": "Phase B",
+        // step-c intentionally omitted - should not emit
+      },
+      onPhase: (phaseName, meta) => {
+        phaseEmissions.push({ name: phaseName, meta });
+      },
+    });
+
+    expect(context.value).toBe(6);
+    expect(phaseEmissions).toEqual([
+      { name: "Phase A", meta: undefined },
+      { name: "Phase A", meta: { complete: true } },
+      { name: "Phase B", meta: undefined },
+      { name: "Phase B", meta: { complete: true } },
+    ]);
+  });
+
+  it("does not emit phases when phaseNames is not provided", async () => {
+    type StepName = "step-a";
+    const context = { value: 0 };
+    const onPhaseMock = vi.fn();
+
+    const steps: RecipeStep<StepName, typeof context>[] = [
+      {
+        name: "step-a",
+        run: (ctx) => {
+          ctx.value = 42;
+        },
+      },
+    ];
+
+    await runRecipe(steps, context, {
+      onPhase: onPhaseMock,
+    });
+
+    expect(context.value).toBe(42);
+    expect(onPhaseMock).not.toHaveBeenCalled();
+  });
+
+  it("does not emit phases when onPhase is not provided", async () => {
+    type StepName = "step-a";
+    const context = { value: 0 };
+
+    const steps: RecipeStep<StepName, typeof context>[] = [
+      {
+        name: "step-a",
+        run: (ctx) => {
+          ctx.value = 42;
+        },
+      },
+    ];
+
+    // Should not throw even though we provide phaseNames without onPhase
+    await expect(
+      runRecipe(steps, context, {
+        phaseNames: {
+          "step-a": "Phase A",
+        },
+      }),
+    ).resolves.toBeDefined();
+
+    expect(context.value).toBe(42);
+  });
+
+  it("emits phases before onTransition when step starts running", async () => {
+    type StepName = "tracked-step";
+    const context = { value: 0 };
+    const emissions: Array<{
+      type: string;
+      data: string;
+      complete?: boolean;
+    }> = [];
+
+    const steps: RecipeStep<StepName, typeof context>[] = [
+      {
+        name: "tracked-step",
+        run: (ctx) => {
+          ctx.value = 100;
+        },
+      },
+    ];
+
+    await runRecipe(steps, context, {
+      phaseNames: {
+        "tracked-step": "Tracked Phase",
+      },
+      onPhase: (phaseName, meta) => {
+        emissions.push({
+          type: "phase",
+          data: phaseName,
+          complete: meta?.complete as boolean | undefined,
+        });
+      },
+      onTransition: (snapshot) => {
+        emissions.push({ type: "transition", data: snapshot.status });
+      },
+    });
+
+    expect(context.value).toBe(100);
+    expect(emissions).toEqual([
+      { type: "phase", data: "Tracked Phase", complete: undefined },
+      { type: "transition", data: "running" },
+      { type: "phase", data: "Tracked Phase", complete: true },
+      { type: "transition", data: "succeeded" },
+    ]);
+  });
+
+  it("does not emit phase when step is halted before starting", async () => {
+    type StepName = "first" | "second";
+    const context = { calls: [] as string[] };
+    const phaseEmissions: Array<{
+      name: string;
+      complete?: boolean;
+    }> = [];
+
+    const steps: RecipeStep<StepName, typeof context>[] = [
+      {
+        name: "first",
+        run: (ctx) => {
+          ctx.calls.push("first");
+          return HALT;
+        },
+      },
+      {
+        name: "second",
+        run: (ctx) => {
+          ctx.calls.push("second");
+        },
+      },
+    ];
+
+    await runRecipe(steps, context, {
+      phaseNames: {
+        first: "First Phase",
+        second: "Second Phase",
+      },
+      onPhase: (phaseName, meta) => {
+        phaseEmissions.push({
+          name: phaseName,
+          complete: meta?.complete as boolean | undefined,
+        });
+      },
+    });
+
+    expect(context.calls).toEqual(["first"]);
+    // Only first phase should be emitted (start + complete), second step never runs
+    expect(phaseEmissions).toEqual([
+      { name: "First Phase", complete: undefined },
+      { name: "First Phase", complete: true },
+    ]);
+  });
+
+  it("emits phase even when step fails", async () => {
+    type StepName = "failing-step";
+    const context = { value: 0 };
+    const phaseEmissions: Array<{
+      name: string;
+      complete?: boolean;
+      failed?: boolean;
+    }> = [];
+
+    const steps: RecipeStep<StepName, typeof context>[] = [
+      {
+        name: "failing-step",
+        run: () => {
+          throw new Error("intentional failure");
+        },
+      },
+    ];
+
+    await expect(
+      runRecipe(steps, context, {
+        phaseNames: {
+          "failing-step": "Failing Phase",
+        },
+        onPhase: (phaseName, meta) => {
+          phaseEmissions.push({
+            name: phaseName,
+            complete: meta?.complete as boolean | undefined,
+            failed: meta?.failed as boolean | undefined,
+          });
+        },
+      }),
+    ).rejects.toThrow("intentional failure");
+
+    // Phase should be emitted with start and failure completion
+    expect(phaseEmissions).toEqual([
+      { name: "Failing Phase", complete: undefined, failed: undefined },
+      { name: "Failing Phase", complete: true, failed: true },
     ]);
   });
 });

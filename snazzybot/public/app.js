@@ -134,20 +134,26 @@ function burstEmojis(mode = "normal") {
 }
 
 // Phase UI ------------------------------------------------------------------
+// Convert phase name to valid CSS ID
+function slugify(name) {
+  return name.toLowerCase().replaceAll(/\s+/g, "-");
+}
+
 function ensurePhase(name, label) {
-  let host = document.querySelector(`[data-phase="${name}"]`);
+  const slug = slugify(name);
+  let host = document.querySelector(`[data-phase="${slug}"]`);
   if (!host) {
     host = document.createElement("div");
-    host.dataset.phase = name;
+    host.dataset.phase = slug;
     const title = document.createElement("div");
     title.className = "phase-title";
-    title.id = `title-${name}`;
+    title.id = `title-${slug}`;
     title.textContent = label || name;
     const bar = document.createElement("div");
     bar.className = "progress";
     const fill = document.createElement("div");
     fill.className = "bar";
-    fill.id = `bar-${name}`;
+    fill.id = `bar-${slug}`;
     bar.append(fill);
     host.append(title);
     host.append(bar);
@@ -158,12 +164,14 @@ function ensurePhase(name, label) {
 }
 
 function setPhaseText(name, txt) {
-  const t = $(`title-${name}`);
+  const slug = slugify(name);
+  const t = $(`title-${slug}`);
   if (t) t.textContent = txt;
 }
 
 function setPhasePct(name, current, total) {
-  const bar = $(`bar-${name}`);
+  const slug = slugify(name);
+  const bar = $(`bar-${slug}`);
   if (!bar || !total) return;
   bar.classList.remove("indeterminate");
   const pct = Math.max(0, Math.min(100, Math.round((current / total) * 100)));
@@ -171,7 +179,8 @@ function setPhasePct(name, current, total) {
 }
 
 function setPhaseIndeterminate(name) {
-  const bar = $(`bar-${name}`);
+  const slug = slugify(name);
+  const bar = $(`bar-${slug}`);
   if (bar) {
     bar.classList.add("indeterminate");
     bar.style.width = "";
@@ -179,10 +188,12 @@ function setPhaseIndeterminate(name) {
 }
 
 function completePhase(name) {
-  const bar = $(`bar-${name}`);
+  const slug = slugify(name);
+  const bar = $(`bar-${slug}`);
   if (bar) {
     bar.classList.remove("indeterminate");
     bar.style.width = "100%";
+    bar.dataset.completed = "true";
   }
 }
 
@@ -387,10 +398,16 @@ async function runSnazzyStream(body) {
         case "phase": {
           const name = String(evt.name || "phase");
           ensurePhase(name, name);
-          if (typeof evt.total === "number") {
+          if (evt.complete === true) {
+            // Phase completed
+            completePhase(name);
+            setPhaseText(name, `${name}: done`);
+          } else if (typeof evt.total === "number") {
+            // Phase started with known total
             setPhasePct(name, 0, evt.total || 1);
             setPhaseText(name, `${name}: 0/${evt.total}`);
           } else {
+            // Phase started with unknown duration
             setPhaseIndeterminate(name);
           }
           break;

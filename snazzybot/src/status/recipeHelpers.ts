@@ -1,6 +1,7 @@
 import { escapeHtml, markdownToHtml } from "./markdown.ts";
 import { buildBuglistURL } from "./output.ts";
 import { summarizeWithOpenAI } from "./summarizer.ts";
+import { SUB_OPERATION_PHASES } from "./phases.ts";
 import type { CandidateCollection } from "./candidateCollector.ts";
 import type { Bug, BugHistoryEntry, DebugLog, ProgressHooks } from "./types.ts";
 import type { StatusContext } from "./context.ts";
@@ -170,7 +171,7 @@ export const summarizeWithOpenAIAndTrack = async (
   ctx: StatusContext,
   bugs: StatusContext["aiCandidates"],
 ) => {
-  ctx.hooks.phase?.("openai");
+  ctx.hooks.phase?.(SUB_OPERATION_PHASES.OPENAI);
   return summarizeWithOpenAI(
     ctx.env,
     ctx.model,

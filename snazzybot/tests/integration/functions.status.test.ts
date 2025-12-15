@@ -103,9 +103,11 @@ describe("functions/api/status.ts", () => {
       .split("\n")
       .map((s) => JSON.parse(s));
     expect(lines[0].kind).toBe("start");
-    expect(lines.some((l) => l.kind === "phase" && l.name === "openai")).toBe(
-      true,
-    );
+    expect(
+      lines.some(
+        (l) => l.kind === "phase" && l.name === "Generating AI summary",
+      ),
+    ).toBe(true);
     expect(lines.at(-1)?.kind).toBe("done");
     await mf.dispose();
   });

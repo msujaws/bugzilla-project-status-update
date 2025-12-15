@@ -5,6 +5,7 @@ import {
   DAY_IN_SECONDS,
   getDefaultCache,
 } from "../utils/cache.ts";
+import { SUB_OPERATION_PHASES } from "./phases.ts";
 import type {
   Bug,
   BugHistoryEntry,
@@ -164,10 +165,16 @@ export class BugzillaClient {
   ): Promise<Bug[]> {
     if (tags.length === 0) return [];
     const results: Bug[] = [];
-    hooks.phase?.("collect-whiteboards", { total: tags.length });
+    hooks.phase?.(SUB_OPERATION_PHASES.COLLECT_WHITEBOARDS, {
+      total: tags.length,
+    });
     let cursor = 0;
     for (const tag of tags) {
-      hooks.progress?.("collect-whiteboards", ++cursor, tags.length);
+      hooks.progress?.(
+        SUB_OPERATION_PHASES.COLLECT_WHITEBOARDS,
+        ++cursor,
+        tags.length,
+      );
       const { bugs } = await this.get<{ bugs: Bug[] }>(`/bug`, {
         status: ["RESOLVED", "VERIFIED", "CLOSED"],
         resolution: "FIXED",
@@ -231,7 +238,7 @@ export class BugzillaClient {
     hooks: ProgressHooks,
   ): Promise<BugHistoryEntry[]> {
     if (ids.length === 0) return [];
-    hooks.phase?.("histories", { total: ids.length });
+    hooks.phase?.(SUB_OPERATION_PHASES.HISTORIES, { total: ids.length });
     hooks.info?.("History mode: per-ID /rest/bug/<id>/history (concurrency=8)");
 
     const out: BugHistoryEntry[] = [];
@@ -254,7 +261,7 @@ export class BugzillaClient {
           hooks.warn?.(`Skipping history for #${id} (${describeError(error)})`);
         } finally {
           handled++;
-          hooks.progress?.("histories", handled, ids.length);
+          hooks.progress?.(SUB_OPERATION_PHASES.HISTORIES, handled, ids.length);
         }
       }
     };

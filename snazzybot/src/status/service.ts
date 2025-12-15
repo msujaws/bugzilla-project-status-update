@@ -23,6 +23,7 @@ import {
   summarizeOpenAiStep,
 } from "./steps/index.ts";
 import { logWindowContext } from "./recipeHelpers.ts";
+import { STEP_PHASE_CONFIG } from "./phases.ts";
 import type {
   Bug,
   DebugLog,
@@ -139,7 +140,10 @@ export async function generateStatus(
   };
 
   const recipe = createStatusRecipe(context);
-  const { snapshots } = await runRecipe(recipe, context);
+  const { snapshots } = await runRecipe(recipe, context, {
+    phaseNames: STEP_PHASE_CONFIG,
+    onPhase: (phaseName, meta) => hooks.phase?.(phaseName, meta),
+  });
 
   if (!context.output || !context.html) {
     const failed = snapshots
@@ -217,7 +221,9 @@ export async function qualifyHistoryPage(
   const start = Math.max(0, normalizedCursor);
   const end = Math.min(candidates.length, start + normalizedPageSize);
   const slice = candidates.slice(start, end);
-  hooks.phase?.("histories", { total: slice.length });
+  hooks.phase?.(STEP_PHASE_CONFIG["fetch-histories"] || "histories", {
+    total: slice.length,
+  });
 
   const histories = await client.fetchHistories(
     slice.map((bug) => bug.id),

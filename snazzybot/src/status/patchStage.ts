@@ -1,5 +1,6 @@
 import { loadPatchContext, type CommitPatch } from "../patch.ts";
 import { describeError } from "../utils/errors.ts";
+import { SUB_OPERATION_PHASES } from "./phases.ts";
 import type { Bug, DebugLog, EnvLike, ProgressHooks } from "./types.ts";
 
 export async function loadPatchContextsForBugs(
@@ -33,7 +34,7 @@ export async function loadPatchContextsForBugs(
     return patchMap;
   }
 
-  hooks.phase?.("patch-context", { total });
+  hooks.phase?.(SUB_OPERATION_PHASES.PATCH_CONTEXT, { total });
   let completed = 0;
 
   await Promise.all(
@@ -60,7 +61,7 @@ export async function loadPatchContextsForBugs(
         if (debugLog) debugLog(`[patch] bug #${bug.id} error: ${message}`);
       } finally {
         completed++;
-        hooks.progress?.("patch-context", completed, total);
+        hooks.progress?.(SUB_OPERATION_PHASES.PATCH_CONTEXT, completed, total);
       }
     }),
   );

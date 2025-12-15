@@ -38,12 +38,30 @@ describe("core integration (with MSW mocks)", () => {
     );
     expect(ids).toEqual([1_987_802]);
     expect(output).toMatch(/View bugs in Bugzilla/);
+
+    // Check for step-level phase starts (no metadata or undefined)
+    const phaseStarts = hooks.phase.mock.calls.filter(
+      (call) => call.length === 1 || call[1] === undefined,
+    );
+    const phaseStartNames = phaseStarts.map((call) => call[0]);
+    expect(phaseStartNames).toContain("Collecting candidate bugs");
+    expect(phaseStartNames).toContain("Fetching bug histories");
+    expect(phaseStartNames).toContain("Loading commit context");
+    expect(phaseStartNames).toContain("Generating AI summary");
+
+    // Check for phase completions
+    const phaseCompletions = hooks.phase.mock.calls.filter(
+      (call) => call[1]?.complete === true,
+    );
+    expect(phaseCompletions.length).toBeGreaterThan(0);
+
+    // Check for sub-operation phases with metadata
     expect(hooks.phase).toHaveBeenCalledWith(
-      "collect-whiteboards",
+      "Collecting whiteboard bugs",
       expect.objectContaining({ total: expect.any(Number) }),
     );
     expect(hooks.phase).toHaveBeenCalledWith(
-      "patch-context",
+      "Loading commit context",
       expect.objectContaining({ total: expect.any(Number) }),
     );
     expect(
