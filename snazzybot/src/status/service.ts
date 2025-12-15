@@ -55,30 +55,40 @@ const debugLogger = (enabled: boolean, hooks: ProgressHooks): DebugLog => {
 function createStatusRecipe(
   context: StatusContext,
 ): RecipeStep<StatusStepName, StatusContext>[] {
+  const hasGithubRepo =
+    context.githubRepos.length > 0 &&
+    context.params.includeGithubActivity !== false;
+  const hasBugzillaQueries =
+    context.components.length > 0 ||
+    context.whiteboards.length > 0 ||
+    context.metabugs.length > 0 ||
+    context.assignees.length > 0;
+  const hasPatchContext = context.includePatchContext;
+  const hasOpenAI = !!context.env.OPENAI_API_KEY;
+
   if (context.params.ids && context.params.ids.length > 0) {
-    return [
+    const recipe: RecipeStep<StatusStepName, StatusContext>[] = [
       fetchPrequalifiedStep,
       limitOpenAiStep,
-      loadPatchContextStep,
-      fetchGithubActivityStep,
-      handleEmptyStep,
-      summarizeOpenAiStep,
-      formatOutputStep,
     ];
+    if (hasPatchContext) recipe.push(loadPatchContextStep);
+    if (hasGithubRepo) recipe.push(fetchGithubActivityStep);
+    recipe.push(handleEmptyStep);
+    if (hasOpenAI) recipe.push(summarizeOpenAiStep);
+    recipe.push(formatOutputStep);
+    return recipe;
   }
 
-  return [
-    logWindowStep,
-    collectCandidatesStep,
-    fetchHistoriesStep,
-    filterByHistoryStep,
-    fetchGithubActivityStep,
-    handleEmptyStep,
-    limitOpenAiStep,
-    loadPatchContextStep,
-    summarizeOpenAiStep,
-    formatOutputStep,
-  ];
+  const recipe: RecipeStep<StatusStepName, StatusContext>[] = [logWindowStep];
+  if (hasBugzillaQueries) {
+    recipe.push(collectCandidatesStep, fetchHistoriesStep, filterByHistoryStep);
+  }
+  if (hasGithubRepo) recipe.push(fetchGithubActivityStep);
+  recipe.push(handleEmptyStep, limitOpenAiStep);
+  if (hasPatchContext) recipe.push(loadPatchContextStep);
+  if (hasOpenAI) recipe.push(summarizeOpenAiStep);
+  recipe.push(formatOutputStep);
+  return recipe;
 }
 
 export async function generateStatus(
