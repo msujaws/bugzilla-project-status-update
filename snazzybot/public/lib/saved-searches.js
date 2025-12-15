@@ -138,7 +138,37 @@ export class SavedSearches {
     this.container = container;
     this.callbacks = callbacks || {}; // { onLoad, onSave }
     this.pendingDelete = undefined; // { id, timeout }
+    this.modifierPressed = false;
+    this.setupKeyboardListeners();
     this.render();
+  }
+
+  setupKeyboardListeners() {
+    document.addEventListener("keydown", (e) => {
+      // Check for Command (Mac) or Ctrl (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && !this.modifierPressed) {
+        this.modifierPressed = true;
+        this.updateNewTabIndicators();
+      }
+    });
+
+    document.addEventListener("keyup", (e) => {
+      // Check for Command (Mac) or Ctrl (Windows/Linux)
+      if ((!e.metaKey && !e.ctrlKey) && this.modifierPressed) {
+        this.modifierPressed = false;
+        this.updateNewTabIndicators();
+      }
+    });
+  }
+
+  updateNewTabIndicators() {
+    const allSearchElements = this.container.querySelectorAll(".saved-search");
+    for (const el of allSearchElements) {
+      const indicator = el.querySelector(".new-tab-indicator");
+      if (indicator) {
+        indicator.style.display = this.modifierPressed ? "inline-flex" : "none";
+      }
+    }
   }
 
   render() {
@@ -182,6 +212,15 @@ export class SavedSearches {
       nameSpan.textContent = search.name;
       nameSpan.dataset.id = search.id;
 
+      // New tab indicator icon
+      const newTabIndicator = document.createElement("span");
+      newTabIndicator.className = "new-tab-indicator";
+      newTabIndicator.innerHTML = '<svg aria-hidden="true" viewBox="0 0 512 512"><use href="#icon-external-link"></use></svg>';
+      // Detect platform for appropriate modifier key label
+      const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+      newTabIndicator.title = `${isMac ? 'Cmd' : 'Ctrl'}+Click to open in new tab and execute`;
+      newTabIndicator.style.display = "none"; // Hidden by default
+
       const editBtn = document.createElement("button");
       editBtn.className = "edit-btn";
       editBtn.dataset.id = search.id;
@@ -218,11 +257,16 @@ export class SavedSearches {
         this.deleteWithUndo(search.id);
       });
 
-      div.addEventListener("click", () => {
-        this.loadSearch(search.id);
+      div.addEventListener("click", (e) => {
+        // Check for Command (Mac) or Ctrl (Windows/Linux)
+        if (e.metaKey || e.ctrlKey) {
+          this.openInNewTabAndExecute(search.id);
+        } else {
+          this.loadSearch(search.id);
+        }
       });
 
-      div.append(nameSpan, editBtn, shareBtn, deleteBtn);
+      div.append(nameSpan, newTabIndicator, editBtn, shareBtn, deleteBtn);
     }
 
     return div;
@@ -269,6 +313,27 @@ export class SavedSearches {
     const search = getAllSearches().find((s) => s.id === id);
     if (search && this.callbacks.onLoad) {
       this.callbacks.onLoad(search.params);
+    }
+  }
+
+  openInNewTabAndExecute(id) {
+    markSearchUsed(id);
+    const search = getAllSearches().find((s) => s.id === id);
+    if (!search) return;
+
+    // Build URL with parameters and auto-execute flag
+    const url = this.getShareableURL(id, {
+      includeOrigin: true,
+      autoExecute: true
+    });
+
+    if (url) {
+      // Use anchor element to ensure it opens in a new tab rather than window
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.click();
     }
   }
 
@@ -360,6 +425,9 @@ export class SavedSearches {
     if (params.debug) sp.set("debug", "true");
     if (!params.cache) sp.set("nocache", "1");
     if (params.patchContext === "omit") sp.set("pc", "0");
+
+    // Add auto-execute flag if requested
+    if (options.autoExecute) sp.set("auto", "1");
 
     const path = `?${sp.toString()}`;
 

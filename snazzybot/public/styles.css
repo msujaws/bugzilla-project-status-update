@@ -548,6 +548,33 @@ summary {
   color: var(--err);
 }
 
+.new-tab-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  margin-left: 4px;
+  animation: fadeIn 0.2s ease;
+}
+
+.new-tab-indicator svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .undo-btn {
   background: var(--accent);
   border: none;

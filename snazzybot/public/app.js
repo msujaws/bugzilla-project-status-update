@@ -730,6 +730,21 @@ function hydrateFromURL() {
     setFieldValue("debug", sp.get("debug") === "true" ? "true" : "false");
   if (sp.has("nocache")) setFieldValue("cache", "false");
   if (sp.get("pc") === "0") setFieldValue("patch-context", "omit");
+
+  // Auto-execute if 'auto' parameter is present
+  if (sp.has("auto") && sp.get("auto") === "1") {
+    // Remove 'auto' parameter from URL after reading it
+    sp.delete("auto");
+    const cleanURL = sp.toString() ? `?${sp.toString()}` : location.pathname;
+    history.replaceState(undefined, "", cleanURL);
+
+    // Trigger the run button after a short delay to ensure DOM is ready
+    setTimeout(() => {
+      if (runButton) {
+        runButton.click();
+      }
+    }, 100);
+  }
 }
 hydrateFromURL();
 
