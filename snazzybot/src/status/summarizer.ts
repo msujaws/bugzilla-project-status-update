@@ -98,12 +98,18 @@ export function cleanBugzillaUsername(
     return "Unassigned";
   }
 
-  // Remove parenthetical phrases like "(please needinfo? me)"
-  let cleaned = trimmed.replaceAll(/\s*\([^)]*\)\s*$/g, "");
+  // Remove IRC-style nicknames in parentheses like "(:mconley)" anywhere
+  let cleaned = trimmed.replaceAll(/\s*\(:[^)]*\)/g, "");
 
-  // Remove IRC-style nicknames like "[:jaws]" or "[jaws]"
-  cleaned = cleaned.replaceAll(/\s*\[:\w+\]\s*$/g, "");
-  cleaned = cleaned.replaceAll(/\s*\[\w+\]\s*$/g, "");
+  // Remove multi-word phrases in parentheses (contains spaces) anywhere
+  cleaned = cleaned.replaceAll(/\s*\([^)]*\s[^)]*\)/g, "");
+
+  // Remove trailing single-word parenthetical content
+  cleaned = cleaned.replaceAll(/\s*\([^)]*\)\s*$/g, "");
+
+  // Remove IRC-style nicknames like "[:jaws]" or "[jaws]" anywhere in the name
+  cleaned = cleaned.replaceAll(/\s*\[:\w+\]/g, "");
+  cleaned = cleaned.replaceAll(/\s*\[\w+\]/g, "");
 
   const result = cleaned.trim();
   return result || undefined;

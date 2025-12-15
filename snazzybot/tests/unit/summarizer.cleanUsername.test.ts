@@ -35,6 +35,18 @@ describe("cleanBugzillaUsername", () => {
     ).toBe("John Doe");
   });
 
+  it("removes IRC nicknames in the middle of names", () => {
+    expect(cleanBugzillaUsername("Scott [:thecount] Downe")).toBe(
+      "Scott Downe",
+    );
+  });
+
+  it("removes multiple parenthetical IRC nicknames", () => {
+    expect(cleanBugzillaUsername("Mike Conley (:mconley) (:⚙️)")).toBe(
+      "Mike Conley",
+    );
+  });
+
   it("returns undefined for undefined input", () => {
     // eslint-disable-next-line unicorn/no-useless-undefined
     expect(cleanBugzillaUsername(undefined)).toBeUndefined();
@@ -53,6 +65,15 @@ describe("cleanBugzillaUsername", () => {
   it("handles names with legitimate parentheses in the middle", () => {
     expect(cleanBugzillaUsername("John (Johnny) Doe")).toBe(
       "John (Johnny) Doe",
+    );
+  });
+
+  it("removes multi-word phrases in parentheses in the middle", () => {
+    expect(cleanBugzillaUsername("Jared (please needinfo? me) Wein")).toBe(
+      "Jared Wein",
+    );
+    expect(cleanBugzillaUsername("Jared (away 10/15-10/31) Wein")).toBe(
+      "Jared Wein",
     );
   });
 
