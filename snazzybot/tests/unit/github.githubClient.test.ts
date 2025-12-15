@@ -268,7 +268,7 @@ describe("GitHubClient", () => {
     );
   });
 
-  it("works without API key", async () => {
+  it("works without API key and makes unauthenticated requests", async () => {
     const envNoKey: EnvLike = {
       OPENAI_API_KEY: "test-openai",
       BUGZILLA_API_KEY: "test-bz",
@@ -276,16 +276,35 @@ describe("GitHubClient", () => {
     const repo = "mozilla/firefox";
     const since = "2025-10-21T00:00:00Z";
 
+    let commitsRequested = false;
+    let pullsRequested = false;
+
     server.use(
       http.get(
         "https://api.github.com/repos/mozilla/firefox/commits",
         ({ request }) => {
           const authHeader = request.headers.get("Authorization");
           expect(authHeader).toBeNull();
-          return HttpResponse.json([]);
+          commitsRequested = true;
+          return HttpResponse.json([
+            {
+              sha: "test123",
+              commit: {
+                message: "Test commit",
+                author: {
+                  name: "Test User",
+                  email: "test@example.com",
+                  date: "2025-10-22T10:00:00Z",
+                },
+              },
+              author: { login: "testuser" },
+              html_url: "https://github.com/mozilla/firefox/commit/test123",
+            },
+          ]);
         },
       ),
       http.get("https://api.github.com/repos/mozilla/firefox/pulls", () => {
+        pullsRequested = true;
         return HttpResponse.json([]);
       }),
     );
@@ -293,8 +312,15 @@ describe("GitHubClient", () => {
     const client = new GitHubClient(envNoKey);
     const activity = await client.getRepoActivity(repo, since);
 
-    expect(activity.commits).toEqual([]);
-    expect(activity.pullRequests).toEqual([]);
+    expect(commitsRequested).toBe(true);
+    expect(pullsRequested).toBe(true);
+    expect(activity.repo).toBe(repo);
+    expect(activity.commits).toHaveLength(1);
+    expect(activity.commits[0]).toMatchObject({
+      sha: "test123",
+      message: "Test commit",
+      author: "testuser",
+    });
   });
 
   it("includes User-Agent header in all requests", async () => {

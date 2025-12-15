@@ -5,46 +5,51 @@ import { fetchGithubActivityStep } from "../../src/status/steps/fetchGithubActiv
 import type { StatusContext } from "../../src/status/context.ts";
 
 describe("fetchGithubActivityStep", () => {
-  it("skips when includeGithubActivity is false", async () => {
-    const ctx: Partial<StatusContext> = {
-      params: { includeGithubActivity: false },
-      githubRepos: ["mozilla/firefox"],
-    };
-
-    await fetchGithubActivityStep.run(ctx as StatusContext);
-
-    expect(ctx.githubActivity).toEqual([]);
-    expect(ctx.githubContributors).toEqual(new Map());
-  });
-
-  it("skips when no GitHub repos provided", async () => {
-    const ctx: Partial<StatusContext> = {
-      params: { includeGithubActivity: true },
-      githubRepos: [],
-    };
-
-    await fetchGithubActivityStep.run(ctx as StatusContext);
-
-    expect(ctx.githubActivity).toEqual([]);
-    expect(ctx.githubContributors).toEqual(new Map());
-  });
-
-  it("skips when no GitHub API key provided", async () => {
+  it.each([
+    {
+      name: "includeGithubActivity is false",
+      ctx: {
+        params: { includeGithubActivity: false },
+        githubRepos: ["mozilla/firefox"],
+      },
+      expectWarning: false,
+    },
+    {
+      name: "no GitHub repos provided",
+      ctx: {
+        params: { includeGithubActivity: true },
+        githubRepos: [],
+      },
+      expectWarning: false,
+    },
+    {
+      name: "no GitHub API key provided",
+      ctx: {
+        params: { includeGithubActivity: true },
+        githubRepos: ["mozilla/firefox"],
+        env: { OPENAI_API_KEY: "test", BUGZILLA_API_KEY: "test" },
+      },
+      expectWarning: true,
+    },
+  ])("skips when $name", async ({ ctx, expectWarning }) => {
     const warnSpy = vi.fn();
-    const ctx: Partial<StatusContext> = {
-      params: { includeGithubActivity: true },
-      githubRepos: ["mozilla/firefox"],
-      env: { OPENAI_API_KEY: "test", BUGZILLA_API_KEY: "test" },
+    const contextWithHooks = {
+      ...ctx,
       hooks: { warn: warnSpy },
     };
 
-    await fetchGithubActivityStep.run(ctx as StatusContext);
+    await fetchGithubActivityStep.run(contextWithHooks as StatusContext);
 
-    expect(ctx.githubActivity).toEqual([]);
-    expect(ctx.githubContributors).toEqual(new Map());
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("GitHub API key not provided"),
-    );
+    expect(contextWithHooks.githubActivity).toEqual([]);
+    expect(contextWithHooks.githubContributors).toEqual(new Map());
+
+    if (expectWarning) {
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("GitHub API key not provided"),
+      );
+    } else {
+      expect(warnSpy).not.toHaveBeenCalled();
+    }
   });
 
   it("fetches activity for multiple repositories", async () => {
@@ -243,7 +248,7 @@ describe("fetchGithubActivityStep", () => {
     expect(alice?.bugzillaEmail).toBe("alice@mozilla.org");
   });
 
-  it("maps GitHub usernames by commit email when no username mapping exists", async () => {
+  it("does not set bugzillaEmail when no email mapping exists", async () => {
     const ctx: Partial<StatusContext> = {
       params: { includeGithubActivity: true },
       githubRepos: ["mozilla/firefox"],
