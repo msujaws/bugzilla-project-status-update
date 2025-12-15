@@ -280,7 +280,9 @@ function setResultIframe(html) {
 
   const onload = () => {
     try {
-      const h = frame.contentDocument.documentElement.scrollHeight;
+      const docElement = frame.contentDocument?.documentElement;
+      if (!docElement) return;
+      const h = docElement.scrollHeight;
       frame.style.height = `${Math.min(Math.max(h + 2, 240), 1200)}px`;
     } catch (error) {
       console.error(error);
