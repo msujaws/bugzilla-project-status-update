@@ -1,0 +1,404 @@
+// Storage key for localStorage
+const STORAGE_KEY = "snazzybot_searches";
+const MAX_SEARCHES = 50;
+
+/**
+ * Get all saved searches from localStorage, sorted by lastUsed descending
+ * @returns {Array} Array of saved search objects
+ */
+export function getAllSearches() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const searches = JSON.parse(raw);
+    return searches.toSorted((a, b) => b.lastUsed - a.lastUsed);
+  } catch (error) {
+    console.error("Failed to load searches:", error);
+    // Clear corrupted data
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Ignore if localStorage is unavailable
+    }
+    return [];
+  }
+}
+
+/**
+ * Save a new search to localStorage
+ * @param {Object} search - Search object with name and params
+ * @returns {Object} The saved search with generated id and timestamps
+ */
+export function saveSearch(search) {
+  const searches = getAllSearches();
+
+  // Generate UUID v4
+  const id =
+    search.id ||
+    (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`);
+
+  const newSearch = {
+    ...search,
+    id,
+    createdAt: search.createdAt || Date.now(),
+    lastUsed: Date.now(),
+  };
+
+  searches.unshift(newSearch);
+
+  // Limit to MAX_SEARCHES (remove oldest by createdAt)
+  if (searches.length > MAX_SEARCHES) {
+    searches.sort((a, b) => b.createdAt - a.createdAt);
+    searches.length = MAX_SEARCHES;
+    // Re-sort by lastUsed for consistency
+    searches.sort((a, b) => b.lastUsed - a.lastUsed);
+  }
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(searches));
+    return newSearch;
+  } catch (error) {
+    if (error.name === "QuotaExceededError") {
+      throw new Error(
+        "Storage quota exceeded. Please delete some saved searches.",
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Delete a search by ID
+ * @param {string} id - Search ID
+ */
+export function deleteSearch(id) {
+  const searches = getAllSearches().filter((s) => s.id !== id);
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(searches));
+  } catch (error) {
+    console.error("Failed to delete search:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update search name
+ * @param {string} id - Search ID
+ * @param {string} name - New name
+ */
+export function updateSearchName(id, name) {
+  const searches = getAllSearches();
+  const search = searches.find((s) => s.id === id);
+  if (search) {
+    search.name = name;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(searches));
+    } catch (error) {
+      console.error("Failed to update search name:", error);
+      throw error;
+    }
+  }
+}
+
+/**
+ * Get search by ID
+ * @param {string} id - Search ID
+ * @returns {Object|null} Search object or null if not found
+ */
+export function getSearchById(id) {
+  const searches = getAllSearches();
+  return searches.find((s) => s.id === id) || undefined;
+}
+
+/**
+ * Mark search as used (updates lastUsed timestamp)
+ * @param {string} id - Search ID
+ */
+export function markSearchUsed(id) {
+  const searches = getAllSearches();
+  const search = searches.find((s) => s.id === id);
+  if (search) {
+    search.lastUsed = Date.now();
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(searches));
+    } catch (error) {
+      console.error("Failed to mark search as used:", error);
+      throw error;
+    }
+  }
+}
+
+/**
+ * SavedSearches UI class
+ */
+export class SavedSearches {
+  constructor(container, callbacks) {
+    this.container = container;
+    this.callbacks = callbacks || {}; // { onLoad, onSave }
+    this.pendingDelete = undefined; // { id, timeout }
+    this.render();
+  }
+
+  render() {
+    const searches = getAllSearches();
+    this.container.innerHTML = "";
+
+    if (searches.length === 0) return;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "saved-searches-wrapper";
+
+    for (const search of searches) {
+      const el = this.createSearchElement(search);
+      wrapper.append(el);
+    }
+
+    this.container.append(wrapper);
+  }
+
+  createSearchElement(search) {
+    const div = document.createElement("div");
+    div.className = "saved-search";
+    div.dataset.id = search.id;
+
+    // Show undo state if this search is pending deletion
+    if (this.pendingDelete?.id === search.id) {
+      div.innerHTML = `
+        <span class="search-name-deleted">${search.name}</span>
+        <button class="undo-btn" data-id="${search.id}">Undo</button>
+      `;
+      const undoBtn = div.querySelector(".undo-btn");
+      if (undoBtn) {
+        undoBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.undoDelete(search.id);
+        });
+      }
+    } else {
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "search-name";
+      nameSpan.textContent = search.name;
+      nameSpan.dataset.id = search.id;
+
+      const editBtn = document.createElement("button");
+      editBtn.className = "edit-btn";
+      editBtn.dataset.id = search.id;
+      editBtn.setAttribute("aria-label", "Edit search name");
+      editBtn.title = "Edit search name";
+      editBtn.innerHTML = `<svg aria-hidden="true" viewBox="0 0 512 512"><use href="#icon-edit"></use></svg>`;
+
+      const shareBtn = document.createElement("button");
+      shareBtn.className = "share-btn";
+      shareBtn.dataset.id = search.id;
+      shareBtn.setAttribute("aria-label", "Copy share link");
+      shareBtn.title = "Copy share link";
+      shareBtn.innerHTML = `<svg aria-hidden="true" viewBox="0 0 640 512"><use href="#icon-link"></use></svg>`;
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "delete-btn";
+      deleteBtn.dataset.id = search.id;
+      deleteBtn.setAttribute("aria-label", "Delete search");
+      deleteBtn.title = "Delete search";
+      deleteBtn.innerHTML = `<svg aria-hidden="true" viewBox="0 0 448 512"><use href="#icon-trash"></use></svg>`;
+
+      editBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.startEditing(search.id);
+      });
+
+      shareBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await this.shareSearch(search.id, shareBtn);
+      });
+
+      deleteBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.deleteWithUndo(search.id);
+      });
+
+      div.addEventListener("click", () => {
+        this.loadSearch(search.id);
+      });
+
+      div.append(nameSpan, editBtn, shareBtn, deleteBtn);
+    }
+
+    return div;
+  }
+
+  async createFromParams(params, options = {}) {
+    const suggestName =
+      options.suggestName || this.suggestNameViaAPI.bind(this);
+
+    let name;
+    try {
+      name = await suggestName(params);
+    } catch (error) {
+      console.error("Name suggestion failed:", error);
+      name = `Saved Search ${Date.now()}`;
+    }
+
+    const search = { name, params };
+    saveSearch(search);
+    this.render();
+
+    if (this.callbacks.onSave) {
+      this.callbacks.onSave(search);
+    }
+  }
+
+  async suggestNameViaAPI(params) {
+    const response = await fetch("/api/suggest-name", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ params }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.name;
+  }
+
+  loadSearch(id) {
+    markSearchUsed(id);
+    const search = getAllSearches().find((s) => s.id === id);
+    if (search && this.callbacks.onLoad) {
+      this.callbacks.onLoad(search.params);
+    }
+  }
+
+  startEditing(id) {
+    const search = getAllSearches().find((s) => s.id === id);
+    if (!search) return;
+
+    const searchDiv = this.container.querySelector(
+      `.saved-search[data-id="${id}"]`,
+    );
+    if (!searchDiv) return;
+
+    const nameEl = searchDiv.querySelector(`.search-name[data-id="${id}"]`);
+    if (!nameEl) return;
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = search.name;
+    input.className = "search-name-input";
+
+    const save = () => {
+      updateSearchName(id, input.value);
+      this.render();
+    };
+
+    const cancel = () => {
+      this.render();
+    };
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        save();
+      } else if (e.key === "Escape") {
+        cancel();
+      }
+    });
+
+    input.addEventListener("blur", () => {
+      cancel();
+    });
+
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  deleteWithUndo(id) {
+    // Cancel any existing pending delete
+    if (this.pendingDelete) {
+      clearTimeout(this.pendingDelete.timeout);
+    }
+
+    this.pendingDelete = {
+      id,
+      timeout: setTimeout(() => {
+        deleteSearch(id);
+        this.pendingDelete = undefined;
+        this.render();
+      }, 3000),
+    };
+    this.render();
+  }
+
+  undoDelete(id) {
+    if (this.pendingDelete?.id === id) {
+      clearTimeout(this.pendingDelete.timeout);
+      this.pendingDelete = undefined;
+      this.render();
+    }
+  }
+
+  getShareableURL(id, options = {}) {
+    const search = getAllSearches().find((s) => s.id === id);
+    if (!search) return "";
+
+    const params = search.params;
+    const sp = new URLSearchParams();
+
+    // Map params to query string using the same format as the form submission
+    if (params.components) sp.set("components", params.components);
+    if (params.whiteboards) sp.set("whiteboards", params.whiteboards);
+    if (params.metabugs) sp.set("metabugs", params.metabugs);
+    if (params.assignees) sp.set("assignees", params.assignees);
+    if (params.githubRepos) sp.set("github-repos", params.githubRepos);
+    if (params.emailMapping) sp.set("email-mapping", params.emailMapping);
+    sp.set("days", String(params.days || 7));
+    sp.set("voice", params.voice || "normal");
+    sp.set("aud", params.audience || "technical");
+    if (params.debug) sp.set("debug", "true");
+    if (!params.cache) sp.set("nocache", "1");
+    if (params.patchContext === "omit") sp.set("pc", "0");
+
+    const path = `?${sp.toString()}`;
+
+    return options.includeOrigin
+      ? `${globalThis.location.origin}${globalThis.location.pathname}${path}`
+      : path;
+  }
+
+  async shareSearch(id, buttonElement) {
+    try {
+      const url = this.getShareableURL(id, { includeOrigin: true });
+      if (!url) return;
+
+      await navigator.clipboard.writeText(url);
+
+      // Show temporary feedback with checkmark
+      const originalHTML = buttonElement.innerHTML;
+      buttonElement.innerHTML = "✓";
+      buttonElement.style.color = "var(--ok)";
+      buttonElement.style.opacity = "1";
+
+      setTimeout(() => {
+        buttonElement.innerHTML = originalHTML;
+        buttonElement.style.color = "";
+        buttonElement.style.opacity = "";
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to copy share link:", error);
+      // Show error feedback with X
+      const originalHTML = buttonElement.innerHTML;
+      buttonElement.innerHTML = "✗";
+      buttonElement.style.color = "var(--err)";
+      buttonElement.style.opacity = "1";
+
+      setTimeout(() => {
+        buttonElement.innerHTML = originalHTML;
+        buttonElement.style.color = "";
+        buttonElement.style.opacity = "";
+      }, 2000);
+    }
+  }
+}

@@ -448,6 +448,126 @@ summary {
   } /* fully off right */
 }
 
+/* Saved Searches Section */
+.saved-searches-section {
+  margin: 24px 0 18px 0;
+}
+
+.saved-searches-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 0;
+}
+
+.saved-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--navy-2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  max-width: 280px;
+}
+
+.saved-search:hover {
+  background: var(--navy-3);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.search-name {
+  color: var(--ink);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  cursor: pointer;
+}
+
+.search-name-deleted {
+  color: var(--muted);
+  text-decoration: line-through;
+  font-size: 14px;
+  flex: 1;
+}
+
+.search-name-input {
+  background: var(--navy-3);
+  border: 1px solid var(--accent);
+  color: var(--ink);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 180px;
+  font-family: inherit;
+}
+
+.edit-btn,
+.share-btn,
+.delete-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+  opacity: 0.6;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.edit-btn svg,
+.share-btn svg,
+.delete-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.edit-btn:hover {
+  opacity: 1;
+  color: var(--gold);
+}
+
+.share-btn:hover {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.delete-btn:hover {
+  opacity: 1;
+  color: var(--err);
+}
+
+.undo-btn {
+  background: var(--accent);
+  border: none;
+  color: var(--navy);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.undo-btn:hover {
+  background: var(--gold);
+}
+
+#save-search {
+  margin-left: 12px;
+}
+
 /* overlay for bursts */
 #fx-layer {
   position: fixed;

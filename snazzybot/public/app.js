@@ -1,4 +1,5 @@
 import DOMPurify from "./vendor/dompurify.js";
+import { SavedSearches } from "./lib/saved-searches.js";
 
 const $ = (id) => document.querySelector(`#${id}`);
 const defaultTitle = document.title;
@@ -671,8 +672,27 @@ if (runButton) {
   });
 }
 
+function getCurrentFormParams() {
+  return {
+    components: $("components")?.value || "",
+    whiteboards: $("whiteboards")?.value || "",
+    metabugs: $("metabugs")?.value || "",
+    assignees: $("assignees")?.value || "",
+    githubRepos: $("github-repos")?.value || "",
+    emailMapping: $("email-mapping")?.value || "",
+    days: Number($("days")?.value) || 7,
+    voice: $("voice")?.value || "normal",
+    audience: $("audience")?.value || "technical",
+    debug: $("debug")?.value === "true",
+    cache: $("cache")?.value === "true",
+    patchContext: $("patch-context")?.value || "omit",
+  };
+}
+
 function hydrateFromURL() {
   const sp = new URLSearchParams(location.search);
+
+  // Parse query parameters
   if (sp.has("components"))
     setFieldValue("components", sp.get("components") || "");
   if (sp.has("whiteboards"))
@@ -680,6 +700,10 @@ function hydrateFromURL() {
   if (sp.has("metabugs")) setFieldValue("metabugs", sp.get("metabugs") || "");
   if (sp.has("assignees"))
     setFieldValue("assignees", sp.get("assignees") || "");
+  if (sp.has("github-repos"))
+    setFieldValue("github-repos", sp.get("github-repos") || "");
+  if (sp.has("email-mapping"))
+    setFieldValue("email-mapping", sp.get("email-mapping") || "");
   if (sp.has("days")) setFieldValue("days", sp.get("days") || "7");
   if (sp.has("voice")) setFieldValue("voice", sp.get("voice") || "normal");
   if (sp.has("aud")) setFieldValue("audience", sp.get("aud") || "technical");
@@ -689,6 +713,43 @@ function hydrateFromURL() {
   if (sp.get("pc") === "0") setFieldValue("patch-context", "omit");
 }
 hydrateFromURL();
+
+// Initialize Saved Searches -------------------------------------------------
+const savedSearchesContainer = document.querySelector(
+  "#saved-searches-container",
+);
+
+const savedSearches = new SavedSearches(savedSearchesContainer, {
+  onLoad: (params) => {
+    // Populate form fields
+    setFieldValue("components", params.components || "");
+    setFieldValue("whiteboards", params.whiteboards || "");
+    setFieldValue("metabugs", params.metabugs || "");
+    setFieldValue("assignees", params.assignees || "");
+    setFieldValue("github-repos", params.githubRepos || "");
+    setFieldValue("email-mapping", params.emailMapping || "");
+    setFieldValue("days", String(params.days || 7));
+    setFieldValue("voice", params.voice || "normal");
+    setFieldValue("audience", params.audience || "technical");
+    setFieldValue("debug", params.debug ? "true" : "false");
+    setFieldValue("cache", params.cache ? "true" : "false");
+    setFieldValue("patch-context", params.patchContext || "omit");
+  },
+});
+
+// Add "Save Search" button
+const actionsRow = document.querySelector(".actions-row .actions");
+if (actionsRow) {
+  const saveSearchBtn = document.createElement("button");
+  saveSearchBtn.id = "save-search";
+  saveSearchBtn.className = "secondary";
+  saveSearchBtn.textContent = "Save Search";
+  saveSearchBtn.addEventListener("click", async () => {
+    const params = getCurrentFormParams();
+    await savedSearches.createFromParams(params);
+  });
+  actionsRow.append(saveSearchBtn);
+}
 
 // Actions -------------------------------------------------------------------
 const copyBtn = $("copy");
