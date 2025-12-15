@@ -3,7 +3,7 @@ const STORAGE_KEY = "snazzybot_searches";
 const MAX_SEARCHES = 50;
 
 /**
- * Get all saved searches from localStorage, sorted by lastUsed descending
+ * Get all saved searches from localStorage
  * @returns {Array} Array of saved search objects
  */
 export function getAllSearches() {
@@ -11,7 +11,7 @@ export function getAllSearches() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const searches = JSON.parse(raw);
-    return searches.toSorted((a, b) => b.lastUsed - a.lastUsed);
+    return searches;
   } catch (error) {
     console.error("Failed to load searches:", error);
     // Clear corrupted data
@@ -43,7 +43,6 @@ export function saveSearch(search) {
     ...search,
     id,
     createdAt: search.createdAt || Date.now(),
-    lastUsed: Date.now(),
   };
 
   searches.unshift(newSearch);
@@ -52,8 +51,6 @@ export function saveSearch(search) {
   if (searches.length > MAX_SEARCHES) {
     searches.sort((a, b) => b.createdAt - a.createdAt);
     searches.length = MAX_SEARCHES;
-    // Re-sort by lastUsed for consistency
-    searches.sort((a, b) => b.lastUsed - a.lastUsed);
   }
 
   try {
@@ -113,24 +110,6 @@ export function getSearchById(id) {
 }
 
 /**
- * Mark search as used (updates lastUsed timestamp)
- * @param {string} id - Search ID
- */
-export function markSearchUsed(id) {
-  const searches = getAllSearches();
-  const search = searches.find((s) => s.id === id);
-  if (search) {
-    search.lastUsed = Date.now();
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(searches));
-    } catch (error) {
-      console.error("Failed to mark search as used:", error);
-      throw error;
-    }
-  }
-}
-
-/**
  * SavedSearches UI class
  */
 export class SavedSearches {
@@ -154,7 +133,7 @@ export class SavedSearches {
 
     document.addEventListener("keyup", (e) => {
       // Check for Command (Mac) or Ctrl (Windows/Linux)
-      if ((!e.metaKey && !e.ctrlKey) && this.modifierPressed) {
+      if (!e.metaKey && !e.ctrlKey && this.modifierPressed) {
         this.modifierPressed = false;
         this.updateNewTabIndicators();
       }
@@ -215,10 +194,11 @@ export class SavedSearches {
       // New tab indicator icon
       const newTabIndicator = document.createElement("span");
       newTabIndicator.className = "new-tab-indicator";
-      newTabIndicator.innerHTML = '<svg aria-hidden="true" viewBox="0 0 512 512"><use href="#icon-external-link"></use></svg>';
+      newTabIndicator.innerHTML =
+        '<svg aria-hidden="true" viewBox="0 0 512 512"><use href="#icon-external-link"></use></svg>';
       // Detect platform for appropriate modifier key label
       const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
-      newTabIndicator.title = `${isMac ? 'Cmd' : 'Ctrl'}+Click to open in new tab and execute`;
+      newTabIndicator.title = `${isMac ? "Cmd" : "Ctrl"}+Click to open in new tab and execute`;
       newTabIndicator.style.display = "none"; // Hidden by default
 
       const editBtn = document.createElement("button");
@@ -309,7 +289,6 @@ export class SavedSearches {
   }
 
   loadSearch(id) {
-    markSearchUsed(id);
     const search = getAllSearches().find((s) => s.id === id);
     if (search && this.callbacks.onLoad) {
       this.callbacks.onLoad(search.params);
@@ -317,14 +296,13 @@ export class SavedSearches {
   }
 
   openInNewTabAndExecute(id) {
-    markSearchUsed(id);
     const search = getAllSearches().find((s) => s.id === id);
     if (!search) return;
 
     // Build URL with parameters and auto-execute flag
     const url = this.getShareableURL(id, {
       includeOrigin: true,
-      autoExecute: true
+      autoExecute: true,
     });
 
     if (url) {

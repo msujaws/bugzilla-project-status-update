@@ -324,7 +324,7 @@ describe("SavedSearches Class", () => {
 
     new SavedSearches(container, mockCallbacks);
 
-    // Get delete buttons (they're in reverse order due to lastUsed sorting)
+    // Get delete buttons
     const deleteButtons = container.querySelectorAll(".delete-btn");
     expect(deleteButtons.length).toBe(2);
 

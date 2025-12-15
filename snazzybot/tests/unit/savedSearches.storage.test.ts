@@ -5,7 +5,6 @@ import {
   deleteSearch,
   updateSearchName,
   getSearchById,
-  markSearchUsed,
 } from "../../public/lib/saved-searches.js";
 
 // Mock localStorage
@@ -69,7 +68,6 @@ describe("SavedSearches Storage", () => {
     expect(stored[0].name).toBe("My Search");
     expect(stored[0].id).toBeDefined();
     expect(stored[0].createdAt).toBeDefined();
-    expect(stored[0].lastUsed).toBeDefined();
     expect(saved.id).toBeDefined();
   });
 
@@ -82,17 +80,14 @@ describe("SavedSearches Storage", () => {
     expect(search1.id).not.toBe(search2.id);
   });
 
-  it("retrieves all saved searches sorted by lastUsed descending", () => {
-    saveSearch({ name: "Old", params: {} });
-    // Wait a bit to ensure different timestamps
-    vi.useFakeTimers();
-    vi.advanceTimersByTime(1000);
-    saveSearch({ name: "Recent", params: {} });
-    vi.useRealTimers();
+  it("retrieves all saved searches in order", () => {
+    saveSearch({ name: "First", params: {} });
+    saveSearch({ name: "Second", params: {} });
 
     const searches = getAllSearches();
-    expect(searches[0].name).toBe("Recent");
-    expect(searches[1].name).toBe("Old");
+    expect(searches).toHaveLength(2);
+    expect(searches[0].name).toBe("Second");
+    expect(searches[1].name).toBe("First");
   });
 
   it("deletes a search by ID", () => {
@@ -113,19 +108,6 @@ describe("SavedSearches Storage", () => {
   it("returns null when getting search by non-existent ID", () => {
     const result = getSearchById("non-existent-id");
     expect(result).toBeUndefined();
-  });
-
-  it("updates lastUsed timestamp when search is marked as used", () => {
-    vi.useFakeTimers();
-    const search = saveSearch({ name: "Test", params: {} });
-    const before = search.lastUsed;
-
-    vi.advanceTimersByTime(1000);
-    markSearchUsed(search.id);
-
-    const after = getSearchById(search.id).lastUsed;
-    expect(after).toBeGreaterThan(before);
-    vi.useRealTimers();
   });
 
   it("handles localStorage quota exceeded gracefully", () => {
@@ -217,9 +199,5 @@ describe("SavedSearches Storage", () => {
   it("returns empty array when localStorage is completely empty", () => {
     const searches = getAllSearches();
     expect(searches).toEqual([]);
-  });
-
-  it("handles marking non-existent search as used without error", () => {
-    expect(() => markSearchUsed("non-existent-id")).not.toThrow();
   });
 });
