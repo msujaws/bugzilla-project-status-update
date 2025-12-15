@@ -76,6 +76,39 @@ export type SummarizerResult = {
   summary_md: string;
 };
 
+/**
+ * Clean up Bugzilla usernames by removing common suffixes and IRC nicknames.
+ * Examples:
+ * - "John Doe (please needinfo? me)" -> "John Doe"
+ * - "Jane Smith [:jsmith]" -> "Jane Smith"
+ * - "Nobody; OK to take it and work on it" -> "Unassigned"
+ */
+export function cleanBugzillaUsername(
+  name: string | undefined,
+): string | undefined {
+  if (name === undefined) return undefined;
+
+  const trimmed = name.trim();
+
+  // Return undefined for empty strings
+  if (!trimmed) return undefined;
+
+  // Handle the "Nobody" case for unassigned bugs
+  if (trimmed.toLowerCase().startsWith("nobody")) {
+    return "Unassigned";
+  }
+
+  // Remove parenthetical phrases like "(please needinfo? me)"
+  let cleaned = trimmed.replaceAll(/\s*\([^)]*\)\s*$/g, "");
+
+  // Remove IRC-style nicknames like "[:jaws]" or "[jaws]"
+  cleaned = cleaned.replaceAll(/\s*\[:\w+\]\s*$/g, "");
+  cleaned = cleaned.replaceAll(/\s*\[\w+\]\s*$/g, "");
+
+  const result = cleaned.trim();
+  return result || undefined;
+}
+
 export async function summarizeWithOpenAI(
   env: EnvLike,
   model: string,
@@ -127,13 +160,17 @@ export async function summarizeWithOpenAI(
       bug.assigned_to && bug.assigned_to.includes("@")
         ? bug.assigned_to.split("@")[0]
         : (bug.assigned_to ?? "Someone");
+
+    // Clean up Bugzilla username patterns
+    const cleanedName = cleanBugzillaUsername(primaryName || fallbackName);
+
     return {
       id: bug.id,
       summary: bug.summary,
       product: bug.product,
       component: bug.component,
       assignee: {
-        name: primaryName || fallbackName,
+        name: cleanedName || fallbackName,
         email: bug.assigned_to ?? "dev-null+email-unknown@example.com",
       },
     };
