@@ -208,6 +208,26 @@ function parseLines(t) {
     .filter(Boolean);
 }
 
+function parseEmailMapping(text) {
+  if (!text || !text.trim()) return {};
+
+  const mapping = {};
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    const match = line.match(/^(.+?)\s*->\s*(.+)$/);
+    if (match) {
+      const [, email, username] = match;
+      mapping[email.trim()] = username.trim();
+    }
+  }
+
+  return mapping;
+}
+
 function setActionsEnabled(enabled) {
   for (const id of ["copy", "copy-rendered", "dl-md", "dl-html"]) {
     const el = $(id);
@@ -595,6 +615,8 @@ if (runButton) {
       .filter((n) => Number.isFinite(n));
     const whiteboards = parseLines($("whiteboards")?.value || "");
     const assignees = parseLines($("assignees")?.value || "");
+    const githubRepos = parseLines($("github-repos")?.value || "");
+    const emailMapping = parseEmailMapping($("email-mapping")?.value || "");
     const days = Number($("days")?.value) || 8;
     const voice = $("voice")?.value || "normal";
     const audience = $("audience")?.value || "technical";
@@ -602,6 +624,7 @@ if (runButton) {
     const skipCache = $("cache")?.value === "false";
     const includePatchContext =
       ($("patch-context")?.value || "include") !== "omit";
+    const includeGithubActivity = githubRepos.length > 0;
 
     const sp = new URLSearchParams();
     // Store raw textarea strings; they're newline-safe in params.
@@ -635,6 +658,9 @@ if (runButton) {
       debug,
       skipCache,
       includePatchContext,
+      githubRepos,
+      emailMapping,
+      includeGithubActivity,
     };
     // If Debug = Yes, use streaming (shows live logs + progress)
     if (debug) {

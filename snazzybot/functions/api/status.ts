@@ -8,6 +8,7 @@ import {
 type Env = {
   OPENAI_API_KEY: string;
   BUGZILLA_API_KEY: string;
+  GITHUB_API_KEY?: string;
 };
 
 const CONTENT_SECURITY_POLICY =
@@ -59,6 +60,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     skipCache = false,
     audience = "technical",
     includePatchContext = true,
+    githubRepos = [],
+    emailMapping = {},
+    includeGithubActivity = false,
     mode = "oneshot", // "discover" | "page" | "finalize" | "oneshot" (legacy)
     cursor = 0,
     pageSize = 35,
@@ -82,6 +86,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const envConfig = {
     OPENAI_API_KEY: env.OPENAI_API_KEY,
     BUGZILLA_API_KEY: env.BUGZILLA_API_KEY,
+    GITHUB_API_KEY: env.GITHUB_API_KEY,
     BUGZILLA_HOST: env.BUGZILLA_HOST,
     SNAZZY_SKIP_CACHE: Boolean(skipCache),
   };
@@ -98,6 +103,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     voice,
     audience,
     includePatchContext,
+    githubRepos,
+    emailMapping,
+    includeGithubActivity,
   } as const;
 
   if (!wantsStream) {

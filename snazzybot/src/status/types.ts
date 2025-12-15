@@ -13,11 +13,15 @@ export type GenerateParams = {
   audience?: "technical" | "product" | "leadership";
   ids?: number[];
   includePatchContext?: boolean;
+  githubRepos?: string[];
+  emailMapping?: Record<string, string>;
+  includeGithubActivity?: boolean;
 };
 
 export type EnvLike = {
   BUGZILLA_API_KEY: string;
   OPENAI_API_KEY: string;
+  GITHUB_API_KEY?: string;
   BUGZILLA_HOST?: string;
   SNAZZY_SKIP_CACHE?: boolean;
 };

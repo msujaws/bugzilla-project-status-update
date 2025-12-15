@@ -11,6 +11,7 @@ import type {
   ProductComponent,
   ProgressHooks,
 } from "./types.ts";
+import type { GitHubActivity, GitHubContributor } from "./githubTypes.ts";
 
 export const MAX_BUGS_FOR_OPENAI = 60;
 
@@ -26,6 +27,7 @@ export type StatusStepName =
   | "handle-empty"
   | "limit-openai"
   | "load-patch-context"
+  | "fetch-github-activity"
   | "summarize-openai"
   | "format-output";
 
@@ -56,6 +58,10 @@ export interface StatusContext {
   providedBugs: Bug[];
   trimmedCount: number;
   patchContext: Map<number, CommitPatch[]>;
+  githubRepos: string[];
+  emailMapping: Record<string, string>;
+  githubActivity: GitHubActivity[];
+  githubContributors: Map<string, GitHubContributor>;
   openAiResponse?: SummarizerResult;
   output?: string;
   html?: string;

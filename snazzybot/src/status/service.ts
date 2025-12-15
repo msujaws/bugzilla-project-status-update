@@ -11,6 +11,7 @@ import {
 } from "./context.ts";
 import {
   collectCandidatesStep,
+  fetchGithubActivityStep,
   fetchHistoriesStep,
   fetchPrequalifiedStep,
   filterByHistoryStep,
@@ -58,6 +59,8 @@ function createStatusRecipe(
       fetchPrequalifiedStep,
       limitOpenAiStep,
       loadPatchContextStep,
+      fetchGithubActivityStep,
+      handleEmptyStep,
       summarizeOpenAiStep,
       formatOutputStep,
     ];
@@ -68,6 +71,7 @@ function createStatusRecipe(
     collectCandidatesStep,
     fetchHistoriesStep,
     filterByHistoryStep,
+    fetchGithubActivityStep,
     handleEmptyStep,
     limitOpenAiStep,
     loadPatchContextStep,
@@ -127,6 +131,10 @@ export async function generateStatus(
     providedBugs: [],
     trimmedCount: 0,
     patchContext: new Map(),
+    githubRepos: params.githubRepos ?? [],
+    emailMapping: params.emailMapping ?? {},
+    githubActivity: [],
+    githubContributors: new Map(),
     ids: [],
   };
 

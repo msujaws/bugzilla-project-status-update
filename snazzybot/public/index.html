@@ -103,6 +103,28 @@
               rows="3"
               placeholder="dev@example.com&#10;peer@example.com"
             ></textarea>
+            <label class="filter-label filter-label--spaced" for="github-repos"
+              >GitHub Repos
+              <span class="hint"
+                >one per line: owner/repo (e.g., mozilla/firefox)</span
+              ></label
+            >
+            <label class="filter-label filter-label--spaced" for="email-mapping"
+              >Email Mapping
+              <span class="hint"
+                >bugzilla@email.com -> github_username</span
+              ></label
+            >
+            <textarea
+              id="github-repos"
+              rows="3"
+              placeholder="mozilla/firefox&#10;mozilla/devtools"
+            ></textarea>
+            <textarea
+              id="email-mapping"
+              rows="3"
+              placeholder="dev@mozilla.org -> githubuser&#10;peer@mozilla.org -> anotheruser"
+            ></textarea>
           </div>
 
           <div class="row" style="margin-top: 14px">

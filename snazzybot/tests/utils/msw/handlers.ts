@@ -116,4 +116,47 @@ export const handlers = [
       headers: { "content-type": "text/xml; charset=utf-8" },
     });
   }),
+
+  // GitHub mock endpoints:
+  // Commits endpoint
+  http.get("https://api.github.com/repos/:owner/:repo/commits", () => {
+    return HttpResponse.json([
+      {
+        sha: "test-sha-123",
+        commit: {
+          message: "Test commit message",
+          author: {
+            name: "Test Author",
+            email: "test@example.com",
+            date: "2025-10-22T10:00:00Z",
+          },
+        },
+        author: { login: "testuser" },
+        html_url: "https://github.com/test/repo/commit/test-sha-123",
+      },
+    ]);
+  }),
+
+  // Pull requests endpoint
+  http.get("https://api.github.com/repos/:owner/:repo/pulls", () => {
+    return HttpResponse.json([
+      {
+        number: 1,
+        title: "Test PR",
+        user: { login: "testuser" },
+        html_url: "https://github.com/test/repo/pull/1",
+        state: "closed",
+        merged_at: "2025-10-22T11:00:00Z",
+        closed_at: "2025-10-22T11:00:00Z",
+      },
+    ]);
+  }),
+
+  // Individual PR details endpoint
+  http.get("https://api.github.com/repos/:owner/:repo/pulls/:number", () => {
+    return HttpResponse.json({
+      additions: 100,
+      deletions: 50,
+    });
+  }),
 ];

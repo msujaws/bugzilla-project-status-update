@@ -182,6 +182,7 @@ export const summarizeWithOpenAIAndTrack = async (
       patchContextByBug: ctx.patchContext,
       groupByAssignee: ctx.assignees.length > 0,
       singleAssignee: ctx.assignees.length === 1,
+      githubContributors: ctx.githubContributors,
     },
   );
 };

@@ -1,4 +1,5 @@
 export { collectCandidatesStep } from "./collectCandidatesStep.ts";
+export { fetchGithubActivityStep } from "./fetchGithubActivityStep.ts";
 export { fetchHistoriesStep } from "./fetchHistoriesStep.ts";
 export { filterByHistoryStep } from "./filterByHistoryStep.ts";
 export { formatOutputStep } from "./formatOutputStep.ts";

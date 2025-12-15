@@ -1,5 +1,6 @@
 import type { CommitPatch } from "../patch.ts";
 import type { Bug, EnvLike } from "./types.ts";
+import type { GitHubContributor } from "./githubTypes.ts";
 
 type VoiceOption = "normal" | "pirate" | "snazzy-robot";
 type AudienceOption = "technical" | "product" | "leadership";
@@ -8,6 +9,7 @@ type SummarizeOptions = {
   patchContextByBug?: Map<number, CommitPatch[]>;
   groupByAssignee?: boolean;
   singleAssignee?: boolean;
+  githubContributors?: Map<string, GitHubContributor>;
 };
 
 const technicalAudienceHint = `
@@ -87,6 +89,7 @@ export async function summarizeWithOpenAI(
     patchContextByBug,
     groupByAssignee = false,
     singleAssignee = false,
+    githubContributors,
   } = options;
 
   const voiceHint =
@@ -186,6 +189,46 @@ Return JSON:
     }
     if (perBug.length > 0) {
       user += `\n\nPatch Context:\n${perBug.join("\n\n")}`;
+    }
+  }
+
+  if (githubContributors && githubContributors.size > 0) {
+    const githubSummary: string[] = [];
+
+    for (const [username, contributor] of githubContributors) {
+      const parts: string[] = [`GitHub User: @${username}`];
+
+      if (contributor.bugzillaEmail) {
+        parts.push(`Bugzilla Email: ${contributor.bugzillaEmail}`);
+      }
+
+      if (contributor.commits.length > 0) {
+        parts.push(`Commits (${contributor.commits.length}):`);
+        const commitLimit = 10;
+        for (const commit of contributor.commits.slice(0, commitLimit)) {
+          const firstLine = commit.message.split("\n")[0];
+          parts.push(`  - ${firstLine} (${commit.url})`);
+        }
+        if (contributor.commits.length > commitLimit) {
+          parts.push(
+            `  - ...and ${contributor.commits.length - commitLimit} more commits`,
+          );
+        }
+      }
+
+      if (contributor.pullRequests.length > 0) {
+        parts.push(`Pull Requests (${contributor.pullRequests.length}):`);
+        for (const pr of contributor.pullRequests) {
+          parts.push(`  - #${pr.number}: ${pr.title} (${pr.state}, ${pr.url})`);
+        }
+      }
+
+      githubSummary.push(parts.join("\n"));
+    }
+
+    if (githubSummary.length > 0) {
+      user += `\n\nGitHub Activity:\n${githubSummary.join("\n\n")}`;
+      user += `\n\nIntegrate GitHub activity into the summary. When a GitHub user has a mapped Bugzilla email, merge their GitHub contributions with their Bugzilla work in the summary. For GitHub-only contributors (no mapped Bugzilla email), include their contributions in a separate section or mention them separately.`;
     }
   }
 
