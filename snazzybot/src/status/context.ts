@@ -1,6 +1,7 @@
 import type { CommitPatch } from "../patch.ts";
 import type { CandidateCollection } from "./candidateCollector.ts";
 import type { BugzillaClient } from "./bugzillaClient.ts";
+import type { JiraClient } from "./jiraClient.ts";
 import type { SummarizerResult } from "./summarizer.ts";
 import type {
   Bug,
@@ -12,6 +13,7 @@ import type {
   ProgressHooks,
 } from "./types.ts";
 import type { GitHubActivity, GitHubContributor } from "./githubTypes.ts";
+import type { JiraIssue, JiraIssueHistory } from "./jiraTypes.ts";
 
 export const MAX_BUGS_FOR_OPENAI = 60;
 
@@ -24,6 +26,9 @@ export type StatusStepName =
   | "collect-candidates"
   | "fetch-histories"
   | "filter-by-history"
+  | "collect-jira-issues"
+  | "fetch-jira-changelogs"
+  | "filter-jira-by-history"
   | "handle-empty"
   | "limit-openai"
   | "load-patch-context"
@@ -36,6 +41,7 @@ export interface StatusContext {
   env: EnvLike;
   hooks: ProgressHooks;
   client: BugzillaClient;
+  jiraClient?: JiraClient;
   includePatchContext: boolean;
   isDebug: boolean;
   debugLog?: DebugLog;
@@ -45,6 +51,8 @@ export interface StatusContext {
   whiteboards: string[];
   metabugs: number[];
   assignees: string[];
+  jiraProjects: string[];
+  jiraJql: string[];
   voice: VoiceOption;
   audience: AudienceOption;
   model: string;
@@ -53,6 +61,10 @@ export interface StatusContext {
   candidates: Bug[];
   histories: BugHistoryEntry[];
   byIdHistory: Map<number, BugHistoryEntry>;
+  jiraIssues: JiraIssue[];
+  jiraHistories: JiraIssueHistory[];
+  byKeyJiraHistory: Map<string, JiraIssueHistory>;
+  finalJiraIssues: JiraIssue[];
   finalBugs: Bug[];
   aiCandidates: Bug[];
   providedBugs: Bug[];

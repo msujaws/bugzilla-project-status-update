@@ -1,7 +1,10 @@
 export { collectCandidatesStep } from "./collectCandidatesStep.ts";
+export { collectJiraIssuesStep } from "./collectJiraIssuesStep.ts";
 export { fetchGithubActivityStep } from "./fetchGithubActivityStep.ts";
 export { fetchHistoriesStep } from "./fetchHistoriesStep.ts";
+export { fetchJiraChangelogsStep } from "./fetchJiraChangelogsStep.ts";
 export { filterByHistoryStep } from "./filterByHistoryStep.ts";
+export { filterJiraByHistoryStep } from "./filterJiraByHistoryStep.ts";
 export { formatOutputStep } from "./formatOutputStep.ts";
 export { handleEmptyStep } from "./handleEmptyStep.ts";
 export { limitOpenAiStep } from "./limitOpenAiStep.ts";

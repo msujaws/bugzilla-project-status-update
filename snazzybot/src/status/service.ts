@@ -1,5 +1,6 @@
 import { isoDaysAgo } from "../utils/time.ts";
 import { BugzillaClient } from "./bugzillaClient.ts";
+import { JiraClient } from "./jiraClient.ts";
 import { runRecipe, type RecipeStep } from "./stateMachine.ts";
 import { collectCandidates } from "./candidateCollector.ts";
 import { qualifiesByHistory } from "./history.ts";
@@ -11,10 +12,13 @@ import {
 } from "./context.ts";
 import {
   collectCandidatesStep,
+  collectJiraIssuesStep,
   fetchGithubActivityStep,
   fetchHistoriesStep,
+  fetchJiraChangelogsStep,
   fetchPrequalifiedStep,
   filterByHistoryStep,
+  filterJiraByHistoryStep,
   formatOutputStep,
   handleEmptyStep,
   limitOpenAiStep,
@@ -63,6 +67,9 @@ function createStatusRecipe(
     context.whiteboards.length > 0 ||
     context.metabugs.length > 0 ||
     context.assignees.length > 0;
+  const hasJiraQueries =
+    (context.jiraProjects.length > 0 || context.jiraJql.length > 0) &&
+    !!context.jiraClient;
   const hasPatchContext = context.includePatchContext;
   const hasOpenAI = !!context.env.OPENAI_API_KEY;
 
@@ -83,6 +90,13 @@ function createStatusRecipe(
   if (hasBugzillaQueries) {
     recipe.push(collectCandidatesStep, fetchHistoriesStep, filterByHistoryStep);
   }
+  if (hasJiraQueries) {
+    recipe.push(
+      collectJiraIssuesStep,
+      fetchJiraChangelogsStep,
+      filterJiraByHistoryStep,
+    );
+  }
   if (hasGithubRepo) recipe.push(fetchGithubActivityStep);
   recipe.push(handleEmptyStep, limitOpenAiStep);
   if (hasPatchContext) recipe.push(loadPatchContextStep);
@@ -100,6 +114,19 @@ export async function generateStatus(
   const isDebug = !!params.debug;
   const debugLog = debugLogger(isDebug, hooks);
   const client = new BugzillaClient(env);
+
+  // Initialize Jira client if credentials are provided
+  let jiraClient: JiraClient | undefined;
+  if (env.JIRA_URL && env.JIRA_API_KEY) {
+    try {
+      jiraClient = new JiraClient(env);
+    } catch (error) {
+      hooks.warn?.(
+        `Failed to initialize Jira client: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   const assignees = (params.assignees ?? [])
     .map((email) => email?.trim())
     .filter(Boolean);
@@ -111,6 +138,8 @@ export async function generateStatus(
   const components = params.components ?? [];
   const whiteboards = params.whiteboards ?? [];
   const metabugs = params.metabugs ?? [];
+  const jiraProjects = params.jiraProjects ?? [];
+  const jiraJql = params.jiraJql ?? [];
   const model = defaultModel(params.model);
   const voice = defaultVoice(params.voice);
   const audience = defaultAudience(idsProvided, params.audience);
@@ -121,6 +150,7 @@ export async function generateStatus(
     env,
     hooks,
     client,
+    jiraClient,
     includePatchContext,
     isDebug,
     debugLog,
@@ -130,6 +160,8 @@ export async function generateStatus(
     whiteboards,
     metabugs,
     assignees,
+    jiraProjects,
+    jiraJql,
     voice,
     audience,
     model,
@@ -137,6 +169,10 @@ export async function generateStatus(
     candidates: [],
     histories: [],
     byIdHistory: new Map(),
+    jiraIssues: [],
+    jiraHistories: [],
+    byKeyJiraHistory: new Map(),
+    finalJiraIssues: [],
     finalBugs: [],
     aiCandidates: [],
     providedBugs: [],

@@ -16,6 +16,8 @@ export type GenerateParams = {
   githubRepos?: string[];
   emailMapping?: Record<string, string>;
   includeGithubActivity?: boolean;
+  jiraJql?: string[];
+  jiraProjects?: string[];
 };
 
 export type EnvLike = {
@@ -23,6 +25,8 @@ export type EnvLike = {
   OPENAI_API_KEY: string;
   GITHUB_API_KEY?: string;
   BUGZILLA_HOST?: string;
+  JIRA_URL?: string;
+  JIRA_API_KEY?: string;
   SNAZZY_SKIP_CACHE?: boolean;
 };
 

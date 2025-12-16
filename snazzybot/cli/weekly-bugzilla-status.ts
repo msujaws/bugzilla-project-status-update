@@ -50,6 +50,20 @@ const argv = yargs(hideBin(process.argv))
     default: false,
     desc: "Include GitHub commit patch context (use --no-patch-context to skip)",
   })
+  .option("jira-url", {
+    type: "string",
+    desc: "Jira instance URL (or use JIRA_URL env var)",
+  })
+  .option("jira-jql", {
+    type: "string",
+    array: true,
+    desc: "JQL query string(s) for Jira issues",
+  })
+  .option("jira-project", {
+    type: "string",
+    array: true,
+    desc: "Jira project key(s) for filtering issues",
+  })
   .help()
   .strict()
   .parseSync();
@@ -57,23 +71,31 @@ const argv = yargs(hideBin(process.argv))
 const BUGZILLA_API_KEY = process.env.BUGZILLA_API_KEY!;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY!;
 const BUGZILLA_HOST = process.env.BUGZILLA_HOST;
+const JIRA_URL = argv["jira-url"] || process.env.JIRA_URL;
+const JIRA_API_KEY = process.env.JIRA_API_KEY;
+
 if (!BUGZILLA_API_KEY || !OPENAI_API_KEY) {
   console.error("ERROR: missing BUGZILLA_API_KEY or OPENAI_API_KEY");
   process.exit(1);
 }
 
-const env = BUGZILLA_HOST
-  ? {
-      BUGZILLA_API_KEY,
-      OPENAI_API_KEY,
-      BUGZILLA_HOST,
-      SNAZZY_SKIP_CACHE: Boolean(argv["no-cache"]),
-    }
-  : {
-      BUGZILLA_API_KEY,
-      OPENAI_API_KEY,
-      SNAZZY_SKIP_CACHE: Boolean(argv["no-cache"]),
-    };
+// Validate Jira configuration if Jira options are provided
+if (
+  (argv["jira-jql"] || argv["jira-project"]) &&
+  (!JIRA_URL || !JIRA_API_KEY)
+) {
+  console.error("ERROR: Jira options require both JIRA_URL and JIRA_API_KEY");
+  process.exit(1);
+}
+
+const env = {
+  BUGZILLA_API_KEY,
+  OPENAI_API_KEY,
+  ...(BUGZILLA_HOST && { BUGZILLA_HOST }),
+  ...(JIRA_URL && { JIRA_URL }),
+  ...(JIRA_API_KEY && { JIRA_API_KEY }),
+  SNAZZY_SKIP_CACHE: Boolean(argv["no-cache"]),
+};
 
 const hooks = {
   info: (m: string) => console.error("[INFO]", m),
@@ -135,6 +157,8 @@ async function main() {
         voice: argv.voice,
         audience: argv.audience,
         includePatchContext: argv["patch-context"],
+        jiraJql: argv["jira-jql"] || [],
+        jiraProjects: argv["jira-project"] || [],
       },
       env,
       hooks,

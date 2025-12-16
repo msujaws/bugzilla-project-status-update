@@ -159,4 +159,70 @@ export const handlers = [
       deletions: 50,
     });
   }),
+
+  // Jira mock endpoints:
+  // Search endpoint
+  http.get("https://test-org.atlassian.net/rest/api/3/search", () => {
+    return HttpResponse.json({
+      issues: [
+        {
+          key: "TEST-123",
+          id: "10001",
+          fields: {
+            summary: "Test Jira issue",
+            project: {
+              key: "TEST",
+              name: "Test Project",
+            },
+            components: [{ name: "Backend" }],
+            status: {
+              name: "Done",
+              statusCategory: { key: "done" },
+            },
+            resolution: { name: "Fixed" },
+            assignee: {
+              displayName: "Test User",
+              emailAddress: "test@example.com",
+            },
+            updated: "2025-10-22T10:00:00.000+0000",
+            resolutiondate: "2025-10-22T10:00:00.000+0000",
+            labels: ["test"],
+            security: undefined,
+          },
+        },
+      ],
+      maxResults: 100,
+      startAt: 0,
+      total: 1,
+    });
+  }),
+
+  // Issue details with changelog endpoint
+  http.get(
+    "https://test-org.atlassian.net/rest/api/3/issue/:issueKey",
+    ({ params }) => {
+      const { issueKey } = params as { issueKey: string };
+      return HttpResponse.json({
+        key: issueKey,
+        changelog: {
+          histories: [
+            {
+              id: "100001",
+              created: "2025-10-22T10:00:00.000+0000",
+              items: [
+                {
+                  field: "status",
+                  fieldtype: "jira",
+                  from: "3",
+                  fromString: "In Progress",
+                  to: "10000",
+                  toString: "Done",
+                },
+              ],
+            },
+          ],
+        },
+      });
+    },
+  ),
 ];

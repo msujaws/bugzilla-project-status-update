@@ -1,6 +1,7 @@
 import type { CommitPatch } from "../patch.ts";
 import type { Bug, EnvLike } from "./types.ts";
 import type { GitHubContributor } from "./githubTypes.ts";
+import type { JiraIssue } from "./jiraTypes.ts";
 
 type VoiceOption = "normal" | "pirate" | "snazzy-robot";
 type AudienceOption = "technical" | "product" | "leadership";
@@ -10,6 +11,7 @@ type SummarizeOptions = {
   groupByAssignee?: boolean;
   singleAssignee?: boolean;
   githubContributors?: Map<string, GitHubContributor>;
+  jiraIssues?: JiraIssue[];
 };
 
 const technicalAudienceHint = `
@@ -129,6 +131,7 @@ export async function summarizeWithOpenAI(
     groupByAssignee = false,
     singleAssignee = false,
     githubContributors,
+    jiraIssues = [],
   } = options;
 
   const voiceHint =
@@ -188,15 +191,62 @@ export async function summarizeWithOpenAI(
       : "In assessments, credit each bug's assignee by name. In the summary, group bugs under Markdown headings for each assignee (use `## Name`) and list their bugs as bullets without repeating the assignee's name inside each bullet."
     : "In both the assessments and the summary, credit the bug's assignee by name (use assignee.name; if missing, fall back to the assignee email handle).";
 
-  let user = `Data window: last ${days} days.
-Bugs (done/fixed):
+  // Build Jira payload if present
+  const jiraPayload = jiraIssues.map((issue) => ({
+    key: issue.key,
+    summary: issue.summary,
+    project: issue.project,
+    component: issue.component || "",
+    assignee: {
+      name: issue.assigneeDisplayName || "Unassigned",
+      email: issue.assigneeEmail || "",
+    },
+  }));
+
+  const hasBugs = bugs.length > 0;
+  const hasJira = jiraIssues.length > 0;
+
+  let user = `Data window: last ${days} days.\n`;
+
+  if (hasBugs && hasJira) {
+    user += `\nBugzilla Bugs (done/fixed):
+${JSON.stringify(bugPayload)}
+
+Jira Issues (done/resolved):
+${JSON.stringify(jiraPayload)}
+
+Tasks:
+1) For each Bugzilla bug, provide an impact score 1-10 and a one-line reason in the assessments array.
+2) For Jira issues, add them to assessments with the issue key as the bug_id field (e.g., "PROJ-123" as bug_id).
+3) For bugs/issues with score >= 8, suggest a one-sentence demo idea.
+4) Write a Markdown summary with TWO sections:
+   - First section titled "## Bugzilla Issues" summarizing the Bugzilla bugs
+   - Second section titled "## Jira Issues" summarizing the Jira issues
+   - Use inline Markdown links: [description](https://bugzil.la/ID) for Bugzilla and [description](JIRA_URL/browse/KEY) for Jira
+5) ${summaryInstruction}`;
+  } else if (hasBugs) {
+    user += `Bugs (done/fixed):
 ${JSON.stringify(bugPayload)}
 
 Tasks:
 1) For each bug, provide an impact score 1-10 and a one-line reason.
 2) For bugs with score >= 8, suggest a one-sentence demo idea.
 3) Write a concise Markdown summary emphasizing user impact only.
-4) ${summaryInstruction}
+4) ${summaryInstruction}`;
+  } else if (hasJira) {
+    user += `Jira Issues (done/resolved):
+${JSON.stringify(jiraPayload)}
+
+Tasks:
+1) For each Jira issue, provide an impact score 1-10 and a one-line reason. Use the issue key as the bug_id field (e.g., "PROJ-123" as bug_id).
+2) For issues with score >= 8, suggest a one-sentence demo idea.
+3) Write a concise Markdown summary emphasizing user impact only.
+4) Credit the assignee by name (use assignee.name; if missing or "Unassigned", skip attribution).`;
+  } else {
+    user += `No bugs or issues to summarize.`;
+  }
+
+  user += `
 
 Return JSON:
 {
