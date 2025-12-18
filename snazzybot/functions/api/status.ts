@@ -152,22 +152,23 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           params,
           envConfig,
         );
-        const { qualifiedIds, nextCursor, total } = await qualifyHistoryPage(
-          envConfig,
-          sinceISO,
-          candidates,
-          Number(cursor) || 0,
-          Number(pageSize) || 35,
-          {
-            info: (msg: string) => debug && console.log("[INFO]", msg),
-            warn: (msg: string) => console.warn("[WARN]", msg),
-            phase: () => {},
-            progress: () => {},
-          },
-          !!debug,
-        );
+        const { qualifiedIds, nextCursor, total, results } =
+          await qualifyHistoryPage(
+            envConfig,
+            sinceISO,
+            candidates,
+            Number(cursor) || 0,
+            Number(pageSize) || 35,
+            {
+              info: (msg: string) => debug && console.log("[INFO]", msg),
+              warn: (msg: string) => console.warn("[WARN]", msg),
+              phase: () => {},
+              progress: () => {},
+            },
+            !!debug,
+          );
         return new Response(
-          JSON.stringify({ qualifiedIds, nextCursor, total }),
+          JSON.stringify({ qualifiedIds, nextCursor, total, results }),
           {
             status: 200,
             headers: withSecurityHeaders({

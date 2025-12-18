@@ -3,7 +3,7 @@ import { BugzillaClient } from "./bugzillaClient.ts";
 import { JiraClient } from "./jiraClient.ts";
 import { runRecipe, type RecipeStep } from "./stateMachine.ts";
 import { collectCandidates } from "./candidateCollector.ts";
-import { qualifiesByHistory } from "./history.ts";
+import { qualifiesByHistoryWhy } from "./history.ts";
 import {
   type AudienceOption,
   type StatusContext,
@@ -257,6 +257,12 @@ export async function qualifyHistoryPage(
   qualifiedIds: number[];
   nextCursor: number | undefined;
   total: number;
+  results: Array<{
+    id: number;
+    qualified: boolean;
+    reason?: string;
+    detail?: string;
+  }>;
 }> {
   const client = new BugzillaClient(env);
   const normalizedCursor = Number.isFinite(cursor) ? Math.trunc(cursor) : 0;
@@ -278,11 +284,37 @@ export async function qualifyHistoryPage(
   const byIdHistory = new Map(histories.map((entry) => [entry.id, entry]));
 
   const qualified: number[] = [];
+  const results: Array<{
+    id: number;
+    qualified: boolean;
+    reason?: string;
+    detail?: string;
+  }> = [];
+
   for (const bug of slice) {
     const history = byIdHistory.get(bug.id);
-    if (!history) continue;
-    if (qualifiesByHistory(history, sinceISO)) {
+    if (!history) {
+      results.push({
+        id: bug.id,
+        qualified: false,
+        reason: "no history returned for id",
+      });
+      continue;
+    }
+    const result = qualifiesByHistoryWhy(history, sinceISO);
+    if (result.ok) {
       qualified.push(bug.id);
+      results.push({
+        id: bug.id,
+        qualified: true,
+        detail: result.detail,
+      });
+    } else {
+      results.push({
+        id: bug.id,
+        qualified: false,
+        reason: result.why || "failed history qualification",
+      });
     }
   }
 
@@ -293,7 +325,12 @@ export async function qualifyHistoryPage(
     );
   }
 
-  return { qualifiedIds: qualified, nextCursor, total: candidates.length };
+  return {
+    qualifiedIds: qualified,
+    nextCursor,
+    total: candidates.length,
+    results,
+  };
 }
 
 export { buildBuglistURL } from "./output.ts";

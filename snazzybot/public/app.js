@@ -525,6 +525,16 @@ async function runSnazzyPaged(body) {
         pageSize: step,
       });
       for (const id of page.qualifiedIds || []) qualified.add(id);
+      // Log qualification reasons for each bug
+      if (page.results && Array.isArray(page.results)) {
+        for (const result of page.results) {
+          if (result.qualified && result.detail) {
+            log("info", `Bug ${result.id}: qualified – ${result.detail}`);
+          } else if (!result.qualified && result.reason) {
+            log("info", `Bug ${result.id}: excluded – ${result.reason}`);
+          }
+        }
+      }
       cursor = page.nextCursor;
     }
     completePhase("histories");

@@ -1,35 +1,5 @@
 import type { BugHistoryEntry } from "./types.ts";
 
-export function qualifiesByHistory(
-  entry: BugHistoryEntry,
-  sinceISO: string,
-): boolean {
-  const since = Date.parse(sinceISO);
-  for (const history of entry.history || []) {
-    const when = Date.parse(history.when);
-    if (when < since) continue;
-    let statusProgress = false;
-    let fixed = false;
-    const changes = Array.isArray(history.changes) ? history.changes : [];
-    for (const change of changes) {
-      const field = change.field_name?.toLowerCase();
-      if (
-        (field === "status" || field === "bug_status") &&
-        (change.added === "RESOLVED" ||
-          change.added === "VERIFIED" ||
-          change.added === "CLOSED")
-      ) {
-        statusProgress = true;
-      }
-      if (field === "resolution" && change.added === "FIXED") {
-        fixed = true;
-      }
-    }
-    if (fixed || statusProgress) return true;
-  }
-  return false;
-}
-
 export function qualifiesByHistoryWhy(
   entry: BugHistoryEntry,
   sinceISO: string,
