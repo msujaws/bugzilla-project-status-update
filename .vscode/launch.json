@@ -41,6 +41,31 @@
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"],
       "envFile": "${workspaceFolder}/snazzybot/.env"
+    },
+    {
+      "name": "CLI: Firefox:Sidebar 7 days",
+      "type": "pwa-node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "cli",
+        "--",
+        "--whiteboard",
+        "[fidefe-sidebar]",
+        "--whiteboard",
+        "[fidefe-splitview]",
+        "--whiteboard",
+        "[fidefe-sessionstore]",
+        "--days",
+        "7",
+        "--format",
+        "md"
+      ],
+      "cwd": "${workspaceFolder}/snazzybot",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "envFile": "${workspaceFolder}/snazzybot/.env"
     }
   ]
 }
