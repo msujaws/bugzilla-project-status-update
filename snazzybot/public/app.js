@@ -4,6 +4,188 @@ import { SavedSearches } from "./lib/saved-searches.js";
 const $ = (id) => document.querySelector(`#${id}`);
 const defaultTitle = document.title;
 
+// Facts Rotation Manager
+class FactsRotator {
+  constructor() {
+    this.facts = [];
+    this.usedFactIndices = [];
+    this.intervalId = undefined;
+    this.container = undefined;
+    this.statusMessage = undefined;
+    this.isRunning = false;
+    this.DISPLAY_TIME = 7000; // 7 seconds per fact
+    this.statusMessages = [
+      "Analyzing bug impact trajectories",
+      "Calibrating priority matrices",
+      "Parsing assignee metadata",
+      "Compiling patch histories",
+      "Reticulating status updates",
+      "Aggregating resolution timelines",
+      "Synthesizing dependency graphs",
+      "Normalizing severity distributions",
+      "Calculating regression probabilities",
+      "Extracting changelog artifacts",
+      "Indexing component hierarchies",
+      "Correlating duplicate patterns",
+      "Stratifying milestone layers",
+      "Sequencing review cycles",
+      "Optimizing summarization vectors",
+      "Triangulating user impact scores",
+      "Coalescing whiteboard metadata",
+      "Factoring product dimensions",
+      "Iterating through bug histories",
+      "Distilling actionable insights",
+    ];
+  }
+
+  async loadFacts() {
+    try {
+      const response = await fetch("/facts.json");
+      const data = await response.json();
+      this.facts = data.facts || [];
+    } catch (error) {
+      console.error("Failed to load facts:", error);
+      this.facts = [
+        {
+          fact: "Loading interesting facts about Bugzilla and Mozilla...",
+          score: 5,
+        },
+      ];
+    }
+  }
+
+  getRandomFact() {
+    if (this.facts.length === 0) return;
+
+    // Reset if we've used all facts
+    if (this.usedFactIndices.length >= this.facts.length) {
+      this.usedFactIndices = [];
+    }
+
+    // Find unused facts
+    const availableIndices = [];
+    for (let i = 0; i < this.facts.length; i++) {
+      if (!this.usedFactIndices.includes(i)) {
+        availableIndices.push(i);
+      }
+    }
+
+    // Pick random unused fact
+    const randomIndex =
+      availableIndices[Math.floor(Math.random() * availableIndices.length)];
+    this.usedFactIndices.push(randomIndex);
+    return { index: randomIndex, fact: this.facts[randomIndex] };
+  }
+
+  getRandomStatusMessage() {
+    return this.statusMessages[
+      Math.floor(Math.random() * this.statusMessages.length)
+    ];
+  }
+
+  start() {
+    if (this.isRunning || this.facts.length === 0) return;
+
+    const frame = $("resultFrame");
+    if (!frame) return;
+
+    // Hide the iframe and create facts container
+    frame.style.display = "none";
+
+    // Create or reuse the facts container
+    let container = document.querySelector("#factsContainer");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "factsContainer";
+      frame.parentNode.insertBefore(container, frame);
+    }
+    container.style.display = "flex";
+    this.container = container;
+
+    // Create or reuse status message element
+    let statusMsg = container.querySelector(".status-message");
+    if (!statusMsg) {
+      statusMsg = document.createElement("div");
+      statusMsg.className = "status-message";
+      container.append(statusMsg);
+    }
+    this.statusMessage = statusMsg;
+
+    // Start showing facts
+    this.isRunning = true;
+    this.usedFactIndices = [];
+    this.showRandomFact();
+
+    // Set up rotation interval
+    this.intervalId = setInterval(() => {
+      this.showRandomFact();
+    }, this.DISPLAY_TIME);
+  }
+
+  showRandomFact() {
+    if (!this.container || this.facts.length === 0) return;
+
+    const randomFact = this.getRandomFact();
+    if (!randomFact) return;
+
+    // Update status message (no animation)
+    if (this.statusMessage) {
+      this.statusMessage.textContent = `${this.getRandomStatusMessage()}...`;
+    }
+
+    const currentSlide = this.container.querySelector(".fact-slide.active");
+    if (currentSlide) {
+      currentSlide.classList.remove("active");
+      currentSlide.classList.add("exiting");
+    }
+
+    // Create new fact slide
+    const slide = document.createElement("div");
+    slide.className = "fact-slide";
+    slide.textContent = randomFact.fact.fact;
+    this.container.append(slide);
+
+    // Trigger animation after a brief delay
+    setTimeout(() => {
+      slide.classList.add("active");
+
+      // Remove old slide after transition
+      if (currentSlide) {
+        setTimeout(() => {
+          if (currentSlide.parentNode) {
+            currentSlide.remove();
+          }
+        }, 600);
+      }
+    }, 50);
+  }
+
+  stop() {
+    if (!this.isRunning) return;
+
+    this.isRunning = false;
+
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = undefined;
+    }
+
+    // Hide facts container and show iframe
+    if (this.container) {
+      this.container.style.display = "none";
+    }
+
+    const frame = $("resultFrame");
+    if (frame) {
+      frame.style.display = "block";
+    }
+  }
+}
+
+const factsRotator = new FactsRotator();
+// Load facts when page loads
+factsRotator.loadFacts();
+
 const escapeHtml = (text = "") =>
   text.replaceAll(/[&<>"']/g, (ch) => {
     switch (ch) {
@@ -45,7 +227,7 @@ window.addEventListener("focus", resetTabTitle);
 
 // ===== Emoji Confetti Engine (no deps) =====
 const reduceMotion = globalThis.matchMedia(
-  "(prefers-reduced-motion: reduce)",
+  "(prefers-reduced-motion: reduce)"
 ).matches;
 
 function burstEmojis(mode = "normal") {
@@ -260,6 +442,9 @@ function download(filename, content, mime) {
 }
 
 function setResultIframe(html) {
+  // Stop facts rotation when displaying results
+  factsRotator.stop();
+
   const safeHtml = DOMPurify.sanitize(html ?? "", {
     USE_PROFILES: { html: true },
   });
@@ -323,7 +508,9 @@ function resetUIBeforeRun() {
   if (phases) phases.innerHTML = "";
   const quickStatus = $("quick-status");
   if (quickStatus) quickStatus.style.display = "none";
-  setResultIframe("<em>Waiting for results…</em>");
+
+  // Start rotating facts instead of showing "Waiting for results..."
+  factsRotator.start();
 }
 
 async function postStatusJSON(payload) {
@@ -418,7 +605,7 @@ async function runSnazzyStream(body) {
             setPhasePct(name, Number(evt.current) || 0, Number(evt.total) || 1);
             setPhaseText(
               name,
-              `${name}: ${Number(evt.current) || 0}/${Number(evt.total) || 1}`,
+              `${name}: ${Number(evt.current) || 0}/${Number(evt.total) || 1}`
             );
           } else {
             setPhaseIndeterminate(name);
@@ -515,7 +702,7 @@ async function runSnazzyPaged(body) {
       spin.textContent = `⏳ Histories ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`;
       setPhaseText(
         "histories",
-        `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`,
+        `histories: ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`
       );
       setPhasePct("histories", Math.min(cursor + step, total), total);
       const page = await postStatusJSON({
@@ -550,7 +737,7 @@ async function runSnazzyPaged(body) {
         setPhasePct("patch-context", 0, qualifiedIds.length);
         setPhaseText(
           "patch-context",
-          `patch-context: 0/${qualifiedIds.length}`,
+          `patch-context: 0/${qualifiedIds.length}`
         );
       } else {
         setPhaseIndeterminate("patch-context");
@@ -760,7 +947,7 @@ hydrateFromURL();
 
 // Initialize Saved Searches -------------------------------------------------
 const savedSearchesContainer = document.querySelector(
-  "#saved-searches-container",
+  "#saved-searches-container"
 );
 
 const savedSearches = new SavedSearches(savedSearchesContainer, {
@@ -846,7 +1033,7 @@ if (downloadMdBtn) {
     download(
       "snazzybot-status.md",
       lastMarkdown,
-      "text/markdown;charset=utf-8",
+      "text/markdown;charset=utf-8"
     );
   });
 }

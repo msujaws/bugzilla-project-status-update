@@ -1,0 +1,116 @@
+{
+  "facts": [
+    {
+      "fact": "Bugzilla was originally created in 1998 by Terry Weissman for the Mozilla project to track bugs in the Netscape browser.",
+      "score": 9
+    },
+    {
+      "fact": "The name 'Bugzilla' is a portmanteau of 'bug' and 'Godzilla', reflecting its ability to handle large-scale bug tracking.",
+      "score": 8
+    },
+    {
+      "fact": "Major organizations like Mozilla, Red Hat, NASA, Linux Kernel, GNOME, KDE, and Apache have used Bugzilla for bug tracking.",
+      "score": 9
+    },
+    {
+      "fact": "Bugzilla was one of the first major open-source bug tracking systems available on the web.",
+      "score": 8
+    },
+    {
+      "fact": "Bugzilla pioneered many features now standard in issue trackers, including dependency tracking and duplicate bug detection.",
+      "score": 8
+    },
+    {
+      "fact": "The project has been actively maintained for over 25 years, making it one of the longest-running open-source projects.",
+      "score": 9
+    },
+    {
+      "fact": "The Firefox browser project has tracked over 2 million bugs in Bugzilla during its development history.",
+      "score": 8
+    },
+    {
+      "fact": "Bugzilla pioneered the use of web-based bug tracking when most systems were still client-server applications.",
+      "score": 8
+    },
+    {
+      "fact": "Mozilla was created from the open-sourcing of Netscape Navigator in 1998, one of the most significant events in open-source history.",
+      "score": 9
+    },
+    {
+      "fact": "The Mozilla mascot is a red panda (often mistaken for a fox), not the Godzilla-like creature many assume from the name.",
+      "score": 8
+    },
+    {
+      "fact": "Mozilla Firefox was codenamed 'Phoenix' and then 'Firebird' before settling on Firefox due to trademark issues.",
+      "score": 8
+    },
+    {
+      "fact": "The Mozilla project directly led to the creation of Firefox, Thunderbird, and influenced the development of Chrome and modern web standards.",
+      "score": 9
+    },
+    {
+      "fact": "Bugzilla's bug #1 in the Mozilla database was filed in 1998 and read 'test bug for new database'.",
+      "score": 8
+    },
+    {
+      "fact": "Mozilla coined the term 'browser chrome' to refer to the user interface elements surrounding web content, which Google later adopted for their browser name.",
+      "score": 9
+    },
+    {
+      "fact": "The original Netscape source code release that birthed Mozilla was over 1 million lines of code.",
+      "score": 8
+    },
+    {
+      "fact": "Mozilla's Gecko rendering engine powered not just Firefox but also early versions of numerous other browsers including Netscape, Flock, and SeaMonkey.",
+      "score": 8
+    },
+    {
+      "fact": "Bugzilla has been used to track bugs for hardware projects, not just software, including the Mars rovers at NASA.",
+      "score": 9
+    },
+    {
+      "fact": "Mozilla Foundation's revenue peaked at nearly $500 million annually, primarily from search engine partnerships with Google and later Yahoo and others.",
+      "score": 8
+    },
+    {
+      "fact": "The original Mozilla Application Suite included a web browser, email client, HTML editor, and IRC chat client all in one package.",
+      "score": 8
+    },
+    {
+      "fact": "Bugzilla's influence was so significant that Microsoft's internal bug tracking system was reportedly inspired by it.",
+      "score": 9
+    },
+    {
+      "fact": "Mozilla hired the world's first dedicated security response team for an open-source browser project in the early 2000s.",
+      "score": 8
+    },
+    {
+      "fact": "The 'Mozilla' name comes from 'Mosaic Killer', a reference to the dominant Mosaic browser that Netscape aimed to surpass.",
+      "score": 9
+    },
+    {
+      "fact": "Bugzilla was used to coordinate the massive browser compatibility testing effort when Firefox 1.0 launched in 2004.",
+      "score": 8
+    },
+    {
+      "fact": "Mozilla's decision to split the browser from the suite and create Firefox (then called Phoenix) in 2002 was initially controversial within the community.",
+      "score": 8
+    },
+    {
+      "fact": "Some Bugzilla installations have been continuously running since the late 1990s with databases containing over 20 years of bug history.",
+      "score": 8
+    },
+    {
+      "fact": "Mozilla created Rust programming language, which has since been adopted by Microsoft, Amazon, Google, and is now used in the Linux kernel.",
+      "score": 10
+    },
+    {
+      "fact": "The Firefox 1.0 launch in 2004 was supported by a crowdfunded full-page ad in The New York Times, a first for open-source software.",
+      "score": 9
+    },
+    {
+      "fact": "Bugzilla's architecture influenced the design of GitHub's issue tracking system and many other modern bug trackers.",
+      "score": 9
+    }
+  ]
+}
