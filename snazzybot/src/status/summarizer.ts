@@ -20,14 +20,19 @@ Refer to each bug's assignee using the provided \`assignee.name\` (fall back to 
 Structure: one concise sentence per bug with a blank line separating each sentence so they render as distinct paragraphs. Use the inline Markdown link style from the samples so the spoken summary can call out the bug ID.
 Keep the tone crisp and technical; highlight concrete fixes, affected surfaces, and any measurable impact.
 
-Below is a sample Markdown output showing the intended style. Replace the names, bug descriptions, and IDs with real data from the payload—never emit placeholders like "[Name]". All Bugzilla links should use shorthand style of 'https://bugzil.la/<ID>', where ID is replaced with the bug's specific ID.
+Below are samples showing the intended style. Replace the names, bug descriptions, and IDs with real data from the payload—never emit placeholders like "[Name]". All Bugzilla links should use shorthand style of 'https://bugzil.la/<ID>', where ID is replaced with the bug's specific ID.
 
-Sample:
+✅ Good examples:
 Rosa Kim [added a dedicated switch_to_parent_frame method to the WebDriver Classic Python client and renamed switch_frame to switch_to_frame](https://bugzil.la/1900453) for spec alignment.\n
 \n
 Mateo Singh updated the network.getData command to [return response bodies for data: scheme requests](https://bugzil.la/1900453).\n
 \n
 Priya Iqbal fixed a bug where [different requests could reuse the same id](https://bugzil.la/1900453), which broke targeted commands like network.provideResponse and network.getData.\n
+
+❌ Avoid these patterns:
+- [Fixed bug 1900453](https://bugzil.la/1900453) (too vague, no assignee, no technical detail)
+- Rosa Kim made improvements to bug [1900453](https://bugzil.la/1900453) (link on bug ID instead of description)
+- Update: various fixes (no specific assignee or technical content)
 `;
 const technicalAudienceHintGrouped = `
 Audience: engineers. Include specific technical details where valuable (file/feature areas, prefs/flags, APIs, perf metrics, platform scopes). Assume context; keep acronyms if common. Avoid business framing.
@@ -77,6 +82,77 @@ export type SummarizerResult = {
   }>;
   summary_md: string;
 };
+
+/**
+ * Filter patch content to remove noise and prioritize meaningful changes.
+ * Removes generated files, lockfiles, and other low-signal content.
+ */
+function filterPatchContent(patch: string): {
+  filtered: string;
+  removed: string[];
+} {
+  const lines = patch.split("\n");
+  const removed: string[] = [];
+  const filtered: string[] = [];
+
+  // Patterns for files to skip entirely
+  const skipPatterns = [
+    /^diff --git .*package-lock\.json/,
+    /^diff --git .*yarn\.lock/,
+    /^diff --git .*pnpm-lock\.yaml/,
+    /^diff --git .*Cargo\.lock/,
+    /^diff --git .*Gemfile\.lock/,
+    /^diff --git .*poetry\.lock/,
+    /^diff --git .*\.min\.js/,
+    /^diff --git .*\.bundle\.js/,
+    /^diff --git .*\/dist\//,
+    /^diff --git .*\/build\//,
+    /^diff --git .*\/target\//,
+    /^diff --git .*\.generated\./,
+  ];
+
+  let inSkippedFile = false;
+
+  for (const line of lines) {
+    // Check if this is a new file diff
+    if (line.startsWith("diff --git ")) {
+      inSkippedFile = skipPatterns.some((pattern) => pattern.test(line));
+
+      if (inSkippedFile) {
+        // Extract filename for reporting
+        const match = line.match(/diff --git a\/(.*?) b\//);
+        if (match) removed.push(match[1]);
+      }
+    }
+
+    // If we're in a skipped file, don't include this line
+    if (!inSkippedFile) {
+      filtered.push(line);
+    }
+  }
+
+  return {
+    filtered: filtered.join("\n"),
+    removed,
+  };
+}
+
+/**
+ * Smart truncation that preserves context at both ends of the patch.
+ * Keeps the first and last portions while removing the middle if content is too long.
+ */
+function smartTruncate(content: string, maxLength: number): string {
+  if (content.length <= maxLength) return content;
+
+  // Keep 60% at the start and 40% at the end to preserve both context
+  const startChars = Math.floor(maxLength * 0.6);
+  const endChars = Math.floor(maxLength * 0.4) - 50; // Reserve space for truncation message
+
+  const start = content.slice(0, startChars);
+  const end = content.slice(-endChars);
+
+  return `${start}\n\n... [truncated ${content.length - maxLength} characters] ...\n\n${end}`;
+}
 
 /**
  * Clean up Bugzilla usernames by removing common suffixes and IRC nicknames.
@@ -206,6 +282,14 @@ export async function summarizeWithOpenAI(
   const hasBugs = bugs.length > 0;
   const hasJira = jiraIssues.length > 0;
 
+  const impactScoreRubric = `
+Impact Score Calibration (1-10):
+• 1-3: Internal/tooling changes, code cleanup, refactoring with no direct user-facing impact
+• 4-6: Bug fixes or minor features affecting some users in specific scenarios
+• 7-8: Significant features, widely-used bug fixes, or notable performance improvements
+• 9-10: Major features, critical bug fixes, or changes affecting all users
+Provide a one-line technical reason citing specific changes from the patch context when available.`;
+
   let user = `Data window: last ${days} days.\n`;
 
   if (hasBugs && hasJira) {
@@ -215,10 +299,12 @@ ${JSON.stringify(bugPayload)}
 Jira Issues (done/resolved):
 ${JSON.stringify(jiraPayload)}
 
+${impactScoreRubric}
+
 Tasks:
-1) For each Bugzilla bug, provide an impact score 1-10 and a one-line reason in the assessments array.
-2) For Jira issues, add them to assessments with the issue key as the bug_id field (e.g., "PROJ-123" as bug_id).
-3) For bugs/issues with score >= 8, suggest a one-sentence demo idea.
+1) For each Bugzilla bug, assess user-facing impact using the rubric above and provide an impact score 1-10 with a one-line reason in the assessments array.
+2) For Jira issues, assess user-facing impact using the rubric and provide an impact score 1-10. Add them to assessments with the issue key as the bug_id field (e.g., "PROJ-123" as bug_id).
+3) For bugs/issues with score >= 9, suggest a one-sentence demo idea.
 4) Write a Markdown summary with TWO sections:
    - First section titled "## Bugzilla Issues" summarizing the Bugzilla bugs
    - Second section titled "## Jira Issues" summarizing the Jira issues
@@ -228,18 +314,22 @@ Tasks:
     user += `Bugs (done/fixed):
 ${JSON.stringify(bugPayload)}
 
+${impactScoreRubric}
+
 Tasks:
-1) For each bug, provide an impact score 1-10 and a one-line reason.
-2) For bugs with score >= 8, suggest a one-sentence demo idea.
+1) For each bug, assess user-facing impact using the rubric above and provide an impact score 1-10 with a one-line reason.
+2) For bugs with score >= 9, suggest a one-sentence demo idea.
 3) Write a concise Markdown summary emphasizing user impact only.
 4) ${summaryInstruction}`;
   } else if (hasJira) {
     user += `Jira Issues (done/resolved):
 ${JSON.stringify(jiraPayload)}
 
+${impactScoreRubric}
+
 Tasks:
-1) For each Jira issue, provide an impact score 1-10 and a one-line reason. Use the issue key as the bug_id field (e.g., "PROJ-123" as bug_id).
-2) For issues with score >= 8, suggest a one-sentence demo idea.
+1) For each Jira issue, assess user-facing impact using the rubric above and provide an impact score 1-10 with a one-line reason. Use the issue key as the bug_id field (e.g., "PROJ-123" as bug_id).
+2) For issues with score >= 9, suggest a one-sentence demo idea.
 3) Write a concise Markdown summary emphasizing user impact only.
 4) Credit the assignee by name (use assignee.name; if missing or "Unassigned", skip attribution).`;
   } else {
@@ -262,23 +352,43 @@ Return JSON:
       const patches = patchContextByBug.get(bug.id);
       if (!patches || patches.length === 0) continue;
       const snippetLines: string[] = [];
+      let totalFilesRemoved: string[] = [];
+
       for (const entry of patches) {
         const parts = [`Commit: ${entry.commitUrl}`];
         if (entry.error) {
           parts.push(`Note: ${entry.error}`, `Message: ${entry.message}`);
+          snippetLines.push(parts.join("\n"));
         } else {
-          parts.push(`Message: ${entry.message}`, `Patch:\n${entry.patch}`);
+          // Filter out generated files and noise from the patch
+          const { filtered, removed } = filterPatchContent(entry.patch);
+          totalFilesRemoved.push(...removed);
+
+          parts.push(`Message: ${entry.message}`);
+
+          if (filtered.trim()) {
+            parts.push(`Patch:\n${filtered}`);
+          } else if (removed.length > 0) {
+            parts.push(`Patch: [Only generated/lock files changed]`);
+          }
+
+          snippetLines.push(parts.join("\n"));
         }
-        snippetLines.push(parts.join("\n"));
       }
       if (snippetLines.length === 0) continue;
+
       const combined = snippetLines.join("\n\n");
       const limit = 8000;
-      const truncated =
-        combined.length > limit
-          ? `${combined.slice(0, limit)}\n…[truncated]`
-          : combined;
-      perBug.push(`Bug ${bug.id}:\n${truncated}`);
+      const truncated = smartTruncate(combined, limit);
+
+      // Add note about filtered files if any were removed
+      let bugContext = `Bug ${bug.id}:\n${truncated}`;
+      if (totalFilesRemoved.length > 0) {
+        const uniqueRemoved = [...new Set(totalFilesRemoved)];
+        bugContext += `\n[Filtered out: ${uniqueRemoved.slice(0, 3).join(", ")}${uniqueRemoved.length > 3 ? `, +${uniqueRemoved.length - 3} more` : ""}]`;
+      }
+
+      perBug.push(bugContext);
     }
     if (perBug.length > 0) {
       user += `\n\nPatch Context:\n${perBug.join("\n\n")}`;
