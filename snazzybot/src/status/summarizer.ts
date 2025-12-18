@@ -176,14 +176,20 @@ export function cleanBugzillaUsername(
     return "Unassigned";
   }
 
+  // Remove pipe character and everything after it (Out of Office messages)
+  let cleaned = trimmed.replaceAll(/\s*\|.*$/g, "");
+
   // Remove IRC-style nicknames in parentheses like "(:mconley)" anywhere
-  let cleaned = trimmed.replaceAll(/\s*\(:[^)]*\)/g, "");
+  cleaned = cleaned.replaceAll(/\s*\(:[^)]*\)/g, "");
 
   // Remove multi-word phrases in parentheses (contains spaces) anywhere
   cleaned = cleaned.replaceAll(/\s*\([^)]*\s[^)]*\)/g, "");
 
   // Remove trailing single-word parenthetical content
   cleaned = cleaned.replaceAll(/\s*\([^)]*\)\s*$/g, "");
+
+  // Remove multi-word phrases in square brackets (contains spaces) anywhere - OOO messages
+  cleaned = cleaned.replaceAll(/\s*\[[^\]]*\s[^\]]*\]/g, "");
 
   // Remove IRC-style nicknames like "[:jaws]" or "[jaws]" anywhere in the name
   cleaned = cleaned.replaceAll(/\s*\[:\w+\]/g, "");

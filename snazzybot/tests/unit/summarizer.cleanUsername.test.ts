@@ -35,6 +35,15 @@ describe("cleanBugzillaUsername", () => {
     ).toBe("John Doe");
   });
 
+  it("handles Out of Office messages", () => {
+    expect(cleanBugzillaUsername("kpatenio [PTO Dec 18 - Jan 4]")).toBe(
+      "kpatenio",
+    );
+    expect(cleanBugzillaUsername("Sarah Clements | PTO until Jan 5th")).toBe(
+      "Sarah Clements",
+    );
+  });
+
   it("removes IRC nicknames in the middle of names", () => {
     expect(cleanBugzillaUsername("Scott [:thecount] Downe")).toBe(
       "Scott Downe",
