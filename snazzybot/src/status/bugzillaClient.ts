@@ -204,13 +204,8 @@ export class BugzillaClient {
     return bugs;
   }
 
-  async fetchBugsByIds(
-    ids: number[],
-    sinceISO?: string,
-    options: { filterResolved?: boolean } = {},
-  ): Promise<Bug[]> {
+  async fetchBugsByIds(ids: number[]): Promise<Bug[]> {
     if (ids.length === 0) return [];
-    const { filterResolved = true } = options;
     const chunkSize = 300;
     const results: Bug[] = [];
     for (let i = 0; i < ids.length; i += chunkSize) {
@@ -221,16 +216,7 @@ export class BugzillaClient {
       });
       results.push(...bugs);
     }
-    if (!filterResolved) return results;
-    const sinceDate = sinceISO ? new Date(sinceISO) : undefined;
-    return results.filter((bug) => {
-      const statusOk = ["RESOLVED", "VERIFIED", "CLOSED"].includes(bug.status);
-      const resolutionOk = bug.resolution === "FIXED";
-      const timeOk = sinceDate
-        ? new Date(bug.last_change_time) >= sinceDate
-        : true;
-      return statusOk && resolutionOk && timeOk;
-    });
+    return results;
   }
 
   async fetchHistories(

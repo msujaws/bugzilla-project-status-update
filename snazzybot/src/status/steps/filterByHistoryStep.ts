@@ -49,7 +49,7 @@ export const filterByHistoryStep: RecipeStep<StatusStepName, StatusContext> = {
     const final = ctx.candidates.filter((bug) => allowed.has(bug.id));
     ctx.finalBugs = final;
     ctx.ids = final.map((bug) => bug.id);
-    ctx.hooks.info?.(`Qualified bugs: ${final.length}`);
+    ctx.hooks.info?.(`Bugzilla Qualified (history): ${final.length}`);
 
     if (ctx.debugLog) {
       if (final.length > 0) {

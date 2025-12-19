@@ -311,13 +311,14 @@ describe("core integration (with MSW mocks)", () => {
     expect(
       infoMessages.some(
         (msg) =>
-          typeof msg === "string" &&
-          msg.includes("Candidates after initial query:"),
+          typeof msg === "string" && msg.includes("Bugzilla Candidates:"),
       ),
     ).toBe(true);
     expect(
       infoMessages.some(
-        (msg) => typeof msg === "string" && msg.includes("Qualified bugs: 1"),
+        (msg) =>
+          typeof msg === "string" &&
+          msg.includes("Bugzilla Qualified (history): 1"),
       ),
     ).toBe(true);
     expect(ids).toEqual([2_000_000]);

@@ -74,6 +74,10 @@ export interface StatusContext {
   emailMapping: Record<string, string>;
   githubActivity: GitHubActivity[];
   githubContributors: Map<string, GitHubContributor>;
+  githubStats?: {
+    candidates: { commits: number; prs: number };
+    qualified: { commits: number; prs: number };
+  };
   openAiResponse?: SummarizerResult;
   output?: string;
   html?: string;

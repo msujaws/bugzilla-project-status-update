@@ -1,5 +1,6 @@
 import type { RecipeStep } from "../stateMachine.ts";
 import type { StatusContext, StatusStepName } from "../context.ts";
+import { filterJiraIssues } from "../qualification.ts";
 
 export const collectJiraIssuesStep: RecipeStep<StatusStepName, StatusContext> =
   {
@@ -47,10 +48,19 @@ export const collectJiraIssuesStep: RecipeStep<StatusStepName, StatusContext> =
         }
       }
 
-      ctx.jiraIssues = [...uniqueIssues.values()];
+      const deduped = [...uniqueIssues.values()];
+      const { qualified, excludedSecure, excludedStatus, excludedStale } =
+        filterJiraIssues(deduped, ctx.sinceISO);
+
+      ctx.jiraIssues = qualified;
       ctx.hooks.info?.(
-        `Collected ${ctx.jiraIssues.length} unique Jira issue${ctx.jiraIssues.length === 1 ? "" : "s"}`,
+        `Jira Candidates: ${ctx.jiraIssues.length} issue${ctx.jiraIssues.length === 1 ? "" : "s"}`,
       );
+      if (excludedSecure + excludedStatus + excludedStale > 0) {
+        ctx.hooks.info?.(
+          `Jira filters removed: ${excludedSecure} secure, ${excludedStatus} status, ${excludedStale} stale`,
+        );
+      }
 
       if (ctx.isDebug && ctx.jiraIssues.length > 0) {
         ctx.debugLog?.(

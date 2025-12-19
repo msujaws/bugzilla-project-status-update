@@ -102,7 +102,7 @@ describe("JiraClient", () => {
     });
   });
 
-  it("filters out secure issues", async () => {
+  it("returns secure issues with security flag set", async () => {
     server.use(
       http.get("https://test-org.atlassian.net/rest/api/3/search", () => {
         return HttpResponse.json({
@@ -148,8 +148,12 @@ describe("JiraClient", () => {
     const client = new JiraClient(env);
     const issues = await client.searchByJQL("project = TEST");
 
-    expect(issues).toHaveLength(1);
-    expect(issues[0].key).toBe("TEST-123");
+    expect(issues).toHaveLength(2);
+    const publicIssue = issues.find((issue) => issue.key === "TEST-123");
+    const secureIssue = issues.find((issue) => issue.key === "TEST-124");
+
+    expect(publicIssue?.isSecure).toBe(false);
+    expect(secureIssue?.isSecure).toBe(true);
   });
 
   it("fetches issues by project keys", async () => {

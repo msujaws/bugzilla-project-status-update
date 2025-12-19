@@ -1,5 +1,8 @@
 import { BugzillaClient } from "./bugzillaClient.ts";
-import { isRestricted } from "./rules.ts";
+import {
+  partitionRestrictedBugs,
+  qualifiesBugSnapshot,
+} from "./qualification.ts";
 import type {
   Bug,
   DebugLog,
@@ -67,7 +70,7 @@ export async function collectCandidates(
     }
   }
 
-  const byIds = await client.fetchBugsByIds(metabugChildren, sinceISO);
+  const byIds = await client.fetchBugsByIds(metabugChildren);
   if (debugLog) {
     debugLog(
       `byIds (filtered) count: ${byIds.length} (from metabug children)`,
@@ -89,8 +92,9 @@ export async function collectCandidates(
     return true;
   });
 
-  const restricted = union.filter((bug) => isRestricted(bug.groups));
-  const candidates = union.filter((bug) => !isRestricted(bug.groups));
+  const qualified = union.filter((bug) => qualifiesBugSnapshot(bug, sinceISO));
+  const { restricted, unrestricted } = partitionRestrictedBugs(qualified);
+  const candidates = unrestricted;
 
   if (debugLog) {
     const totalBeforeDedupe =
@@ -119,7 +123,7 @@ export async function collectCandidates(
     });
   }
 
-  hooks.info?.(`Candidates after initial query: ${candidates.length}`);
+  hooks.info?.(`Bugzilla Candidates: ${candidates.length}`);
 
   return {
     union,

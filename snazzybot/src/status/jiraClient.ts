@@ -149,12 +149,7 @@ export class JiraClient {
 
       for (const rawIssue of response.issues) {
         const issue = this.normalizeIssue(rawIssue);
-        // Exclude secure/private issues
-        if (issue.isSecure) {
-          hooks?.warn?.(`Excluding secure issue ${issue.key} from report`);
-        } else {
-          allIssues.push(issue);
-        }
+        allIssues.push(issue);
       }
 
       startAt += response.issues.length;
@@ -164,9 +159,7 @@ export class JiraClient {
       }
     } while (startAt < total);
 
-    hooks?.info?.(
-      `Found ${allIssues.length} issues (${total - allIssues.length} secure issues excluded)`,
-    );
+    hooks?.info?.(`Found ${allIssues.length} issues`);
     return allIssues;
   }
 
@@ -234,9 +227,7 @@ export class JiraClient {
       const response = await this.get<JiraRawSearchResponse>(path);
       for (const rawIssue of response.issues) {
         const issue = this.normalizeIssue(rawIssue);
-        if (!issue.isSecure) {
-          results.push(issue);
-        }
+        results.push(issue);
       }
     }
 

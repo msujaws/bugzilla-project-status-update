@@ -394,6 +394,31 @@ function log(kind, msg) {
   logHost.scrollTop = logHost.scrollHeight;
 }
 
+function logStats(stats) {
+  if (!stats) return;
+  if (stats.jira) {
+    const jiraCandidates = stats.jira.candidates ?? 0;
+    const jiraQualified = stats.jira.qualified ?? 0;
+    log("info", `Jira Candidates: ${jiraCandidates}`);
+    log("info", `Jira Qualified (history): ${jiraQualified}`);
+  }
+  if (stats.github) {
+    const gh = stats.github;
+    log(
+      "info",
+      `GitHub Candidates: ${gh.candidates.commits} commit${
+        gh.candidates.commits === 1 ? "" : "s"
+      }, ${gh.candidates.prs} PR${gh.candidates.prs === 1 ? "" : "s"}`,
+    );
+    log(
+      "info",
+      `GitHub Qualified (window): ${gh.qualified.commits} commit${
+        gh.qualified.commits === 1 ? "" : "s"
+      }, ${gh.qualified.prs} PR${gh.qualified.prs === 1 ? "" : "s"}`,
+    );
+  }
+}
+
 // Utilities -----------------------------------------------------------------
 function parseLines(t) {
   return t
@@ -626,6 +651,7 @@ async function runSnazzyStream(body) {
             lastHTML = fallbackMarkdownToHtml(lastMarkdown);
           }
           lastHTML = setResultIframe(lastHTML);
+          logStats(evt.stats);
           setActionsEnabled(Boolean(lastMarkdown));
           spin.style.display = "none";
           burstEmojis(currentVoice);
@@ -691,7 +717,7 @@ async function runSnazzyPaged(body) {
     spin.textContent = "⏳ Discovering…";
     const discover = await postStatusJSON({ ...body, mode: "discover" });
     const total = discover.total || 0;
-    log("info", `Candidates: ${total}`);
+    log("info", `Bugzilla Candidates: ${total}`);
 
     // 2) Page through histories
     const qualified = new Set();
@@ -725,7 +751,7 @@ async function runSnazzyPaged(body) {
       cursor = page.nextCursor;
     }
     completePhase("histories");
-    log("info", `Qualified (history): ${qualified.size}`);
+    log("info", `Bugzilla Qualified (history): ${qualified.size}`);
 
     // 3) Gather patch context
     const qualifiedIds = [...qualified];
@@ -753,6 +779,7 @@ async function runSnazzyPaged(body) {
       mode: "finalize",
       ids: qualifiedIds,
     });
+    logStats(final.stats);
     if (includePatchContext) {
       completePhase("patch-context");
       setPhaseText("patch-context", "patch-context: done");

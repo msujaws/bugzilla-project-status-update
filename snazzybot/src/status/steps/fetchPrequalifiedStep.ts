@@ -8,9 +8,7 @@ export const fetchPrequalifiedStep: RecipeStep<StatusStepName, StatusContext> =
       const ids = ctx.params.ids ?? [];
       ctx.ids = [...ids];
       ctx.hooks.info?.(`Summarizing ${ids.length} pre-qualified bugs…`);
-      const bugs = await ctx.client.fetchBugsByIds(ids, undefined, {
-        filterResolved: false,
-      });
+      const bugs = await ctx.client.fetchBugsByIds(ids);
       ctx.providedBugs = bugs;
       ctx.finalBugs = bugs;
     },

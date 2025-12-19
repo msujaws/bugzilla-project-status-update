@@ -105,11 +105,65 @@ function createStatusRecipe(
   return recipe;
 }
 
+type StatusStats = {
+  bugzilla?: { candidates: number; qualified: number };
+  jira?: { candidates: number; qualified: number };
+  github?: {
+    candidates: { commits: number; prs: number };
+    qualified: { commits: number; prs: number };
+  };
+};
+
+const buildStatusStats = (ctx: StatusContext): StatusStats => {
+  const hasBugzilla =
+    (ctx.params.ids && ctx.params.ids.length > 0) ||
+    ctx.components.length > 0 ||
+    ctx.whiteboards.length > 0 ||
+    ctx.metabugs.length > 0 ||
+    ctx.assignees.length > 0;
+  const hasJira = ctx.jiraProjects.length > 0 || ctx.jiraJql.length > 0;
+  const hasGithub =
+    ctx.githubRepos.length > 0 && ctx.params.includeGithubActivity !== false;
+
+  const stats: StatusStats = {};
+
+  if (hasBugzilla) {
+    const candidates =
+      ctx.candidates.length > 0
+        ? ctx.candidates.length
+        : ctx.providedBugs.length > 0
+          ? ctx.providedBugs.length
+          : Math.max(ctx.finalBugs.length, 0);
+    stats.bugzilla = {
+      candidates,
+      qualified: ctx.finalBugs.length,
+    };
+  }
+
+  if (hasJira) {
+    stats.jira = {
+      candidates: ctx.jiraIssues.length,
+      qualified: ctx.finalJiraIssues.length,
+    };
+  }
+
+  if (hasGithub && ctx.githubStats) {
+    stats.github = ctx.githubStats;
+  }
+
+  return stats;
+};
+
 export async function generateStatus(
   params: GenerateParams,
   env: EnvLike,
   hooks: ProgressHooks = defaultHooks,
-): Promise<{ output: string; html: string; ids: number[] }> {
+): Promise<{
+  output: string;
+  html: string;
+  ids: number[];
+  stats: StatusStats;
+}> {
   const includePatchContext = params.includePatchContext !== false;
   const isDebug = !!params.debug;
   const debugLog = debugLogger(isDebug, hooks);
@@ -203,7 +257,12 @@ export async function generateStatus(
     );
   }
 
-  return { output: context.output, html: context.html, ids: context.ids };
+  return {
+    output: context.output,
+    html: context.html,
+    ids: context.ids,
+    stats: buildStatusStats(context),
+  };
 }
 
 export async function discoverCandidates(
@@ -239,9 +298,7 @@ export async function discoverCandidates(
     metabugs,
     assignees,
   });
-  hooks.info?.(
-    `Candidates after initial query: ${collection.candidates.length}`,
-  );
+  hooks.info?.(`Bugzilla Candidates: ${collection.candidates.length}`);
   return { sinceISO, candidates: collection.candidates };
 }
 

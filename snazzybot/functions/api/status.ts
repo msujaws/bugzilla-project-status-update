@@ -189,11 +189,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
     if (mode === "finalize") {
       try {
-        const { output, html } = await generateStatus(
+        const { output, html, stats } = await generateStatus(
           { ...params, ids },
           envConfig,
         );
-        return new Response(JSON.stringify({ output, html }), {
+        return new Response(JSON.stringify({ output, html, stats }), {
           status: 200,
           headers: withSecurityHeaders({
             "content-type": "application/json; charset=utf-8",
@@ -213,8 +213,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
     // ---- Legacy one-shot (unchanged) ----
     try {
-      const { output, html } = await generateStatus(params, envConfig);
-      return new Response(JSON.stringify({ output, html }), {
+      const { output, html, stats } = await generateStatus(params, envConfig);
+      return new Response(JSON.stringify({ output, html, stats }), {
         status: 200,
         headers: withSecurityHeaders({
           "content-type": "application/json; charset=utf-8",
@@ -258,8 +258,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
       write({ kind: "start", msg: "Starting snazzybot…" });
 
-      const { output, html } = await generateStatus(params, envConfig, hooks);
-      write({ kind: "done", output, html });
+      const { output, html, stats } = await generateStatus(
+        params,
+        envConfig,
+        hooks,
+      );
+      write({ kind: "done", output, html, stats });
     } catch (error: unknown) {
       write({ kind: "error", msg: toErrorMessage(error) });
     } finally {

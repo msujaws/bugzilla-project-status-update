@@ -2,6 +2,7 @@ import { GitHubClient } from "../githubClient.ts";
 import type { RecipeStep } from "../stateMachine.ts";
 import type { StatusContext, StatusStepName } from "../context.ts";
 import type { GitHubContributor } from "../githubTypes.ts";
+import { filterGithubActivity } from "../qualification.ts";
 
 export const fetchGithubActivityStep: RecipeStep<
   StatusStepName,
@@ -37,7 +38,49 @@ export const fetchGithubActivityStep: RecipeStep<
       }
     }
 
-    ctx.githubActivity = activities;
+    const filteredActivities = [];
+    let droppedCommits = 0;
+    let droppedPullRequests = 0;
+    let totalCommits = 0;
+    let totalPullRequests = 0;
+
+    for (const activity of activities) {
+      totalCommits += activity.commits.length;
+      totalPullRequests += activity.pullRequests.length;
+      const filtered = filterGithubActivity(activity, ctx.sinceISO);
+      filteredActivities.push(filtered.activity);
+      droppedCommits += filtered.droppedCommits;
+      droppedPullRequests += filtered.droppedPullRequests;
+    }
+
+    ctx.hooks.info?.(
+      `GitHub Candidates: ${totalCommits} commit${
+        totalCommits === 1 ? "" : "s"
+      }, ${totalPullRequests} PR${totalPullRequests === 1 ? "" : "s"}`,
+    );
+
+    if (droppedCommits + droppedPullRequests > 0) {
+      ctx.hooks.info?.(
+        `GitHub filters removed: ${droppedCommits} commits, ${droppedPullRequests} PRs`,
+      );
+    }
+
+    ctx.hooks.info?.(
+      `GitHub Qualified (window): ${totalCommits - droppedCommits} commit${
+        totalCommits - droppedCommits === 1 ? "" : "s"
+      }, ${totalPullRequests - droppedPullRequests} PR${
+        totalPullRequests - droppedPullRequests === 1 ? "" : "s"
+      }`,
+    );
+
+    ctx.githubActivity = filteredActivities;
+    ctx.githubStats = {
+      candidates: { commits: totalCommits, prs: totalPullRequests },
+      qualified: {
+        commits: totalCommits - droppedCommits,
+        prs: totalPullRequests - droppedPullRequests,
+      },
+    };
 
     const contributors = new Map<string, GitHubContributor>();
 
@@ -48,7 +91,7 @@ export const fetchGithubActivityStep: RecipeStep<
       reverseEmailMapping.set(githubUsername.toLowerCase(), bugzillaEmail);
     }
 
-    for (const activity of activities) {
+    for (const activity of filteredActivities) {
       for (const commit of activity.commits) {
         const username = commit.author;
         if (!contributors.has(username)) {

@@ -67,7 +67,7 @@ export const filterJiraByHistoryStep: RecipeStep<
 
     const final = ctx.jiraIssues.filter((issue) => allowedKeys.has(issue.key));
     ctx.finalJiraIssues = final;
-    ctx.hooks.info?.(`Qualified Jira issues: ${final.length}`);
+    ctx.hooks.info?.(`Jira Qualified (history): ${final.length}`);
 
     if (ctx.debugLog) {
       if (final.length > 0) {

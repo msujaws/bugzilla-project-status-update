@@ -211,15 +211,9 @@ export class GitHubClient {
 
     const prsData = await this.fetchPaginatedPRs(repo);
 
-    const sinceDate = new Date(since);
-    const relevantPRs = prsData.filter((pr: GitHubRawPullRequest) => {
-      const closedAt = pr.closed_at ? new Date(pr.closed_at) : undefined;
-      return closedAt && closedAt >= sinceDate;
-    });
-
     const pullRequests: GitHubPullRequest[] = [];
 
-    for (const pr of relevantPRs) {
+    for (const pr of prsData) {
       if (pr.merged_at) {
         try {
           const prDetails = await this.get<GitHubRawPullRequestDetails>(

@@ -142,7 +142,7 @@ describe("GitHubClient", () => {
     });
   });
 
-  it("filters pull requests by since date", async () => {
+  it("returns pull requests regardless of since date", async () => {
     const repo = "mozilla/firefox";
     const since = "2025-10-25T00:00:00Z";
 
@@ -183,8 +183,8 @@ describe("GitHubClient", () => {
     const client = new GitHubClient(env);
     const activity = await client.getRepoActivity(repo, since);
 
-    expect(activity.pullRequests).toHaveLength(1);
-    expect(activity.pullRequests[0].number).toBe(101);
+    expect(activity.pullRequests).toHaveLength(2);
+    expect(activity.pullRequests.map((pr) => pr.number)).toEqual([100, 101]);
   });
 
   it("handles commits with missing author login", async () => {
