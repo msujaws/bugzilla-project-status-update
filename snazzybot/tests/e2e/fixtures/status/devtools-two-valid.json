@@ -1,6 +1,6 @@
 {
-  "name": "devtools-stream-two-valid",
-  "kind": "stream",
+  "name": "devtools-two-valid",
+  "kind": "paged",
   "recordedAt": "2025-11-09T13:51:26.145Z",
   "requestBody": {
     "format": "md",
@@ -17,47 +17,77 @@
     "whiteboards": [],
     "assignees": [],
     "days": 21,
-    "debug": true,
     "model": "gpt-5"
   },
-  "events": [
-    {
-      "kind": "start",
-      "msg": "Starting snazzybot…"
+  "responses": {
+    "discover": {
+      "sinceISO": "2025-10-19T13:51:25.062Z",
+      "total": 2,
+      "logs": [
+        {
+          "kind": "info",
+          "msg": "Window: last 21 days (since 2025-10-19T13:51:25.062Z)"
+        },
+        {
+          "kind": "info",
+          "msg": "Components: DevTools"
+        },
+        {
+          "kind": "info",
+          "msg": "Bugzilla Candidates: 2"
+        },
+        {
+          "kind": "info",
+          "msg": "[debug] security-restricted removed: 1 (sample: 1020281)"
+        },
+        {
+          "kind": "info",
+          "msg": "[debug] candidates after security filter: 2"
+        }
+      ],
+      "candidates": [
+        {
+          "id": 1118592,
+          "last_change_time": "2025-10-27T06:31:32Z",
+          "product": "DevTools",
+          "component": "Framework"
+        },
+        {
+          "id": 1781328,
+          "last_change_time": "2025-10-20T06:37:00Z",
+          "product": "DevTools",
+          "component": "General"
+        }
+      ]
     },
-    {
-      "kind": "info",
-      "msg": "[debug] Window: last 21 days (since 2025-10-19T13:51:25.062Z)"
-    },
-    {
-      "kind": "info",
-      "msg": "[debug] DevTools bugs in response: 4 total"
-    },
-    {
-      "kind": "info",
-      "msg": "[debug] security-restricted removed: 1 (sample: 1020281)"
-    },
-    {
-      "kind": "info",
-      "msg": "[debug] confidential-restricted removed: 1 (sample: 1165576)"
-    },
-    {
-      "kind": "info",
-      "msg": "[debug] Valid candidate bugs retained for summary: 2 (1118592, 1781328)"
-    },
-    {
-      "kind": "phase",
-      "name": "openai"
-    },
-    {
-      "kind": "done",
+    "pages": [
+      {
+        "request": {
+          "cursor": 0,
+          "pageSize": 35
+        },
+        "response": {
+          "qualifiedIds": [1118592, 1781328],
+          "total": 2,
+          "logs": [
+            {
+              "kind": "info",
+              "msg": "[debug] page qualified=2 (cursor 0→2/2)"
+            }
+          ]
+        }
+      }
+    ],
+    "finalize": {
       "output": "## DevTools — Highlighted fixes\n\n- Bug 1118592: Intermittent browser_tableWidget_mouse_interaction.js | Test timed out (Owner: Julian Descottes [:jdescottes])\n- Bug 1781328: Intermittent devtools/shared/commands/inspector/tests/browser_inspector_command_findNodeFrontFromSelectors.js | single tracking bug (Owner: Julian Descottes [:jdescottes])\n\n_Fixture note:_ Both fixes landed within the 21-day window and were authored by Julian Descottes [:jdescottes].\n\nSecurity-restricted candidate omitted: Bug 1020281 (Ability to create and send NEW requests in netmonitor.).\nConfidential candidate omitted: Bug 1165576 (Netmonitor theme refresh).\n\n_OpenAI fixture response generated for automated testing on 2025-11-09._\n\n[View bugs in Bugzilla](https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&resolution=FIXED&chfieldfrom=2025-10-19T13%3A51%3A25.062Z&chfieldto=Now&bug_id=1118592%2C1781328&product=DevTools)",
       "html": "<h2>DevTools — Highlighted fixes</h2>\n<ul>\n<li>Bug 1118592: Intermittent browser_tableWidget_mouse_interaction.js | Test timed out (Owner: Julian Descottes [:jdescottes])</li>\n<li>Bug 1781328: Intermittent devtools/shared/commands/inspector/tests/browser_inspector_command_findNodeFrontFromSelectors.js | single tracking bug (Owner: Julian Descottes [:jdescottes])</li>\n</ul>\n<p><em>Fixture note:</em> Both fixes landed within the 21-day window and were authored by Julian Descottes [:jdescottes].</p>\n<p>Security-restricted candidate omitted: Bug 1020281 (Ability to create and send NEW requests in netmonitor.).\nConfidential candidate omitted: Bug 1165576 (Netmonitor theme refresh).</p>\n<p><em>OpenAI fixture response generated for automated testing on 2025-11-09.</em></p>\n\n<p><a href=\"https://bugzilla.mozilla.org/buglist.cgi?bug_status=RESOLVED%2CVERIFIED%2CCLOSED&amp;resolution=FIXED&amp;chfieldfrom=2025-10-19T13%3A51%3A25.062Z&amp;chfieldto=Now&amp;bug_id=1118592%2C1781328&amp;product=DevTools\">View bugs in Bugzilla</a></p>"
     }
-  ],
+  },
   "meta": {
     "sinceISO": "2025-10-19T13:51:25.062Z",
     "days": 21,
+    "recordedAt": "2025-11-09T13:51:26.145Z",
+    "qualifiedIds": [1118592, 1781328],
     "valid": [
       {
         "id": 1118592,
@@ -75,27 +105,6 @@
         "component": "General",
         "last_change_time": "2025-10-20T06:37:00Z"
       }
-    ],
-    "invalid": [
-      {
-        "reason": "security",
-        "id": 1020281,
-        "summary": "Ability to create and send NEW requests in netmonitor.",
-        "assignee": "Nobody; OK to take it and work on it",
-        "product": "DevTools",
-        "component": "Netmonitor",
-        "last_change_time": "2025-11-01T21:49:39Z"
-      },
-      {
-        "reason": "confidential",
-        "id": 1165576,
-        "summary": "Netmonitor theme refresh",
-        "assignee": "Tim Nguyen :ntim",
-        "product": "DevTools",
-        "component": "Netmonitor",
-        "last_change_time": "2025-11-04T06:47:37Z"
-      }
-    ],
-    "recordedAt": "2025-11-09T13:51:26.145Z"
+    ]
   }
 }

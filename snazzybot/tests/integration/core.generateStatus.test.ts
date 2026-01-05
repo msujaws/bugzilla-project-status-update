@@ -29,7 +29,6 @@ describe("core integration (with MSW mocks)", () => {
         days: 8,
         model: "gpt-5",
         format: "md",
-        debug: true,
         components: [{ product: "Firefox", component: "IP Protection" }],
         whiteboards: ["[fx-vpn]"],
       },
@@ -302,7 +301,6 @@ describe("core integration (with MSW mocks)", () => {
       {
         days: 8,
         assignees: ["dev@example.com"],
-        debug: true,
       },
       env,
       hooks,

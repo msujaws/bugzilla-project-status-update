@@ -17,13 +17,26 @@
     "whiteboards": [],
     "assignees": [],
     "days": 21,
-    "debug": false,
     "model": "gpt-5"
   },
   "responses": {
     "discover": {
       "sinceISO": "2025-10-19T13:51:25.062Z",
       "total": 2,
+      "logs": [
+        {
+          "kind": "info",
+          "msg": "Window: last 21 days (since 2025-10-19T13:51:25.062Z)"
+        },
+        {
+          "kind": "info",
+          "msg": "Components: DevTools"
+        },
+        {
+          "kind": "info",
+          "msg": "Bugzilla Candidates: 2"
+        }
+      ],
       "candidates": [
         {
           "id": 1118592,

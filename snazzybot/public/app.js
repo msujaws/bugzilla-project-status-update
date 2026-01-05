@@ -551,153 +551,16 @@ async function postStatusJSON(payload) {
   return res.json();
 }
 
-// Streaming runner (NDJSON) -------------------------------------------------
-async function runSnazzyStream(body) {
-  const runBtn = $("run");
-  const spin = $("spin");
-  if (!runBtn || !spin) return;
-
-  runBtn.disabled = true;
-  setActionsEnabled(false);
-  spin.style.display = "inline-flex";
-  spin.textContent = "⏳ Starting…";
-  resetUIBeforeRun();
-
-  try {
-    const res = await fetch("/api/status", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        // tell the Worker to use the streaming branch
-        accept: "application/x-ndjson",
-        "x-snazzy-stream": "1",
-      },
-      body: JSON.stringify({
-        ...body,
-        // no mode needed for streaming; the server does oneshot with hooks
-      }),
-    });
-    if (!res.ok || !res.body) {
-      const data = await res.text().catch(() => "");
-      throw new Error(data || res.statusText || `HTTP ${res.status}`);
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = "";
-
-    const flushLine = (line) => {
-      if (!line.trim()) return;
-      let evt;
-      try {
-        evt = JSON.parse(line);
-      } catch {
-        return;
-      }
-      switch (evt.kind) {
-        case "start": {
-          spin.textContent = "⏳ Discovering…";
-          break;
-        }
-        case "info": {
-          log("info", evt.msg || "");
-          break;
-        }
-        case "warn": {
-          log("warn", evt.msg || "");
-          break;
-        }
-        case "phase": {
-          const name = String(evt.name || "phase");
-          ensurePhase(name, name);
-          if (evt.complete === true) {
-            // Phase completed
-            completePhase(name);
-            setPhaseText(name, `${name}: done`);
-          } else if (typeof evt.total === "number") {
-            // Phase started with known total
-            setPhasePct(name, 0, evt.total || 1);
-            setPhaseText(name, `${name}: 0/${evt.total}`);
-          } else {
-            // Phase started with unknown duration
-            setPhaseIndeterminate(name);
-          }
-          break;
-        }
-        case "progress": {
-          const name = String(evt.phase || "phase");
-          if (typeof evt.total === "number") {
-            setPhasePct(name, Number(evt.current) || 0, Number(evt.total) || 1);
-            setPhaseText(
-              name,
-              `${name}: ${Number(evt.current) || 0}/${Number(evt.total) || 1}`,
-            );
-          } else {
-            setPhaseIndeterminate(name);
-          }
-          break;
-        }
-        case "done": {
-          setPhaseText("openai", "openai: done");
-          completePhase("openai");
-          lastMarkdown =
-            typeof evt.output === "string" ? evt.output.trim() : "";
-          const html = typeof evt.html === "string" ? evt.html : "";
-          if (html) {
-            lastHTML = html;
-          } else if (body.format === "html") {
-            lastHTML = lastMarkdown;
-          } else {
-            lastHTML = fallbackMarkdownToHtml(lastMarkdown);
-          }
-          lastHTML = setResultIframe(lastHTML);
-          logStats(evt.stats);
-          setActionsEnabled(Boolean(lastMarkdown));
-          spin.style.display = "none";
-          burstEmojis(currentVoice);
-          markResultsComplete();
-          break;
-        }
-        case "error": {
-          throw new Error(evt.msg || "Server error");
-        }
-      }
-    };
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      let idx;
-      while ((idx = buf.indexOf("\n")) >= 0) {
-        const line = buf.slice(0, idx);
-        buf = buf.slice(idx + 1);
-        flushLine(line);
-      }
-    }
-    // flush any remaining partial (in case the stream ended without newline)
-    if (buf) flushLine(buf);
-  } catch (error) {
-    console.error(error);
-    const out = $("out");
-    if (out) {
-      out.style.display = "block";
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === "string"
-            ? error
-            : "";
-      out.textContent = `ERROR: ${message || "Unknown error"}`;
-    }
-    setActionsEnabled(Boolean(lastMarkdown));
-    if (spin) spin.style.display = "none";
-  } finally {
-    runBtn.disabled = false;
+const logResponseLogs = (payload) => {
+  if (!payload || !Array.isArray(payload.logs)) return;
+  for (const entry of payload.logs) {
+    if (!entry || typeof entry.msg !== "string") continue;
+    const kind = entry.kind === "warn" ? "warn" : "info";
+    log(kind, entry.msg);
   }
-}
+};
 
-// Existing paged runner (kept as fallback) ----------------------------------
+// Paged runner (Cloudflare Pages friendly) ----------------------------------
 async function runSnazzyPaged(body) {
   const runBtn = $("run");
   const spin = $("spin");
@@ -716,8 +579,8 @@ async function runSnazzyPaged(body) {
     spin.style.display = "inline-flex";
     spin.textContent = "⏳ Discovering…";
     const discover = await postStatusJSON({ ...body, mode: "discover" });
+    logResponseLogs(discover);
     const total = discover.total || 0;
-    log("info", `Bugzilla Candidates: ${total}`);
 
     // 2) Page through histories
     const qualified = new Set();
@@ -737,6 +600,7 @@ async function runSnazzyPaged(body) {
         cursor,
         pageSize: step,
       });
+      logResponseLogs(page);
       for (const id of page.qualifiedIds || []) qualified.add(id);
       // Log qualification reasons for each bug
       if (page.results && Array.isArray(page.results)) {
@@ -779,6 +643,7 @@ async function runSnazzyPaged(body) {
       mode: "finalize",
       ids: qualifiedIds,
     });
+    logResponseLogs(final);
     logStats(final.stats);
     if (includePatchContext) {
       completePhase("patch-context");
@@ -864,7 +729,6 @@ if (runButton) {
     const days = Number($("days")?.value) || 8;
     const voice = $("voice")?.value || "normal";
     const audience = $("audience")?.value || "technical";
-    const debug = $("debug")?.value === "true";
     const skipCache = $("cache")?.value === "false";
     const includePatchContext =
       ($("patch-context")?.value || "include") !== "omit";
@@ -879,7 +743,6 @@ if (runButton) {
     sp.set("days", String(days));
     sp.set("voice", voice);
     sp.set("aud", audience);
-    sp.set("debug", String(debug));
     if (skipCache) sp.set("nocache", "1");
     else sp.delete("nocache");
     if (includePatchContext) {
@@ -899,19 +762,13 @@ if (runButton) {
       format: "md",
       voice,
       audience,
-      debug,
       skipCache,
       includePatchContext,
       githubRepos,
       emailMapping,
       includeGithubActivity,
     };
-    // If Debug = Yes, use streaming (shows live logs + progress)
-    if (debug) {
-      runSnazzyStream(payload);
-    } else {
-      runSnazzyPaged(payload);
-    }
+    runSnazzyPaged(payload);
   });
 }
 
@@ -926,7 +783,6 @@ function getCurrentFormParams() {
     days: Number($("days")?.value) || 7,
     voice: $("voice")?.value || "normal",
     audience: $("audience")?.value || "technical",
-    debug: $("debug")?.value === "true",
     cache: $("cache")?.value === "true",
     patchContext: $("patch-context")?.value || "omit",
   };
@@ -950,8 +806,6 @@ function hydrateFromURL() {
   if (sp.has("days")) setFieldValue("days", sp.get("days") || "7");
   if (sp.has("voice")) setFieldValue("voice", sp.get("voice") || "normal");
   if (sp.has("aud")) setFieldValue("audience", sp.get("aud") || "technical");
-  if (sp.has("debug"))
-    setFieldValue("debug", sp.get("debug") === "true" ? "true" : "false");
   if (sp.has("nocache")) setFieldValue("cache", "false");
   if (sp.get("pc") === "0") setFieldValue("patch-context", "omit");
 
@@ -989,7 +843,6 @@ const savedSearches = new SavedSearches(savedSearchesContainer, {
     setFieldValue("days", String(params.days || 7));
     setFieldValue("voice", params.voice || "normal");
     setFieldValue("audience", params.audience || "technical");
-    setFieldValue("debug", params.debug ? "true" : "false");
     setFieldValue("cache", params.cache ? "true" : "false");
     setFieldValue("patch-context", params.patchContext || "omit");
   },

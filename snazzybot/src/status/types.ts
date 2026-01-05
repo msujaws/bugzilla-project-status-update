@@ -8,7 +8,6 @@ export type GenerateParams = {
   days?: number;
   model?: string;
   format?: "md" | "html";
-  debug?: boolean;
   voice?: "normal" | "pirate" | "snazzy-robot";
   audience?: "technical" | "product" | "leadership";
   ids?: number[];

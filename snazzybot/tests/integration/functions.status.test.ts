@@ -87,28 +87,23 @@ describe("functions/api/status.ts", () => {
     await mf.dispose();
   });
 
-  it("streaming NDJSON emits start → phase/progress → done", async () => {
+  it("oneshot mode includes debug logs payload", async () => {
     const mf = await makeMiniflare({}, { forceFallback: true });
-    const r = await mf.dispatchFetch("http://local/api/status?stream=1", {
+    const r = await mf.dispatchFetch("http://local/api/status", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        accept: "application/x-ndjson",
       },
       body: JSON.stringify({ days: 8, whiteboards: ["[fx-vpn]"] }),
     });
-    const text = await r.text();
-    const lines = text
-      .trim()
-      .split("\n")
-      .map((s) => JSON.parse(s));
-    expect(lines[0].kind).toBe("start");
+    const j = await r.json();
+    expect(Array.isArray(j.logs)).toBe(true);
     expect(
-      lines.some(
-        (l) => l.kind === "phase" && l.name === "Generating AI summary",
+      j.logs.some(
+        (entry: { msg?: string }) =>
+          typeof entry.msg === "string" && entry.msg.includes("Window: last"),
       ),
     ).toBe(true);
-    expect(lines.at(-1)?.kind).toBe("done");
     await mf.dispose();
   });
 });

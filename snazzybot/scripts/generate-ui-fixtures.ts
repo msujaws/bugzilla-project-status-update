@@ -8,30 +8,21 @@ import { formatSummaryOutput } from "../src/status/recipeHelpers.ts";
 import { buildBuglistURL } from "../src/status/output.ts";
 import type { Bug, ProductComponent } from "../src/status/types.ts";
 
-type ScenarioFixture =
-  | {
-      name: string;
-      kind: "stream";
-      recordedAt: string;
-      requestBody: Record<string, unknown>;
-      events: Array<Record<string, unknown>>;
-      meta: Record<string, unknown>;
-    }
-  | {
-      name: string;
-      kind: "paged";
-      recordedAt: string;
-      requestBody: Record<string, unknown>;
-      responses: {
-        discover: Record<string, unknown>;
-        pages: Array<{
-          request: { cursor: number; pageSize: number };
-          response: Record<string, unknown>;
-        }>;
-        finalize: Record<string, unknown>;
-      };
-      meta: Record<string, unknown>;
-    };
+type ScenarioFixture = {
+  name: string;
+  kind: "paged";
+  recordedAt: string;
+  requestBody: Record<string, unknown>;
+  responses: {
+    discover: Record<string, unknown>;
+    pages: Array<{
+      request: { cursor: number; pageSize: number };
+      response: Record<string, unknown>;
+    }>;
+    finalize: Record<string, unknown>;
+  };
+  meta: Record<string, unknown>;
+};
 
 type CandidatePick = {
   valid: Bug[];
@@ -181,7 +172,7 @@ async function collectDevToolsSample(
   };
 }
 
-function buildDevToolsStreamFixture(sample: DevToolsSample) {
+function buildDevToolsPagedFixture(sample: DevToolsSample) {
   const { days, sinceISO, valid, security, confidential, recordedAt } = sample;
   const summaryLines = [
     "## DevTools — Highlighted fixes",
@@ -211,34 +202,6 @@ function buildDevToolsStreamFixture(sample: DevToolsSample) {
     link,
   });
 
-  const events = [
-    { kind: "start", msg: "Starting snazzybot…" },
-    {
-      kind: "info",
-      msg: `[debug] Window: last ${days} days (since ${sinceISO})`,
-    },
-    {
-      kind: "info",
-      msg: `[debug] DevTools bugs in response: 4 total`,
-    },
-    {
-      kind: "info",
-      msg: `[debug] security-restricted removed: 1 (sample: ${security.id})`,
-    },
-    {
-      kind: "info",
-      msg: `[debug] confidential-restricted removed: 1 (sample: ${confidential.id})`,
-    },
-    {
-      kind: "info",
-      msg: `[debug] Valid candidate bugs retained for summary: 2 (${valid
-        .map((bug) => bug.id)
-        .join(", ")})`,
-    },
-    { kind: "phase", name: "openai" },
-    { kind: "done", output: markdown, html },
-  ];
-
   const requestBody = {
     ...DEFAULT_REQUEST,
     components: [{ product: "DevTools" }],
@@ -246,7 +209,6 @@ function buildDevToolsStreamFixture(sample: DevToolsSample) {
     whiteboards: [],
     assignees: [],
     days,
-    debug: true,
     model: "gpt-5",
   };
 
@@ -262,11 +224,58 @@ function buildDevToolsStreamFixture(sample: DevToolsSample) {
   };
 
   return {
-    name: "devtools-stream-two-valid",
-    kind: "stream" as const,
+    name: "devtools-two-valid",
+    kind: "paged" as const,
     recordedAt,
     requestBody,
-    events,
+    responses: {
+      discover: {
+        sinceISO,
+        total: valid.length,
+        logs: [
+          {
+            kind: "info",
+            msg: `Window: last ${days} days (since ${sinceISO})`,
+          },
+          {
+            kind: "info",
+            msg: "Components: DevTools",
+          },
+          {
+            kind: "info",
+            msg: `Bugzilla Candidates: ${valid.length}`,
+          },
+          {
+            kind: "info",
+            msg: `[debug] security-restricted removed: 1 (sample: ${security.id})`,
+          },
+          {
+            kind: "info",
+            msg: `[debug] candidates after security filter: ${valid.length}`,
+          },
+        ],
+        candidates: valid.map((bug) => minifyCandidate(bug)),
+      },
+      pages: [
+        {
+          request: { cursor: 0, pageSize: 35 },
+          response: {
+            qualifiedIds: valid.map((bug) => bug.id),
+            total: valid.length,
+            logs: [
+              {
+                kind: "info",
+                msg: `[debug] page qualified=${valid.length} (cursor 0→${valid.length}/${valid.length})`,
+              },
+            ],
+          },
+        },
+      ],
+      finalize: {
+        output: markdown,
+        html,
+      },
+    },
     meta,
   };
 }
@@ -309,7 +318,6 @@ function buildDevToolsPatchFixture(sample: DevToolsSample) {
       whiteboards: [],
       assignees: [],
       days,
-      debug: false,
       includePatchContext: true,
       model: "gpt-5",
     },
@@ -352,7 +360,6 @@ async function gatherDevToolsEmptyFixture(client: BugzillaClient) {
     whiteboards: [],
     assignees: [],
     days,
-    debug: false,
     model: "gpt-5",
   };
   const collection = await collectCandidates(client, {}, sinceISO, {
@@ -381,6 +388,20 @@ async function gatherDevToolsEmptyFixture(client: BugzillaClient) {
       discover: {
         sinceISO,
         total: collection.candidates.length,
+        logs: [
+          {
+            kind: "info",
+            msg: `Window: last ${days} days (since ${sinceISO})`,
+          },
+          {
+            kind: "info",
+            msg: "Components: DevTools:Imaginary Component",
+          },
+          {
+            kind: "info",
+            msg: `Bugzilla Candidates: ${collection.candidates.length}`,
+          },
+        ],
         candidates: collection.candidates.map((bug) => minifyCandidate(bug)),
       },
       pages: [],
@@ -408,7 +429,6 @@ async function gatherFxVpnFixture(client: BugzillaClient) {
     metabugs: [],
     assignees: [],
     days,
-    debug: false,
     model: "gpt-5",
   };
   const collection = await collectCandidates(client, {}, sinceISO, {
@@ -459,6 +479,20 @@ async function gatherFxVpnFixture(client: BugzillaClient) {
       discover: {
         sinceISO,
         total: discoverCandidates.length,
+        logs: [
+          {
+            kind: "info",
+            msg: `Window: last ${days} days (since ${sinceISO})`,
+          },
+          {
+            kind: "info",
+            msg: `Whiteboard filters: ${whiteboards.join(", ")}`,
+          },
+          {
+            kind: "info",
+            msg: `Bugzilla Candidates: ${discoverCandidates.length}`,
+          },
+        ],
         candidates: discoverCandidates,
       },
       pages: [
@@ -507,7 +541,7 @@ async function main() {
   await ensureDir();
   const devtoolsSample = await collectDevToolsSample(client);
   const fixtures: ScenarioFixture[] = [
-    buildDevToolsStreamFixture(devtoolsSample),
+    buildDevToolsPagedFixture(devtoolsSample),
     buildDevToolsPatchFixture(devtoolsSample),
     await gatherDevToolsEmptyFixture(client),
     await gatherFxVpnFixture(client),
