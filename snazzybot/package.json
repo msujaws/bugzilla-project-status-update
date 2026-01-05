@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev:pages": "wrangler pages dev ./public",
-    "deploy": "wrangler pages publish ./public",
+    "deploy": "wrangler pages deploy ./public --project-name bugzilla-project-status-update",
     "test": "vitest run",
     "test:watch": "vitest --ui --watch",
     "coverage": "vitest run --coverage",
