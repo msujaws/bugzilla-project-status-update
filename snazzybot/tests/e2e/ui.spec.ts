@@ -3,6 +3,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+type StreamFixture = {
+  name: string;
+  kind: "stream";
+  recordedAt: string;
+  requestBody: Record<string, unknown>;
+  events: Array<Record<string, unknown>>;
+  meta: {
+    valid: Array<{ id: number; summary: string; assignee: string }>;
+    invalid: Array<{ reason: string; id: number; summary: string }>;
+  };
+};
+
 type PagedFixture = {
   name: string;
   kind: "paged";
@@ -16,10 +28,7 @@ type PagedFixture = {
     }>;
     finalize: Record<string, unknown>;
   };
-  meta?: {
-    valid?: Array<{ id: number; summary: string; assignee: string }>;
-    [key: string]: unknown;
-  };
+  meta?: Record<string, unknown>;
 };
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,7 +41,7 @@ const loadJson = <T>(name: string): T => {
 };
 
 const fixtures = {
-  devtoolsTwoValid: loadJson<PagedFixture>("devtools-two-valid"),
+  devtoolsStream: loadJson<StreamFixture>("devtools-stream-two-valid"),
   devtoolsPatch: loadJson<PagedFixture>("devtools-patch-context"),
   devtoolsEmpty: loadJson<PagedFixture>("devtools-empty"),
   fxVpn: loadJson<PagedFixture>("fx-vpn-trio"),
@@ -81,6 +90,25 @@ const respondJson = async (route: Route, payload: Record<string, unknown>) => {
   });
 };
 
+const streamBodyFrom = (events: Array<Record<string, unknown>>) =>
+  events.map((evt) => JSON.stringify(evt)).join("\n") + "\n";
+
+const setupStreamRoute = async (
+  page: Page,
+  events: Array<Record<string, unknown>>,
+) => {
+  await page.route("**/api/status", async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/x-ndjson; charset=utf-8" },
+      body: streamBodyFrom(events),
+    });
+  });
+};
+
+const setupStreamFixture = async (page: Page, fixture: StreamFixture) =>
+  setupStreamRoute(page, fixture.events);
+
 const setupPagedFixture = async (page: Page, fixture: PagedFixture) => {
   const pages = [...(fixture.responses.pages || [])];
   await page.route("**/api/status", async (route) => {
@@ -103,25 +131,30 @@ const setupPagedFixture = async (page: Page, fixture: PagedFixture) => {
 };
 
 test.describe("SnazzyBot UI fixtures", () => {
-  test("DevTools paged run highlights two valid bugs and logs diagnostics", async ({
+  test("DevTools streaming run highlights two valid bugs and logs restricted counts", async ({
     page,
   }) => {
-    const fixture = fixtures.devtoolsTwoValid;
-    await setupPagedFixture(page, fixture);
+    const fixture = fixtures.devtoolsStream;
+    await setupStreamFixture(page, fixture);
 
     await page.goto("/");
     await page.fill("#components", "DevTools");
     await page.fill("#days", String(requestDays(fixture.requestBody, 21)));
+    await page.selectOption("#debug", "true");
     await page.getByRole("button", { name: "Run SnazzyBot" }).click();
 
-    await expect(page.locator("#log")).toContainText("Window: last 21 days");
-    await expect(page.locator("#log")).toContainText("Bugzilla Candidates: 2");
+    await expect(page.locator("#log")).toContainText(
+      "DevTools bugs in response: 4 total",
+    );
+    await expect(page.locator("#log")).toContainText(
+      "security-restricted removed: 1",
+    );
+    await expect(page.locator("#log")).toContainText(
+      "confidential-restricted removed: 1",
+    );
 
     const frame = page.frameLocator("#resultFrame");
-    const [first, second] = fixture.meta?.valid ?? [];
-    if (!first || !second) {
-      throw new Error("Fixture is missing valid bug metadata");
-    }
+    const [first, second] = fixture.meta.valid;
     await expect(frame.locator("body")).toContainText(
       "DevTools — Highlighted fixes",
     );
@@ -179,6 +212,24 @@ test.describe("SnazzyBot UI fixtures", () => {
     await expect(frame.locator("body")).toContainText("OpenAI fixture summary");
   });
 
+  test("Streaming mode surfaces server errors and keeps copy disabled", async ({
+    page,
+  }) => {
+    allowConsoleErrors(page);
+    await setupStreamRoute(page, [
+      { kind: "start" },
+      { kind: "error", msg: "Server exploded" },
+    ]);
+    await page.goto("/");
+    await page.fill("#components", "DevTools");
+    await page.selectOption("#debug", "true");
+    await page.getByRole("button", { name: "Run SnazzyBot" }).click();
+
+    await expect(page.locator("#out")).toContainText("ERROR: Server exploded");
+    await expect(page.locator("#copy")).toBeDisabled();
+    await expect(page.locator("#copy-rendered")).toBeDisabled();
+  });
+
   test("Paged discover failure shows the error banner", async ({ page }) => {
     allowConsoleErrors(page);
     await page.route("**/api/status", async (route) => {
@@ -231,8 +282,8 @@ test.describe("SnazzyBot UI fixtures", () => {
     page,
     context,
   }) => {
-    const fixture = fixtures.devtoolsTwoValid;
-    await setupPagedFixture(page, fixture);
+    const fixture = fixtures.devtoolsStream;
+    await setupStreamFixture(page, fixture);
     if (test.info().project.use?.browserName !== "firefox") {
       await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     }
@@ -262,6 +313,7 @@ test.describe("SnazzyBot UI fixtures", () => {
 
     await page.goto("/");
     await page.fill("#components", "DevTools");
+    await page.selectOption("#debug", "true");
     await page.getByRole("button", { name: "Run SnazzyBot" }).click();
 
     await page.getByLabel("Copy .md").click();
@@ -288,15 +340,16 @@ test.describe("SnazzyBot UI fixtures", () => {
   test("Query params hydrate the form and persist updated selections", async ({
     page,
   }) => {
-    const fixture = fixtures.devtoolsTwoValid;
-    await setupPagedFixture(page, fixture);
+    const fixture = fixtures.devtoolsStream;
+    await setupStreamFixture(page, fixture);
     await page.goto(
-      "/?components=Firefox%3AGeneral&days=3&aud=product&nocache=1&pc=0",
+      "/?components=Firefox%3AGeneral&days=3&debug=true&aud=product&nocache=1&pc=0",
     );
 
     await expect(page.locator("#components")).toHaveValue("Firefox:General");
     await expect(page.locator("#days")).toHaveValue("3");
     await expect(page.locator("#audience")).toHaveValue("product");
+    await expect(page.locator("#debug")).toHaveValue("true");
     await expect(page.locator("#cache")).toHaveValue("false");
     await expect(page.locator("#patch-context")).toHaveValue("omit");
 

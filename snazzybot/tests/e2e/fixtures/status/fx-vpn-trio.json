@@ -13,26 +13,13 @@
     "metabugs": [],
     "assignees": [],
     "days": 30,
+    "debug": false,
     "model": "gpt-5"
   },
   "responses": {
     "discover": {
       "sinceISO": "2025-10-10T13:51:26.932Z",
       "total": 3,
-      "logs": [
-        {
-          "kind": "info",
-          "msg": "Window: last 30 days (since 2025-10-10T13:51:26.932Z)"
-        },
-        {
-          "kind": "info",
-          "msg": "Whiteboard filters: [fx-vpn]"
-        },
-        {
-          "kind": "info",
-          "msg": "Bugzilla Candidates: 3"
-        }
-      ],
       "candidates": [
         {
           "id": 1976518,

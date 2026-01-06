@@ -400,6 +400,7 @@ export class SavedSearches {
     sp.set("days", String(params.days || 7));
     sp.set("voice", params.voice || "normal");
     sp.set("aud", params.audience || "technical");
+    if (params.debug) sp.set("debug", "true");
     if (!params.cache) sp.set("nocache", "1");
     if (params.patchContext === "omit") sp.set("pc", "0");
 

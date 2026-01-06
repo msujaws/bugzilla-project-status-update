@@ -56,6 +56,7 @@ describe("SavedSearches Storage", () => {
         days: 7,
         voice: "normal",
         audience: "technical",
+        debug: false,
         cache: true,
         patchContext: "omit",
       },

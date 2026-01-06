@@ -30,6 +30,7 @@ const argv = yargs(hideBin(process.argv))
   .option("days", { type: "number", default: 8 })
   .option("model", { type: "string", default: "gpt-5" })
   .option("format", { choices: ["md", "html"] as const, default: "md" })
+  .option("debug", { type: "boolean", default: false })
   .option("no-cache", {
     type: "boolean",
     default: false,
@@ -152,6 +153,7 @@ async function main() {
         days: clampedDays,
         model: argv.model,
         format: argv.format,
+        debug: argv.debug,
         voice: argv.voice,
         audience: argv.audience,
         includePatchContext: argv["patch-context"],

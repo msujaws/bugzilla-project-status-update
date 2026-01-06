@@ -30,23 +30,6 @@ const toErrorMessage = (error: unknown): string => {
   }
 };
 
-const createLogCapture = () => {
-  const logs: Array<{ kind: "info" | "warn"; msg: string }> = [];
-  const hooks = {
-    info: (msg: string) => {
-      logs.push({ kind: "info", msg });
-      console.log("[INFO]", msg);
-    },
-    warn: (msg: string) => {
-      logs.push({ kind: "warn", msg });
-      console.warn("[WARN]", msg);
-    },
-    phase: () => {},
-    progress: () => {},
-  };
-  return { hooks, logs };
-};
-
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!env.OPENAI_API_KEY || !env.BUGZILLA_API_KEY) {
     return new Response(
@@ -71,6 +54,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     days = 8,
     format = "md",
     model = "gpt-5",
+    debug = false,
     assignees = [],
     voice = "normal",
     skipCache = false,
@@ -85,6 +69,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     // only for finalize
     ids = [],
   } = body || {};
+
+  const url = new URL(request.url);
+  const accept = request.headers.get("accept") || "";
+  const streamHeader = (
+    request.headers.get("x-snazzy-stream") || ""
+  ).toLowerCase();
+  const streamParam = (url.searchParams.get("stream") || "").toLowerCase();
+  const wantsStream =
+    accept.includes("application/x-ndjson") ||
+    streamHeader === "1" ||
+    streamHeader === "true" ||
+    streamParam === "1" ||
+    streamParam === "true";
 
   const envConfig = {
     OPENAI_API_KEY: env.OPENAI_API_KEY,
@@ -101,6 +98,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     days,
     format,
     model,
+    debug,
     assignees,
     voice,
     audience,
@@ -110,91 +108,113 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     includeGithubActivity,
   } as const;
 
-  // ---- Paging protocol ----
-  if (mode === "discover") {
-    try {
-      const { hooks, logs } = createLogCapture();
-      const { sinceISO, candidates } = await discoverCandidates(
-        params,
-        envConfig,
-        hooks,
-      );
-      return new Response(
-        JSON.stringify({
-          sinceISO,
-          total: candidates.length,
-          logs,
-          // return a compact array to hold in the client between calls
-          candidates: candidates.map((b) => ({
-            id: b.id,
-            last_change_time: b.last_change_time,
-            product: b.product,
-            component: b.component,
-          })),
-        }),
-        {
-          status: 200,
-          headers: withSecurityHeaders({
-            "content-type": "application/json; charset=utf-8",
-            "cache-control": "no-store",
-          }),
-        },
-      );
-    } catch (error: unknown) {
-      return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
-        status: 500,
-        headers: withSecurityHeaders({
-          "content-type": "application/json; charset=utf-8",
-          "cache-control": "no-store",
-        }),
-      });
-    }
-  }
-  if (mode === "page") {
-    try {
-      const { sinceISO, candidates } = await discoverCandidates(
-        params,
-        envConfig,
-      );
-      const { hooks, logs } = createLogCapture();
-      const { qualifiedIds, nextCursor, total, results } =
-        await qualifyHistoryPage(
+  if (!wantsStream) {
+    // ---- Paging protocol ----
+    if (mode === "discover") {
+      try {
+        const { sinceISO, candidates } = await discoverCandidates(
+          params,
           envConfig,
-          sinceISO,
-          candidates,
-          Number(cursor) || 0,
-          Number(pageSize) || 35,
-          hooks,
         );
-      return new Response(
-        JSON.stringify({ qualifiedIds, nextCursor, total, results, logs }),
-        {
+        return new Response(
+          JSON.stringify({
+            sinceISO,
+            total: candidates.length,
+            // return a compact array to hold in the client between calls
+            candidates: candidates.map((b) => ({
+              id: b.id,
+              last_change_time: b.last_change_time,
+              product: b.product,
+              component: b.component,
+            })),
+          }),
+          {
+            status: 200,
+            headers: withSecurityHeaders({
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "no-store",
+            }),
+          },
+        );
+      } catch (error: unknown) {
+        return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
+          status: 500,
+          headers: withSecurityHeaders({
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "no-store",
+          }),
+        });
+      }
+    }
+    if (mode === "page") {
+      try {
+        const { sinceISO, candidates } = await discoverCandidates(
+          params,
+          envConfig,
+        );
+        const { qualifiedIds, nextCursor, total, results } =
+          await qualifyHistoryPage(
+            envConfig,
+            sinceISO,
+            candidates,
+            Number(cursor) || 0,
+            Number(pageSize) || 35,
+            {
+              info: (msg: string) => debug && console.log("[INFO]", msg),
+              warn: (msg: string) => console.warn("[WARN]", msg),
+              phase: () => {},
+              progress: () => {},
+            },
+            !!debug,
+          );
+        return new Response(
+          JSON.stringify({ qualifiedIds, nextCursor, total, results }),
+          {
+            status: 200,
+            headers: withSecurityHeaders({
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "no-store",
+            }),
+          },
+        );
+      } catch (error: unknown) {
+        return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
+          status: 500,
+          headers: withSecurityHeaders({
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "no-store",
+          }),
+        });
+      }
+    }
+    if (mode === "finalize") {
+      try {
+        const { output, html, stats } = await generateStatus(
+          { ...params, ids },
+          envConfig,
+        );
+        return new Response(JSON.stringify({ output, html, stats }), {
           status: 200,
           headers: withSecurityHeaders({
             "content-type": "application/json; charset=utf-8",
             "cache-control": "no-store",
           }),
-        },
-      );
-    } catch (error: unknown) {
-      return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
-        status: 500,
-        headers: withSecurityHeaders({
-          "content-type": "application/json; charset=utf-8",
-          "cache-control": "no-store",
-        }),
-      });
+        });
+      } catch (error: unknown) {
+        return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
+          status: 500,
+          headers: withSecurityHeaders({
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "no-store",
+          }),
+        });
+      }
     }
-  }
-  if (mode === "finalize") {
+
+    // ---- Legacy one-shot (unchanged) ----
     try {
-      const { hooks, logs } = createLogCapture();
-      const { output, html, stats } = await generateStatus(
-        { ...params, ids },
-        envConfig,
-        hooks,
-      );
-      return new Response(JSON.stringify({ output, html, stats, logs }), {
+      const { output, html, stats } = await generateStatus(params, envConfig);
+      return new Response(JSON.stringify({ output, html, stats }), {
         status: 200,
         headers: withSecurityHeaders({
           "content-type": "application/json; charset=utf-8",
@@ -212,28 +232,50 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
   }
 
-  // ---- Legacy one-shot ----
-  try {
-    const { hooks, logs } = createLogCapture();
-    const { output, html, stats } = await generateStatus(
-      params,
-      envConfig,
-      hooks,
-    );
-    return new Response(JSON.stringify({ output, html, stats, logs }), {
-      status: 200,
-      headers: withSecurityHeaders({
-        "content-type": "application/json; charset=utf-8",
-        "cache-control": "no-store",
-      }),
-    });
-  } catch (error: unknown) {
-    return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
-      status: 500,
-      headers: withSecurityHeaders({
-        "content-type": "application/json; charset=utf-8",
-        "cache-control": "no-store",
-      }),
-    });
-  }
+  // Streaming (NDJSON) response
+  const enc = new TextEncoder();
+  const ts = new TransformStream();
+  const writer = ts.writable.getWriter();
+
+  const write = (obj: Record<string, unknown>) => {
+    void writer.write(enc.encode(JSON.stringify(obj) + "\n"));
+  };
+
+  (async () => {
+    try {
+      const hooks = {
+        info: (msg: string) => write({ kind: "info", msg }),
+        warn: (msg: string) => write({ kind: "warn", msg }),
+        phase: (name: string, meta?: Record<string, unknown>) => {
+          const payload = meta
+            ? { kind: "phase", name, ...meta }
+            : { kind: "phase", name };
+          write(payload);
+        },
+        progress: (name: string, current: number, total?: number) =>
+          write({ kind: "progress", phase: name, current, total }),
+      };
+
+      write({ kind: "start", msg: "Starting snazzybot…" });
+
+      const { output, html, stats } = await generateStatus(
+        params,
+        envConfig,
+        hooks,
+      );
+      write({ kind: "done", output, html, stats });
+    } catch (error: unknown) {
+      write({ kind: "error", msg: toErrorMessage(error) });
+    } finally {
+      await writer.close();
+    }
+  })();
+
+  return new Response(ts.readable, {
+    status: 200,
+    headers: withSecurityHeaders({
+      "content-type": "application/x-ndjson; charset=utf-8",
+      "cache-control": "no-store",
+    }),
+  });
 };

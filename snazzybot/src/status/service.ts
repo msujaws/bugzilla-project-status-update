@@ -47,11 +47,12 @@ const defaultVoice = (voice?: VoiceOption): VoiceOption => voice ?? "normal";
 
 const defaultModel = (model?: string) => model ?? "gpt-5";
 
-const debugLogger = (hooks: ProgressHooks): DebugLog => {
-  return (message) => {
+const debugLogger = (enabled: boolean, hooks: ProgressHooks): DebugLog => {
+  return (message, options) => {
+    if (!enabled && !options?.always) return;
     const payload = `[status] ${message}`;
     console.debug(payload);
-    hooks.info?.(`[debug] ${message}`);
+    if (enabled) hooks.info?.(`[debug] ${message}`);
   };
 };
 
@@ -164,8 +165,8 @@ export async function generateStatus(
   stats: StatusStats;
 }> {
   const includePatchContext = params.includePatchContext !== false;
-  const isDebug = true;
-  const debugLog = debugLogger(hooks);
+  const isDebug = !!params.debug;
+  const debugLog = debugLogger(isDebug, hooks);
   const client = new BugzillaClient(env);
 
   // Initialize Jira client if credentials are provided
@@ -270,7 +271,6 @@ export async function discoverCandidates(
   hooks: ProgressHooks = defaultHooks,
 ): Promise<{ sinceISO: string; candidates: Bug[] }> {
   const client = new BugzillaClient(env);
-  const debugLog = debugLogger(hooks);
   const days = params.days ?? 8;
   const sinceISO = isoDaysAgo(days);
   const components = params.components ?? [];
@@ -297,7 +297,6 @@ export async function discoverCandidates(
     whiteboards,
     metabugs,
     assignees,
-    debugLog,
   });
   hooks.info?.(`Bugzilla Candidates: ${collection.candidates.length}`);
   return { sinceISO, candidates: collection.candidates };
@@ -310,6 +309,7 @@ export async function qualifyHistoryPage(
   cursor: number,
   pageSize: number,
   hooks: ProgressHooks = defaultHooks,
+  debug = false,
 ): Promise<{
   qualifiedIds: number[];
   nextCursor: number | undefined;
@@ -376,10 +376,11 @@ export async function qualifyHistoryPage(
   }
 
   const nextCursor = end < candidates.length ? end : undefined;
-  const debugLog = debugLogger(hooks);
-  debugLog(
-    `page qualified=${qualified.length} (cursor ${start}→${end}/${candidates.length})`,
-  );
+  if (debug) {
+    hooks.info?.(
+      `[debug] page qualified=${qualified.length} (cursor ${start}→${end}/${candidates.length})`,
+    );
+  }
 
   return {
     qualifiedIds: qualified,
