@@ -1,0 +1,6 @@
+# Run lint-staged (prettier + eslint on staged files)
+npx lint-staged
+
+# Run all tests
+npm run test
+npm run test:e2e

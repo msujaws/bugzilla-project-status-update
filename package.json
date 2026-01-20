@@ -16,7 +16,8 @@
     "test:all": "npm run --prefix snazzybot test:all && npm run --prefix snazzybot lint",
     "coverage": "npm run --prefix snazzybot coverage",
     "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
-    "verify": "npm run --prefix snazzybot test:all && npm run --prefix snazzybot lint"
+    "verify": "npm run --prefix snazzybot test:all && npm run --prefix snazzybot lint",
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
@@ -30,9 +31,15 @@
   },
   "homepage": "https://github.com/msujaws/bugzilla-project-status-update#readme",
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.6.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
+  },
+  "lint-staged": {
+    "*.{js,jsx,mjs,cjs,ts,tsx,json}": "prettier --write",
+    "snazzybot/**/*.{ts,js}": "eslint --fix"
   }
 }
