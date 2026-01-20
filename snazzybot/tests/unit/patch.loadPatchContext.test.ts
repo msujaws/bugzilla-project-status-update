@@ -83,36 +83,24 @@ describe("loadPatchContext", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns commit patches and caches them for 24h", async () => {
+  it("returns commit patches from pulsebot comments", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     fetchSpy.mockResolvedValueOnce(makeXmlResponse(sampleXml));
     fetchSpy.mockResolvedValueOnce(makePatchResponse());
 
     const { loadPatchContext } = await import("../../src/patch.ts");
 
-    const first = await loadPatchContext(env, 123_456);
-    expect(first).toHaveLength(1);
-    expect(first[0]).toMatchObject({
+    const result = await loadPatchContext(env, 123_456);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
       commitUrl: "https://github.com/mozilla/example/commit/abcdef1234567890",
       message: "Example fix",
       error: undefined,
     });
     expect(fetchSpy).toHaveBeenCalledTimes(2);
-
-    const second = await loadPatchContext(env, 123_456);
-    expect(second).toHaveLength(1);
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
-
-    fetchSpy.mockResolvedValueOnce(makeXmlResponse(sampleXml));
-    fetchSpy.mockResolvedValueOnce(makePatchResponse());
-    vi.setSystemTime(new Date(baseTime.getTime() + 24 * 60 * 60 * 1000 + 1));
-
-    const third = await loadPatchContext(env, 123_456);
-    expect(third).toHaveLength(1);
-    expect(fetchSpy).toHaveBeenCalledTimes(4);
   });
 
-  it("caches empty results for bugs without pulsebot comments", async () => {
+  it("returns empty array for bugs without pulsebot comments", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     fetchSpy.mockImplementation(() =>
       Promise.resolve(makeXmlResponse(noPulsebotXml)),
@@ -120,18 +108,9 @@ describe("loadPatchContext", () => {
 
     const { loadPatchContext } = await import("../../src/patch.ts");
 
-    const first = await loadPatchContext(env, 999_999);
-    expect(first).toEqual([]);
+    const result = await loadPatchContext(env, 999_999);
+    expect(result).toEqual([]);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-    const second = await loadPatchContext(env, 999_999);
-    expect(second).toEqual([]);
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-    vi.setSystemTime(new Date(baseTime.getTime() + 24 * 60 * 60 * 1000 + 1));
-    const third = await loadPatchContext(env, 999_999);
-    expect(third).toEqual([]);
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it("retains commit reference when patch download fails", async () => {

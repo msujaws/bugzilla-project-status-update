@@ -1,10 +1,5 @@
 import { describeError } from "../utils/errors.ts";
-import {
-  createExpiringMemoryCache,
-  DAY_IN_MILLISECONDS,
-  DAY_IN_SECONDS,
-  getDefaultCache,
-} from "../utils/cache.ts";
+import { DAY_IN_SECONDS, getDefaultCache } from "../utils/cache.ts";
 import { SUB_OPERATION_PHASES } from "./phases.ts";
 import type { EnvLike, ProgressHooks } from "./types.ts";
 import type {
@@ -28,8 +23,6 @@ const JIRA_FIELDS = [
   "labels",
   "security",
 ];
-
-const requestCache = createExpiringMemoryCache<unknown>(DAY_IN_MILLISECONDS);
 
 // Regex patterns for validating Jira identifiers to prevent JQL injection
 // Issue keys: PROJECT-123 format (alphanumeric project, dash, numeric ID)
@@ -86,17 +79,12 @@ export class JiraClient {
 
   private async get<T>(path: string): Promise<T> {
     const url = `${this.baseUrl}${path}`;
+    const cfCache = this.bypass ? undefined : getDefaultCache();
 
-    if (!this.bypass) {
-      const cfCache = getDefaultCache();
-      if (cfCache) {
-        const cached = await cfCache.match(url);
-        if (cached) {
-          return cached.json() as Promise<T>;
-        }
-      } else {
-        const hit = requestCache.get(url);
-        if (hit !== undefined) return hit as T;
+    if (cfCache) {
+      const cached = await cfCache.match(url);
+      if (cached) {
+        return cached.json() as Promise<T>;
       }
     }
 
@@ -114,24 +102,19 @@ export class JiraClient {
 
     const json = (await response.json()) as T;
 
-    if (!this.bypass) {
-      const cfCache = getDefaultCache();
-      if (cfCache) {
-        try {
-          await cfCache.put(
-            url,
-            new Response(JSON.stringify(json), {
-              headers: {
-                "content-type": "application/json; charset=utf-8",
-                "cache-control": `public, s-maxage=${DAY_IN_SECONDS}, max-age=0, immutable`,
-              },
-            }),
-          );
-        } catch (error) {
-          console.warn("Failed to cache Jira response", error);
-        }
-      } else {
-        requestCache.set(url, json as unknown);
+    if (cfCache) {
+      try {
+        await cfCache.put(
+          url,
+          new Response(JSON.stringify(json), {
+            headers: {
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": `public, s-maxage=${DAY_IN_SECONDS}, max-age=0, immutable`,
+            },
+          }),
+        );
+      } catch (error) {
+        console.warn("Failed to cache Jira response", error);
       }
     }
 

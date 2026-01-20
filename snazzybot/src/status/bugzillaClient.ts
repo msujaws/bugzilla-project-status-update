@@ -1,10 +1,5 @@
 import { describeError } from "../utils/errors.ts";
-import {
-  createExpiringMemoryCache,
-  DAY_IN_MILLISECONDS,
-  DAY_IN_SECONDS,
-  getDefaultCache,
-} from "../utils/cache.ts";
+import { DAY_IN_SECONDS, getDefaultCache } from "../utils/cache.ts";
 import { SUB_OPERATION_PHASES } from "./phases.ts";
 import type {
   Bug,
@@ -29,8 +24,6 @@ const BUG_FIELDS = [
   "depends_on",
   "blocks",
 ];
-
-const requestCache = createExpiringMemoryCache<unknown>(DAY_IN_MILLISECONDS);
 
 type BugQueryParams = Record<string, string | number | string[] | undefined>;
 
@@ -61,17 +54,12 @@ export class BugzillaClient {
     const url = this.makeUrl(path, params);
     // Use URL without API key as cache key to avoid credential exposure
     const cacheKey = url.toString();
+    const cfCache = this.bypass ? undefined : getDefaultCache();
 
-    if (!this.bypass) {
-      const cfCache = getDefaultCache();
-      if (cfCache) {
-        const cached = await cfCache.match(cacheKey);
-        if (cached) {
-          return cached.json() as Promise<T>;
-        }
-      } else {
-        const hit = requestCache.get(cacheKey);
-        if (hit !== undefined) return hit as T;
+    if (cfCache) {
+      const cached = await cfCache.match(cacheKey);
+      if (cached) {
+        return cached.json() as Promise<T>;
       }
     }
 
@@ -86,24 +74,19 @@ export class BugzillaClient {
     }
     const json = (await response.json()) as T;
 
-    if (!this.bypass) {
-      const cfCache = getDefaultCache();
-      if (cfCache) {
-        try {
-          await cfCache.put(
-            cacheKey,
-            new Response(JSON.stringify(json), {
-              headers: {
-                "content-type": "application/json; charset=utf-8",
-                "cache-control": `public, s-maxage=${DAY_IN_SECONDS}, max-age=0, immutable`,
-              },
-            }),
-          );
-        } catch (error) {
-          console.warn("Failed to cache Bugzilla response", error);
-        }
-      } else {
-        requestCache.set(cacheKey, json as unknown);
+    if (cfCache) {
+      try {
+        await cfCache.put(
+          cacheKey,
+          new Response(JSON.stringify(json), {
+            headers: {
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": `public, s-maxage=${DAY_IN_SECONDS}, max-age=0, immutable`,
+            },
+          }),
+        );
+      } catch (error) {
+        console.warn("Failed to cache Bugzilla response", error);
       }
     }
 

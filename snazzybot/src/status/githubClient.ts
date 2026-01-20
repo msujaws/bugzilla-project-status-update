@@ -1,10 +1,5 @@
 import { describeError } from "../utils/errors.ts";
-import {
-  createExpiringMemoryCache,
-  DAY_IN_MILLISECONDS,
-  DAY_IN_SECONDS,
-  getDefaultCache,
-} from "../utils/cache.ts";
+import { DAY_IN_SECONDS, getDefaultCache } from "../utils/cache.ts";
 import type { EnvLike } from "./types.ts";
 import type {
   GitHubCommit,
@@ -14,8 +9,6 @@ import type {
   GitHubRawPullRequest,
   GitHubRawPullRequestDetails,
 } from "./githubTypes.ts";
-
-const requestCache = createExpiringMemoryCache<unknown>(DAY_IN_MILLISECONDS);
 
 const MAX_COMMITS_PER_REPO = 500;
 const MAX_PRS_PER_REPO = 100;
@@ -43,17 +36,13 @@ export class GitHubClient {
     }
 
     const url = `${this.baseUrl}${path}`;
+    const cfCache =
+      !this.bypass && !options.bypassCache ? getDefaultCache() : undefined;
 
-    if (!this.bypass && !options.bypassCache) {
-      const cfCache = getDefaultCache();
-      if (cfCache) {
-        const cached = await cfCache.match(url);
-        if (cached) {
-          return cached.json() as Promise<T>;
-        }
-      } else {
-        const hit = requestCache.get(url);
-        if (hit !== undefined) return hit as T;
+    if (cfCache) {
+      const cached = await cfCache.match(url);
+      if (cached) {
+        return cached.json() as Promise<T>;
       }
     }
 
@@ -81,24 +70,19 @@ export class GitHubClient {
 
     const json = (await response.json()) as T;
 
-    if (!this.bypass && !options.bypassCache) {
-      const cfCache = getDefaultCache();
-      if (cfCache) {
-        try {
-          await cfCache.put(
-            url,
-            new Response(JSON.stringify(json), {
-              headers: {
-                "content-type": "application/json; charset=utf-8",
-                "cache-control": `public, s-maxage=${DAY_IN_SECONDS}, max-age=0, immutable`,
-              },
-            }),
-          );
-        } catch (error) {
-          console.warn("Failed to cache GitHub response", error);
-        }
-      } else {
-        requestCache.set(url, json as unknown);
+    if (cfCache) {
+      try {
+        await cfCache.put(
+          url,
+          new Response(JSON.stringify(json), {
+            headers: {
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": `public, s-maxage=${DAY_IN_SECONDS}, max-age=0, immutable`,
+            },
+          }),
+        );
+      } catch (error) {
+        console.warn("Failed to cache GitHub response", error);
       }
     }
 

@@ -1,11 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import type { EnvLike } from "./status/types.ts";
-import {
-  createExpiringMemoryCache,
-  DAY_IN_MILLISECONDS,
-  DAY_IN_SECONDS,
-  getDefaultCache,
-} from "./utils/cache.ts";
+import { DAY_IN_SECONDS, getDefaultCache } from "./utils/cache.ts";
 import { describeError } from "./utils/errors.ts";
 
 export type CommitPatch = {
@@ -19,8 +14,6 @@ type CachePayload = {
   bugId: number;
   patches: CommitPatch[];
 };
-
-const memCache = createExpiringMemoryCache<CachePayload>(DAY_IN_MILLISECONDS);
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -55,18 +48,16 @@ const readCache = async (
 ): Promise<CachePayload | undefined> => {
   if (bypass) return undefined;
   const cfCache = getDefaultCache();
-  if (cfCache) {
-    try {
-      const hit = await cfCache.match(key);
-      if (!hit) return undefined;
-      const json = (await hit.json()) as CachePayload;
-      if (json && typeof json === "object") return json;
-    } catch (error) {
-      console.warn("Failed to read patch context from cache", error);
-    }
-    return undefined;
+  if (!cfCache) return undefined;
+  try {
+    const hit = await cfCache.match(key);
+    if (!hit) return undefined;
+    const json = (await hit.json()) as CachePayload;
+    if (json && typeof json === "object") return json;
+  } catch (error) {
+    console.warn("Failed to read patch context from cache", error);
   }
-  return memCache.get(key);
+  return undefined;
 };
 
 const writeCache = async (
@@ -76,23 +67,20 @@ const writeCache = async (
 ) => {
   if (bypass) return;
   const cfCache = getDefaultCache();
-  if (cfCache) {
-    try {
-      await cfCache.put(
-        key,
-        new Response(JSON.stringify(payload), {
-          headers: {
-            "content-type": "application/json; charset=utf-8",
-            "cache-control": `public, s-maxage=${DAY_IN_SECONDS}, max-age=0, immutable`,
-          },
-        }),
-      );
-    } catch (error) {
-      console.warn("Failed to write patch context to cache", error);
-    }
-    return;
+  if (!cfCache) return;
+  try {
+    await cfCache.put(
+      key,
+      new Response(JSON.stringify(payload), {
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": `public, s-maxage=${DAY_IN_SECONDS}, max-age=0, immutable`,
+        },
+      }),
+    );
+  } catch (error) {
+    console.warn("Failed to write patch context to cache", error);
   }
-  memCache.set(key, payload);
 };
 
 const extractLastPulsebotComment = (parsed: unknown) => {
