@@ -31,6 +31,42 @@ const JIRA_FIELDS = [
 
 const requestCache = createExpiringMemoryCache<unknown>(DAY_IN_MILLISECONDS);
 
+// Regex patterns for validating Jira identifiers to prevent JQL injection
+// Issue keys: PROJECT-123 format (alphanumeric project, dash, numeric ID)
+const VALID_ISSUE_KEY = /^[A-Z][A-Z0-9]*-\d+$/i;
+// Project keys: alphanumeric only, typically uppercase (but allow flexibility)
+const VALID_PROJECT_KEY = /^[A-Z][A-Z0-9_]*$/i;
+
+/**
+ * Escape a string value for use in JQL queries.
+ * JQL requires double quotes around values with special characters,
+ * and backslash escaping for quotes within the value.
+ */
+function escapeJqlValue(value: string): string {
+  // Escape backslashes first, then double quotes
+  const escaped = value
+    .replaceAll("\\", "\\\\")
+    .replaceAll('"', String.raw`\"`);
+  // Always quote the value to be safe
+  return `"${escaped}"`;
+}
+
+/**
+ * Validate that a string is a valid Jira issue key (e.g., "TEST-123")
+ * to prevent JQL injection attacks.
+ */
+function isValidIssueKey(key: string): boolean {
+  return VALID_ISSUE_KEY.test(key);
+}
+
+/**
+ * Validate that a string is a valid Jira project key
+ * to prevent JQL injection attacks.
+ */
+function isValidProjectKey(key: string): boolean {
+  return VALID_PROJECT_KEY.test(key);
+}
+
 export class JiraClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
@@ -164,14 +200,17 @@ export class JiraClient {
   }
 
   /**
-   * Generate JQL for a project with time window and status filters
+   * Generate JQL for a project with time window and status filters.
+   * Project names are properly escaped to prevent JQL injection.
    */
   generateProjectJQL(project: string, sinceDays: number): string {
-    return `project = ${project} AND statusCategory = Done AND updated >= -${sinceDays}d`;
+    // Use escapeJqlValue to safely quote the project name
+    return `project = ${escapeJqlValue(project)} AND statusCategory = Done AND updated >= -${sinceDays}d`;
   }
 
   /**
-   * Fetch issues by project names with parallel execution
+   * Fetch issues by project names with parallel execution.
+   * Project names are validated to prevent JQL injection attacks.
    */
   async fetchIssuesByProjects(
     projects: string[],
@@ -179,6 +218,15 @@ export class JiraClient {
     hooks: ProgressHooks,
   ): Promise<JiraIssue[]> {
     if (projects.length === 0) return [];
+
+    // Validate all project names before processing
+    for (const project of projects) {
+      if (!isValidProjectKey(project)) {
+        throw new Error(
+          `Invalid project key: "${project}". Project keys must be alphanumeric.`,
+        );
+      }
+    }
 
     const results: JiraIssue[] = [];
     const CONCURRENCY = 8;
@@ -225,17 +273,30 @@ export class JiraClient {
   }
 
   /**
-   * Fetch issues by their keys
+   * Fetch issues by their keys.
+   * Keys are validated to prevent JQL injection attacks.
    */
   async fetchIssuesByKeys(keys: string[]): Promise<JiraIssue[]> {
     if (keys.length === 0) return [];
+
+    // Validate all keys before processing
+    for (const key of keys) {
+      if (!isValidIssueKey(key)) {
+        throw new Error(
+          `Invalid issue key: "${key}". Issue keys must be in PROJECT-123 format.`,
+        );
+      }
+    }
 
     const chunkSize = 100;
     const results: JiraIssue[] = [];
 
     for (let i = 0; i < keys.length; i += chunkSize) {
       const chunk = keys.slice(i, i + chunkSize);
-      const jql = `key IN (${chunk.join(",")})`;
+      // Keys are validated, so we can safely use them in JQL
+      // Quote each key for safety
+      const quotedKeys = chunk.map((k) => escapeJqlValue(k));
+      const jql = `key IN (${quotedKeys.join(",")})`;
       const encodedJQL = encodeURIComponent(jql);
       const encodedFields = encodeURIComponent(JIRA_FIELDS.join(","));
       const path = `/rest/api/3/search?jql=${encodedJQL}&maxResults=${chunkSize}&fields=${encodedFields}`;

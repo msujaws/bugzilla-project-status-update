@@ -164,7 +164,8 @@ describe("JiraClient", () => {
           const url = new URL(request.url);
           const jql = url.searchParams.get("jql");
 
-          expect(jql).toContain("project = TEST1");
+          // Project names are now quoted for JQL injection protection
+          expect(jql).toContain('project = "TEST1"');
 
           return HttpResponse.json({
             issues: [
@@ -250,12 +251,13 @@ describe("JiraClient", () => {
     });
   });
 
-  it("generates correct JQL for project filtering", () => {
+  it("generates correct JQL for project filtering with proper quoting", () => {
     const client = new JiraClient(env);
     const jql = client.generateProjectJQL("MYPROJ", 7);
 
+    // Project names should be quoted to prevent JQL injection
     expect(jql).toBe(
-      "project = MYPROJ AND statusCategory = Done AND updated >= -7d",
+      'project = "MYPROJ" AND statusCategory = Done AND updated >= -7d',
     );
   });
 
@@ -452,5 +454,86 @@ describe("JiraClient", () => {
     expect(issues).toHaveLength(150);
     expect(issues[0].key).toBe("TEST-1");
     expect(issues[149].key).toBe("TEST-150");
+  });
+
+  describe("JQL sanitization", () => {
+    it("properly escapes project names with special characters in JQL", () => {
+      const client = new JiraClient(env);
+
+      // Project name with double quotes should be escaped
+      const jqlWithQuotes = client.generateProjectJQL('Test"Project', 7);
+      // Double quotes inside should be escaped with backslash
+      expect(jqlWithQuotes).toContain(String.raw`Test\"Project`);
+    });
+
+    it("validates issue keys to prevent JQL injection", async () => {
+      const client = new JiraClient(env);
+
+      // Malicious key attempt should be rejected
+      const maliciousKey = 'TEST-1 OR key = "ADMIN-1"';
+      // Keys should only contain alphanumeric, dash characters
+      await expect(client.fetchIssuesByKeys([maliciousKey])).rejects.toThrow(
+        /invalid.*key/i,
+      );
+    });
+
+    it("validates project names to prevent JQL injection", async () => {
+      const client = new JiraClient(env);
+
+      // Malicious project name attempt
+      const maliciousProject = 'TEST OR project = "SECRET"';
+      await expect(
+        client.fetchIssuesByProjects([maliciousProject], 7, {}),
+      ).rejects.toThrow(/invalid.*project/i);
+    });
+
+    it("accepts valid project keys", () => {
+      const client = new JiraClient(env);
+
+      // Valid project keys should work
+      const jql1 = client.generateProjectJQL("TEST", 7);
+      expect(jql1).toContain('project = "TEST"');
+
+      // Project with numbers should work
+      const jql2 = client.generateProjectJQL("PROJECT123", 7);
+      expect(jql2).toContain('project = "PROJECT123"');
+
+      // Project with underscore should work
+      const jql3 = client.generateProjectJQL("MY_PROJECT", 7);
+      expect(jql3).toContain('project = "MY_PROJECT"');
+    });
+
+    it("rejects invalid issue keys", async () => {
+      const client = new JiraClient(env);
+
+      // Missing project prefix
+      await expect(client.fetchIssuesByKeys(["123"])).rejects.toThrow(
+        /invalid.*key/i,
+      );
+
+      // Invalid characters
+      await expect(client.fetchIssuesByKeys(["TEST@123"])).rejects.toThrow(
+        /invalid.*key/i,
+      );
+    });
+
+    it("accepts valid issue keys", async () => {
+      server.use(
+        http.get("https://test-org.atlassian.net/rest/api/3/search", () => {
+          return HttpResponse.json({
+            issues: [],
+            maxResults: 100,
+            startAt: 0,
+            total: 0,
+          });
+        }),
+      );
+
+      const client = new JiraClient(env);
+      // These should not throw
+      await expect(
+        client.fetchIssuesByKeys(["TEST-123", "PROJ-1", "A1-999"]),
+      ).resolves.toEqual([]);
+    });
   });
 });
