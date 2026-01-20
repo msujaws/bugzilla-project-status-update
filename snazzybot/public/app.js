@@ -466,6 +466,9 @@ function download(filename, content, mime) {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
+// Store reference to previous iframe load handler to prevent memory leaks
+let previousIframeLoadHandler = null;
+
 function setResultIframe(html) {
   // Stop facts rotation when displaying results
   factsRotator.stop();
@@ -509,6 +512,13 @@ function setResultIframe(html) {
       console.error(error);
     }
   };
+
+  // Remove previous listener to prevent memory leaks from accumulating handlers
+  if (previousIframeLoadHandler) {
+    frame.removeEventListener("load", previousIframeLoadHandler);
+  }
+  previousIframeLoadHandler = onload;
+
   frame.addEventListener("load", onload);
   setTimeout(onload, 50);
   return safeHtml;
