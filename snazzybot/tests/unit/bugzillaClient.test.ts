@@ -5,6 +5,7 @@ import type { EnvLike, ProgressHooks } from "../../src/status/types.ts";
 describe("BugzillaClient", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
   let capturedUrls: URL[] = [];
+  let capturedHeaders: Headers[] = [];
 
   const mockEnv: EnvLike = {
     BUGZILLA_API_KEY: "test-api-key",
@@ -16,11 +17,17 @@ describe("BugzillaClient", () => {
 
   beforeEach(() => {
     capturedUrls = [];
+    capturedHeaders = [];
     fetchSpy = vi
       .spyOn(globalThis, "fetch")
-      .mockImplementation(async (input) => {
+      .mockImplementation(async (input, init) => {
         const url = new URL(input as string);
         capturedUrls.push(url);
+        if (init?.headers) {
+          capturedHeaders.push(
+            new Headers(init.headers as Record<string, string>),
+          );
+        }
         return new Response(JSON.stringify({ bugs: [] }), {
           status: 200,
           headers: { "content-type": "application/json" },
@@ -141,6 +148,35 @@ describe("BugzillaClient", () => {
       expect(totalDuration).toBeLessThan(120);
 
       vi.useFakeTimers();
+    });
+  });
+
+  describe("API key handling", () => {
+    it("should send API key via X-BUGZILLA-API-KEY header, not in URL", async () => {
+      const client = new BugzillaClient(mockEnv);
+
+      await client.fetchBugsByWhiteboards(["[test]"], "2026-01-01", emptyHooks);
+
+      expect(capturedUrls).toHaveLength(1);
+      const url = capturedUrls[0];
+
+      // API key should NOT be in URL query params
+      expect(url.searchParams.has("api_key")).toBe(false);
+      expect(url.toString()).not.toContain("test-api-key");
+
+      // API key should be in header
+      expect(capturedHeaders).toHaveLength(1);
+      expect(capturedHeaders[0].get("X-BUGZILLA-API-KEY")).toBe("test-api-key");
+    });
+
+    it("should not expose API key in cache keys", async () => {
+      const client = new BugzillaClient(mockEnv);
+
+      await client.fetchBugsByWhiteboards(["[test]"], "2026-01-01", emptyHooks);
+
+      // The URL used for caching should not contain the API key
+      expect(capturedUrls[0].toString()).not.toContain("api_key");
+      expect(capturedUrls[0].toString()).not.toContain("test-api-key");
     });
   });
 });

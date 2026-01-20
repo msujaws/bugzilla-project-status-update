@@ -53,28 +53,34 @@ export class BugzillaClient {
         url.searchParams.set(key, String(value));
       }
     }
-    url.searchParams.set("api_key", this.env.BUGZILLA_API_KEY);
+    // API key is sent via header, not URL params, to avoid exposure in logs/caches
     return url;
   }
 
   private async get<T>(path: string, params: BugQueryParams = {}): Promise<T> {
     const url = this.makeUrl(path, params);
-    const key = url.toString();
+    // Use URL without API key as cache key to avoid credential exposure
+    const cacheKey = url.toString();
 
     if (!this.bypass) {
       const cfCache = getDefaultCache();
       if (cfCache) {
-        const cached = await cfCache.match(key);
+        const cached = await cfCache.match(cacheKey);
         if (cached) {
           return cached.json() as Promise<T>;
         }
       } else {
-        const hit = requestCache.get(key);
+        const hit = requestCache.get(cacheKey);
         if (hit !== undefined) return hit as T;
       }
     }
 
-    const response = await fetch(key);
+    // Send API key via header instead of URL to prevent exposure in logs/caches
+    const response = await fetch(url.toString(), {
+      headers: {
+        "X-BUGZILLA-API-KEY": this.env.BUGZILLA_API_KEY,
+      },
+    });
     if (!response.ok) {
       throw new Error(`Bugzilla ${response.status}: ${await response.text()}`);
     }
@@ -85,7 +91,7 @@ export class BugzillaClient {
       if (cfCache) {
         try {
           await cfCache.put(
-            key,
+            cacheKey,
             new Response(JSON.stringify(json), {
               headers: {
                 "content-type": "application/json; charset=utf-8",
@@ -97,7 +103,7 @@ export class BugzillaClient {
           console.warn("Failed to cache Bugzilla response", error);
         }
       } else {
-        requestCache.set(key, json as unknown);
+        requestCache.set(cacheKey, json as unknown);
       }
     }
 
