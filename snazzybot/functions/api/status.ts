@@ -28,14 +28,34 @@ const withSecurityHeaders = (headers: globalThis.HeadersInit = {}) => {
   return merged;
 };
 
-const toErrorMessage = (error: unknown): string => {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
+/**
+ * Generate a short unique error ID for tracking purposes.
+ * Uses timestamp + random suffix to create a unique identifier.
+ */
+const generateErrorId = (): string => {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).slice(2, 6);
+  return `${timestamp}-${random}`;
+};
+
+/**
+ * Create a safe, generic error response that doesn't leak internal details.
+ * Logs the full error server-side for debugging while returning a sanitized message to clients.
+ */
+const createSafeErrorResponse = (
+  error: unknown,
+  context: string,
+): { message: string; errorId: string } => {
+  const errorId = generateErrorId();
+
+  // Log full error details server-side for debugging
+  console.error(`[${context}] Error ${errorId}:`, error);
+
+  // Return generic message to client - don't expose internal error details
+  return {
+    message: `An error occurred while processing your request. Error ID: ${errorId}`,
+    errorId,
+  };
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -157,13 +177,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           },
         );
       } catch (error: unknown) {
-        return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
-          status: 500,
-          headers: withSecurityHeaders({
-            "content-type": "application/json; charset=utf-8",
-            "cache-control": "no-store",
+        const safeError = createSafeErrorResponse(error, "status-api");
+        return new Response(
+          JSON.stringify({
+            error: safeError.message,
+            errorId: safeError.errorId,
           }),
-        });
+          {
+            status: 500,
+            headers: withSecurityHeaders({
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "no-store",
+            }),
+          },
+        );
       }
     }
     if (mode === "page") {
@@ -198,13 +225,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           },
         );
       } catch (error: unknown) {
-        return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
-          status: 500,
-          headers: withSecurityHeaders({
-            "content-type": "application/json; charset=utf-8",
-            "cache-control": "no-store",
+        const safeError = createSafeErrorResponse(error, "status-api");
+        return new Response(
+          JSON.stringify({
+            error: safeError.message,
+            errorId: safeError.errorId,
           }),
-        });
+          {
+            status: 500,
+            headers: withSecurityHeaders({
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "no-store",
+            }),
+          },
+        );
       }
     }
     if (mode === "finalize") {
@@ -221,13 +255,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           }),
         });
       } catch (error: unknown) {
-        return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
-          status: 500,
-          headers: withSecurityHeaders({
-            "content-type": "application/json; charset=utf-8",
-            "cache-control": "no-store",
+        const safeError = createSafeErrorResponse(error, "status-api");
+        return new Response(
+          JSON.stringify({
+            error: safeError.message,
+            errorId: safeError.errorId,
           }),
-        });
+          {
+            status: 500,
+            headers: withSecurityHeaders({
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "no-store",
+            }),
+          },
+        );
       }
     }
 
@@ -242,13 +283,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         }),
       });
     } catch (error: unknown) {
-      return new Response(JSON.stringify({ error: toErrorMessage(error) }), {
-        status: 500,
-        headers: withSecurityHeaders({
-          "content-type": "application/json; charset=utf-8",
-          "cache-control": "no-store",
+      const safeError = createSafeErrorResponse(error, "status-api");
+      return new Response(
+        JSON.stringify({
+          error: safeError.message,
+          errorId: safeError.errorId,
         }),
-      });
+        {
+          status: 500,
+          headers: withSecurityHeaders({
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "no-store",
+          }),
+        },
+      );
     }
   }
 
@@ -285,7 +333,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       );
       write({ kind: "done", output, html, stats });
     } catch (error: unknown) {
-      write({ kind: "error", msg: toErrorMessage(error) });
+      const safeError = createSafeErrorResponse(error, "status-api-stream");
+      write({
+        kind: "error",
+        msg: safeError.message,
+        errorId: safeError.errorId,
+      });
     } finally {
       await writer.close();
     }
