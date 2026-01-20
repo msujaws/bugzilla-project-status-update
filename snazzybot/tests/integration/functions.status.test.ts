@@ -24,7 +24,7 @@ describe("functions/api/status.ts", () => {
     });
     expect(r.status).toBe(500);
     const j = await r.json();
-    expect(j.error).toMatch(/missing OPENAI_API_KEY/i);
+    expect(j.error).toMatch(/server configuration error/i);
     await mf.dispose();
   });
 

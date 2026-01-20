@@ -26,16 +26,6 @@ interface RequestBody {
   params?: SearchParams;
 }
 
-const toErrorMessage = (error: unknown): string => {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-};
-
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // Apply rate limiting
   const clientIP = getClientIP(request);
@@ -46,7 +36,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   if (!env.OPENAI_API_KEY) {
     return new Response(
-      JSON.stringify({ error: "OpenAI API key not configured" }),
+      JSON.stringify({
+        error: "Server configuration error. Please contact the administrator.",
+      }),
       {
         status: 500,
         headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -97,7 +89,7 @@ Return format: {"name": "Your Name Here"}`;
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API returned ${response.status}`);
+      throw new Error("Failed to generate name suggestion");
     }
 
     const data = await response.json();
@@ -114,10 +106,11 @@ Return format: {"name": "Your Name Here"}`;
       headers: { "Content-Type": "application/json; charset=utf-8" },
     });
   } catch (error) {
+    // Log detailed error for debugging, but return generic message to client
     console.error("Name suggestion error:", error);
     return new Response(
       JSON.stringify({
-        error: toErrorMessage(error) || "Failed to generate name",
+        error: "Failed to generate name suggestion. Please try again.",
       }),
       {
         status: 500,

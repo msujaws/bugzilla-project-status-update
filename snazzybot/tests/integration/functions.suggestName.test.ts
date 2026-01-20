@@ -166,7 +166,7 @@ describe("Suggest Name API Function", () => {
 
     expect(response.status).toBe(500);
     const data = await response.json();
-    expect(data.error).toContain("API key");
+    expect(data.error).toContain("Server configuration error");
   });
 
   it("returns error when OpenAI API fails", async () => {

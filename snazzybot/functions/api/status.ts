@@ -54,7 +54,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!env.OPENAI_API_KEY || !env.BUGZILLA_API_KEY) {
     return new Response(
       JSON.stringify({
-        error: "Server missing OPENAI_API_KEY or BUGZILLA_API_KEY",
+        error: "Server configuration error. Please contact the administrator.",
       }),
       {
         status: 500,
