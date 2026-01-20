@@ -186,7 +186,49 @@ const validateInput = (body: Record<string, unknown>): string | undefined => {
   return undefined;
 };
 
+/**
+ * Validate the Origin header to protect against CSRF attacks.
+ * For same-origin requests, the Origin header should match the request URL's origin.
+ * Returns an error message if validation fails, undefined if valid.
+ */
+const validateOrigin = (request: Request): string | undefined => {
+  const origin = request.headers.get("Origin");
+  const requestUrl = new URL(request.url);
+
+  // No Origin header is acceptable for:
+  // - Same-origin requests (browser may omit Origin for same-origin POST)
+  // - Non-browser clients (curl, Postman, etc.)
+  if (!origin) {
+    return undefined;
+  }
+
+  // Parse and validate the Origin header
+  try {
+    const originUrl = new URL(origin);
+    // Origin should match the request host
+    if (originUrl.host !== requestUrl.host) {
+      return "Cross-origin requests are not allowed";
+    }
+  } catch {
+    return "Invalid Origin header";
+  }
+
+  return undefined;
+};
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  // Validate Origin header for CSRF protection
+  const originError = validateOrigin(request);
+  if (originError) {
+    return new Response(JSON.stringify({ error: originError }), {
+      status: 403,
+      headers: withSecurityHeaders({
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+      }),
+    });
+  }
+
   // Apply rate limiting
   const clientIP = getClientIP(request);
   const rateLimit = checkRateLimit(clientIP, STATUS_RATE_LIMIT);

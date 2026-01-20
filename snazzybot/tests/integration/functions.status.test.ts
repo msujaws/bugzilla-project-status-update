@@ -112,6 +112,66 @@ describe("functions/api/status.ts", () => {
     await mf.dispose();
   });
 
+  describe("CSRF protection", () => {
+    it("allows requests without Origin header", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ days: 7, whiteboards: ["[fx-vpn]"] }),
+      });
+      // Should not be rejected for CSRF (may be 200 or other status, but not 403)
+      expect(r.status).not.toBe(403);
+      await mf.dispose();
+    });
+
+    it("allows same-origin requests", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Origin: "http://local",
+        },
+        body: JSON.stringify({ days: 7, whiteboards: ["[fx-vpn]"] }),
+      });
+      expect(r.status).not.toBe(403);
+      await mf.dispose();
+    });
+
+    it("rejects cross-origin requests", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Origin: "http://evil.com",
+        },
+        body: JSON.stringify({ days: 7, whiteboards: ["[fx-vpn]"] }),
+      });
+      expect(r.status).toBe(403);
+      const j = await r.json();
+      expect(j.error).toMatch(/cross-origin/i);
+      await mf.dispose();
+    });
+
+    it("rejects invalid Origin header", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Origin: "not-a-valid-url",
+        },
+        body: JSON.stringify({ days: 7, whiteboards: ["[fx-vpn]"] }),
+      });
+      expect(r.status).toBe(403);
+      const j = await r.json();
+      expect(j.error).toMatch(/invalid origin/i);
+      await mf.dispose();
+    });
+  });
+
   describe("input validation", () => {
     it("rejects arrays exceeding max length", async () => {
       const mf = await makeMiniflare({}, { forceFallback: true });
