@@ -3,6 +3,7 @@ import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import globals from "globals";
 import unicorn from "eslint-plugin-unicorn";
+import noUnsanitized from "eslint-plugin-no-unsanitized";
 import eslintConfigPrettier from "eslint-config-prettier";
 
 const commonUnicornRules = {
@@ -72,31 +73,15 @@ export default [
     },
     plugins: {
       unicorn,
+      "no-unsanitized": noUnsanitized,
     },
     rules: {
       ...js.configs.recommended.rules,
       ...unicorn.configs.recommended.rules,
       ...commonUnicornRules,
-      // Security: Prohibit innerHTML to prevent XSS vulnerabilities
-      // Use textContent, createElement, or DOMPurify.sanitize() instead
-      "no-restricted-properties": [
-        "error",
-        {
-          object: "document",
-          property: "write",
-          message: "Use safe DOM methods instead of document.write",
-        },
-        {
-          property: "innerHTML",
-          message:
-            "innerHTML can lead to XSS vulnerabilities. Use textContent, createElement with append, or DOMPurify.sanitize() instead.",
-        },
-        {
-          property: "outerHTML",
-          message:
-            "outerHTML can lead to XSS vulnerabilities. Use textContent, createElement with append, or DOMPurify.sanitize() instead.",
-        },
-      ],
+      // Security: Prevent XSS via innerHTML/outerHTML - use textContent, createElement, or DOMPurify
+      "no-unsanitized/method": "error",
+      "no-unsanitized/property": "error",
     },
   },
   eslintConfigPrettier, // must come last; turns off style rules that conflict with Prettier
