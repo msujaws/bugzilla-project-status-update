@@ -85,4 +85,62 @@ describe("BugzillaClient", () => {
       expect(url.searchParams.has("last_change_time")).toBe(false);
     });
   });
+
+  describe("fetchBugsByIds", () => {
+    it("should fetch multiple chunks in parallel", async () => {
+      const requestTimes: { chunk: string; start: number; end: number }[] = [];
+
+      fetchSpy.mockImplementation(async (input) => {
+        const url = new URL(input as string);
+        const ids = url.searchParams.get("id") || "";
+
+        const start = Date.now();
+        // Simulate network delay
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const end = Date.now();
+
+        requestTimes.push({ chunk: ids, start, end });
+
+        const bugIds = ids.split(",").map(Number);
+        return new Response(
+          JSON.stringify({
+            bugs: bugIds.map((id) => ({
+              id,
+              summary: `Bug ${id}`,
+              status: "RESOLVED",
+              resolution: "FIXED",
+            })),
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      });
+
+      const client = new BugzillaClient(mockEnv);
+
+      // Create 900 IDs - this will require 3 chunks of 300
+      const ids = Array.from({ length: 900 }, (_, i) => i + 1);
+
+      vi.useRealTimers(); // Need real timers for parallel timing test
+
+      const bugs = await client.fetchBugsByIds(ids);
+
+      expect(bugs).toHaveLength(900);
+      expect(requestTimes).toHaveLength(3); // 3 chunks
+
+      // Verify requests overlapped (parallel execution)
+      // With sequential execution, 3 chunks × 50ms = 150ms+
+      // With parallel execution, they should overlap significantly
+      const firstStart = Math.min(...requestTimes.map((r) => r.start));
+      const lastEnd = Math.max(...requestTimes.map((r) => r.end));
+      const totalDuration = lastEnd - firstStart;
+
+      // If parallel, should complete in ~50-80ms; if sequential, ~150ms+
+      expect(totalDuration).toBeLessThan(120);
+
+      vi.useFakeTimers();
+    });
+  });
 });

@@ -210,15 +210,28 @@ export class BugzillaClient {
   async fetchBugsByIds(ids: number[]): Promise<Bug[]> {
     if (ids.length === 0) return [];
     const chunkSize = 300;
-    const results: Bug[] = [];
+    const chunks: number[][] = [];
     for (let i = 0; i < ids.length; i += chunkSize) {
-      const chunk = ids.slice(i, i + chunkSize);
-      const { bugs } = await this.get<{ bugs: Bug[] }>(`/bug`, {
-        id: chunk.join(","),
-        include_fields: BUG_FIELDS.join(","),
-      });
-      results.push(...bugs);
+      chunks.push(ids.slice(i, i + chunkSize));
     }
+
+    const results: Bug[] = [];
+    const CONCURRENCY = 8;
+    let cursor = 0;
+
+    const worker = async () => {
+      while (cursor < chunks.length) {
+        const index = cursor++;
+        const chunk = chunks[index];
+        const { bugs } = await this.get<{ bugs: Bug[] }>(`/bug`, {
+          id: chunk.join(","),
+          include_fields: BUG_FIELDS.join(","),
+        });
+        results.push(...bugs);
+      }
+    };
+
+    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
     return results;
   }
 
