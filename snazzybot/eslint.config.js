@@ -77,6 +77,26 @@ export default [
       ...js.configs.recommended.rules,
       ...unicorn.configs.recommended.rules,
       ...commonUnicornRules,
+      // Security: Prohibit innerHTML to prevent XSS vulnerabilities
+      // Use textContent, createElement, or DOMPurify.sanitize() instead
+      "no-restricted-properties": [
+        "error",
+        {
+          object: "document",
+          property: "write",
+          message: "Use safe DOM methods instead of document.write",
+        },
+        {
+          property: "innerHTML",
+          message:
+            "innerHTML can lead to XSS vulnerabilities. Use textContent, createElement with append, or DOMPurify.sanitize() instead.",
+        },
+        {
+          property: "outerHTML",
+          message:
+            "outerHTML can lead to XSS vulnerabilities. Use textContent, createElement with append, or DOMPurify.sanitize() instead.",
+        },
+      ],
     },
   },
   eslintConfigPrettier, // must come last; turns off style rules that conflict with Prettier

@@ -2,6 +2,25 @@
 const STORAGE_KEY = "snazzybot_searches";
 const MAX_SEARCHES = 50;
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/**
+ * Create an SVG icon element using a symbol reference.
+ * This is a safe alternative to innerHTML that prevents XSS.
+ * @param {string} iconId - The ID of the SVG symbol (e.g., "icon-edit")
+ * @param {string} viewBox - The viewBox attribute value
+ * @returns {SVGSVGElement} The created SVG element
+ */
+function createSvgIcon(iconId, viewBox) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("viewBox", viewBox);
+  const use = document.createElementNS(SVG_NS, "use");
+  use.setAttributeNS("http://www.w3.org/1999/xlink", "href", `#${iconId}`);
+  svg.append(use);
+  return svg;
+}
+
 /**
  * Get all saved searches from localStorage
  * @returns {Array} Array of saved search objects
@@ -152,7 +171,7 @@ export class SavedSearches {
 
   render() {
     const searches = getAllSearches();
-    this.container.innerHTML = "";
+    this.container.replaceChildren(); // Safe way to clear container
 
     if (searches.length === 0) return;
 
@@ -174,17 +193,21 @@ export class SavedSearches {
 
     // Show undo state if this search is pending deletion
     if (this.pendingDelete?.id === search.id) {
-      div.innerHTML = `
-        <span class="search-name-deleted">${search.name}</span>
-        <button class="undo-btn" data-id="${search.id}">Undo</button>
-      `;
-      const undoBtn = div.querySelector(".undo-btn");
-      if (undoBtn) {
-        undoBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.undoDelete(search.id);
-        });
-      }
+      // Use safe DOM methods instead of innerHTML to prevent XSS
+      const deletedNameSpan = document.createElement("span");
+      deletedNameSpan.className = "search-name-deleted";
+      deletedNameSpan.textContent = search.name; // Safe: textContent escapes HTML
+
+      const undoBtn = document.createElement("button");
+      undoBtn.className = "undo-btn";
+      undoBtn.dataset.id = search.id;
+      undoBtn.textContent = "Undo";
+      undoBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.undoDelete(search.id);
+      });
+
+      div.append(deletedNameSpan, undoBtn);
     } else {
       const nameSpan = document.createElement("span");
       nameSpan.className = "search-name";
@@ -194,8 +217,9 @@ export class SavedSearches {
       // New tab indicator icon
       const newTabIndicator = document.createElement("span");
       newTabIndicator.className = "new-tab-indicator";
-      newTabIndicator.innerHTML =
-        '<svg aria-hidden="true" viewBox="0 0 512 512"><use href="#icon-external-link"></use></svg>';
+      newTabIndicator.append(
+        createSvgIcon("icon-external-link", "0 0 512 512"),
+      );
       // Detect platform for appropriate modifier key label
       const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
       newTabIndicator.title = `${isMac ? "Cmd" : "Ctrl"}+Click to open in new tab and execute`;
@@ -206,21 +230,21 @@ export class SavedSearches {
       editBtn.dataset.id = search.id;
       editBtn.setAttribute("aria-label", "Edit search name");
       editBtn.title = "Edit search name";
-      editBtn.innerHTML = `<svg aria-hidden="true" viewBox="0 0 512 512"><use href="#icon-edit"></use></svg>`;
+      editBtn.append(createSvgIcon("icon-edit", "0 0 512 512"));
 
       const shareBtn = document.createElement("button");
       shareBtn.className = "share-btn";
       shareBtn.dataset.id = search.id;
       shareBtn.setAttribute("aria-label", "Copy share link");
       shareBtn.title = "Copy share link";
-      shareBtn.innerHTML = `<svg aria-hidden="true" viewBox="0 0 640 512"><use href="#icon-link"></use></svg>`;
+      shareBtn.append(createSvgIcon("icon-link", "0 0 640 512"));
 
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "delete-btn";
       deleteBtn.dataset.id = search.id;
       deleteBtn.setAttribute("aria-label", "Delete search");
       deleteBtn.title = "Delete search";
-      deleteBtn.innerHTML = `<svg aria-hidden="true" viewBox="0 0 448 512"><use href="#icon-trash"></use></svg>`;
+      deleteBtn.append(createSvgIcon("icon-trash", "0 0 448 512"));
 
       editBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -415,36 +439,31 @@ export class SavedSearches {
   }
 
   async shareSearch(id, buttonElement) {
+    // Helper to show temporary feedback and restore original content
+    const showFeedback = (text, color) => {
+      // Save original children (the SVG icon)
+      const originalChildren = [...buttonElement.childNodes];
+      buttonElement.replaceChildren(); // Clear safely
+      buttonElement.textContent = text;
+      buttonElement.style.color = color;
+      buttonElement.style.opacity = "1";
+
+      setTimeout(() => {
+        buttonElement.replaceChildren(...originalChildren);
+        buttonElement.style.color = "";
+        buttonElement.style.opacity = "";
+      }, 2000);
+    };
+
     try {
       const url = this.getShareableURL(id, { includeOrigin: true });
       if (!url) return;
 
       await navigator.clipboard.writeText(url);
-
-      // Show temporary feedback with checkmark
-      const originalHTML = buttonElement.innerHTML;
-      buttonElement.innerHTML = "✓";
-      buttonElement.style.color = "var(--ok)";
-      buttonElement.style.opacity = "1";
-
-      setTimeout(() => {
-        buttonElement.innerHTML = originalHTML;
-        buttonElement.style.color = "";
-        buttonElement.style.opacity = "";
-      }, 2000);
+      showFeedback("✓", "var(--ok)");
     } catch (error) {
       console.error("Failed to copy share link:", error);
-      // Show error feedback with X
-      const originalHTML = buttonElement.innerHTML;
-      buttonElement.innerHTML = "✗";
-      buttonElement.style.color = "var(--err)";
-      buttonElement.style.opacity = "1";
-
-      setTimeout(() => {
-        buttonElement.innerHTML = originalHTML;
-        buttonElement.style.color = "";
-        buttonElement.style.opacity = "";
-      }, 2000);
+      showFeedback("✗", "var(--err)");
     }
   }
 }

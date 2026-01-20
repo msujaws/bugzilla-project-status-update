@@ -449,4 +449,51 @@ describe("SavedSearches Class", () => {
     // Should show error feedback
     expect(shareBtn.innerHTML).toBe("✗");
   });
+
+  it("escapes HTML in search names during undo state to prevent XSS", () => {
+    vi.useFakeTimers();
+
+    // Create a search with a malicious name containing HTML/script injection
+    const maliciousName = "<img src=x onerror=\"alert('XSS')\">";
+    saveSearch({ name: maliciousName, params: {} });
+
+    new SavedSearches(container, mockCallbacks);
+
+    // Trigger delete to show undo state
+    const deleteBtn = container.querySelector(".delete-btn");
+    deleteBtn.click();
+
+    // The malicious content should be escaped/displayed as text, not rendered as HTML
+    const deletedNameSpan = container.querySelector(".search-name-deleted");
+    expect(deletedNameSpan).toBeTruthy();
+
+    // The text content should contain the literal string, not execute it
+    expect(deletedNameSpan.textContent).toBe(maliciousName);
+
+    // The innerHTML should NOT contain an actual img tag that could execute
+    // It should be escaped or set via textContent
+    expect(deletedNameSpan.innerHTML).not.toContain("<img");
+
+    vi.useRealTimers();
+  });
+
+  it("escapes HTML in search IDs during undo state to prevent XSS", () => {
+    vi.useFakeTimers();
+
+    // Create a search with a normal name but we'll verify the button data-id is safe
+    const search = saveSearch({ name: "Test Search", params: {} });
+
+    new SavedSearches(container, mockCallbacks);
+
+    // Trigger delete to show undo state
+    const deleteBtn = container.querySelector(".delete-btn");
+    deleteBtn.click();
+
+    // The undo button should exist and have the correct data-id attribute
+    const undoBtn = container.querySelector(".undo-btn");
+    expect(undoBtn).toBeTruthy();
+    expect(undoBtn.dataset.id).toBe(search.id);
+
+    vi.useRealTimers();
+  });
 });

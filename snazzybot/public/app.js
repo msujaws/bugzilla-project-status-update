@@ -579,7 +579,7 @@ function resetUIBeforeRun() {
   const logHost = $("log");
   if (logHost) logHost.textContent = "";
   const phases = $("phases");
-  if (phases) phases.innerHTML = "";
+  if (phases) phases.replaceChildren(); // Safe way to clear container
   const quickStatus = $("quick-status");
   if (quickStatus) quickStatus.style.display = "none";
 
