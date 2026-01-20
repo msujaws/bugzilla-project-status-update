@@ -46,6 +46,29 @@ Maintain a crisp, technical tone and highlight concrete fixes, affected surfaces
 `;
 const leadershipAudienceHint = `
 Audience: leadership. Be high-level and concise. Focus on user/business impact, risks, timelines, and cross-team blockers. Avoid low-level tech details and code paths.
+
+Structure: Group updates by feature or subproject area using Markdown headings (e.g., \`## WebDriver\`, \`## Network\`). For each area, write a brief paragraph (2-3 sentences) describing the collective improvements and their user/business impact. Lead with what changed and why it matters—do not lead with individual names.
+
+Attribution: At the end of each feature/subproject section, add a separate line crediting contributors with linked bug numbers: \`Contributors: Name ([bug_id](https://bugzil.la/bug_id))\`. If a contributor fixed multiple bugs, list all their bug IDs. This keeps the focus on the product changes while still acknowledging the team members and their specific contributions.
+
+Below is a sample showing the intended style. Replace the feature areas, descriptions, and names with real data from the payload.
+
+✅ Good example:
+## WebDriver
+Improved spec compliance for frame switching and added support for response bodies on data: scheme requests. These changes bring the implementation closer to W3C standards and unblock automated testing workflows that depend on data URLs.
+
+Contributors: Rosa Kim ([1900453](https://bugzil.la/1900453)), Mateo Singh ([1900454](https://bugzil.la/1900454), [1900455](https://bugzil.la/1900455))
+
+## Network
+Fixed an issue where different requests could incorrectly share the same internal identifier, which was causing targeted commands to fail silently. This improves reliability for teams using fine-grained network interception.
+
+Contributors: Priya Iqbal ([1900456](https://bugzil.la/1900456))
+
+❌ Avoid these patterns:
+- Rosa Kim improved WebDriver this week... (leading with individual names)
+- 5 bugs were fixed in Network (using counts instead of narrative)
+- Fixed bug 1900453 (too vague, no context on impact)
+- Contributors: Rosa Kim, Mateo Singh (missing bug links)
 `;
 const productAudienceHint = `
 Audience: product managers. Emphasize user impact, product implications, rollout/experimentation notes, and notable tradeoffs. Include light technical context only when it clarifies impact.
