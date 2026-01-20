@@ -556,8 +556,13 @@ let currentVoice = "normal";
 function showErrorAlert(message) {
   const errorAlert = $("error-alert");
   if (errorAlert) {
-    errorAlert.textContent = message;
+    // Clear first to ensure screen readers detect the change, even if same message
+    errorAlert.textContent = "";
     errorAlert.style.display = "block";
+    // Small delay ensures the live region announces the new content
+    setTimeout(() => {
+      errorAlert.textContent = message;
+    }, 50);
   }
 }
 
