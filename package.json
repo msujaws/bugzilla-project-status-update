@@ -40,6 +40,6 @@
   },
   "lint-staged": {
     "*.{js,jsx,mjs,cjs,ts,tsx,json}": "prettier --write",
-    "snazzybot/**/*.{ts,js}": "eslint --fix"
+    "snazzybot/**/*.{ts,js}": "snazzybot/node_modules/.bin/eslint --fix --config snazzybot/eslint.config.js"
   }
 }
