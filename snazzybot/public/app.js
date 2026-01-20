@@ -222,7 +222,7 @@ function resetTabTitle() {
 function markResultsComplete() {
   document.title = `Results ready - ${defaultTitle}`;
   // Announce to screen readers (function defined later, safe due to hoisting)
-  const announcer = document.getElementById("progress-announcer");
+  const announcer = document.querySelector("#progress-announcer");
   if (announcer) {
     announcer.textContent = "";
     setTimeout(() => {
@@ -490,7 +490,7 @@ function download(filename, content, mime) {
 }
 
 // Store reference to previous iframe load handler to prevent memory leaks
-let previousIframeLoadHandler = null;
+let previousIframeLoadHandler;
 
 function setResultIframe(html) {
   // Stop facts rotation when displaying results
@@ -749,7 +749,6 @@ async function runSnazzyStream(body) {
 async function runSnazzyPaged(body) {
   const runBtn = $("run");
   const spin = $("spin");
-  const out = $("out");
   if (!runBtn || !spin) return;
 
   runBtn.disabled = true;

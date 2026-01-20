@@ -47,7 +47,8 @@ export default [
     },
   },
   {
-    files: ["functions/**/*.ts"],
+    // Match both relative (when run from snazzybot/) and absolute paths (when run from root)
+    files: ["functions/**/*.ts", "**/functions/**/*.ts"],
     languageOptions: {
       globals: {
         ...globals.serviceworker,

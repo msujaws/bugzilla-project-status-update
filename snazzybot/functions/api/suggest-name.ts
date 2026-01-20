@@ -1,7 +1,16 @@
 // functions/api/suggest-name.ts
+import {
+  checkRateLimit,
+  getClientIP,
+  rateLimitedResponse,
+} from "../../src/utils/rateLimiter";
+
 interface Env {
   OPENAI_API_KEY: string;
 }
+
+// Rate limit: 20 requests per minute per IP (more restrictive for AI calls)
+const SUGGEST_RATE_LIMIT = { maxRequests: 20, windowMs: 60_000 };
 
 interface SearchParams {
   components?: string;
@@ -28,6 +37,13 @@ const toErrorMessage = (error: unknown): string => {
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  // Apply rate limiting
+  const clientIP = getClientIP(request);
+  const rateLimit = checkRateLimit(clientIP, SUGGEST_RATE_LIMIT);
+  if (!rateLimit.allowed) {
+    return rateLimitedResponse(rateLimit.resetAt);
+  }
+
   if (!env.OPENAI_API_KEY) {
     return new Response(
       JSON.stringify({ error: "OpenAI API key not configured" }),

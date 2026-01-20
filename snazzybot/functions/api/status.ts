@@ -4,12 +4,20 @@ import {
   discoverCandidates,
   qualifyHistoryPage,
 } from "../../src/core";
+import {
+  checkRateLimit,
+  getClientIP,
+  rateLimitedResponse,
+} from "../../src/utils/rateLimiter";
 
 type Env = {
   OPENAI_API_KEY: string;
   BUGZILLA_API_KEY: string;
   GITHUB_API_KEY?: string;
 };
+
+// Rate limit: 30 requests per minute per IP
+const STATUS_RATE_LIMIT = { maxRequests: 30, windowMs: 60_000 };
 
 const CONTENT_SECURITY_POLICY =
   "default-src 'self' blob:; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com; img-src 'self' https: data:; font-src 'self' data:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
@@ -31,6 +39,18 @@ const toErrorMessage = (error: unknown): string => {
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  // Apply rate limiting
+  const clientIP = getClientIP(request);
+  const rateLimit = checkRateLimit(clientIP, STATUS_RATE_LIMIT);
+  if (!rateLimit.allowed) {
+    return rateLimitedResponse(
+      rateLimit.resetAt,
+      withSecurityHeaders({
+        "content-type": "application/json; charset=utf-8",
+      }),
+    );
+  }
+
   if (!env.OPENAI_API_KEY || !env.BUGZILLA_API_KEY) {
     return new Response(
       JSON.stringify({
