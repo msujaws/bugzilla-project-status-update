@@ -259,6 +259,131 @@ describe("JiraClient", () => {
     );
   });
 
+  it("fetches multiple projects in parallel with concurrency limit", async () => {
+    const requestTimes: { project: string; start: number; end: number }[] = [];
+
+    server.use(
+      http.get(
+        "https://test-org.atlassian.net/rest/api/3/search",
+        async ({ request }) => {
+          const url = new URL(request.url);
+          const jql = url.searchParams.get("jql") || "";
+          const projectMatch = jql.match(/project = (\w+)/);
+          const project = projectMatch ? projectMatch[1] : "UNKNOWN";
+
+          const start = Date.now();
+          // Simulate network delay
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          const end = Date.now();
+
+          requestTimes.push({ project, start, end });
+
+          return HttpResponse.json({
+            issues: [
+              {
+                key: `${project}-1`,
+                id: `${project.codePointAt(0)}001`,
+                fields: {
+                  summary: `Issue from ${project}`,
+                  project: { key: project, name: `${project} Project` },
+                  status: { name: "Done", statusCategory: { key: "done" } },
+                  updated: "2025-10-22T10:00:00.000+0000",
+                  labels: [],
+                  security: undefined,
+                },
+              },
+            ],
+            maxResults: 100,
+            startAt: 0,
+            total: 1,
+          });
+        },
+      ),
+    );
+
+    vi.useRealTimers(); // Need real timers for parallel timing test
+
+    const client = new JiraClient(env);
+    const projects = ["PROJ1", "PROJ2", "PROJ3", "PROJ4"];
+    const issues = await client.fetchIssuesByProjects(projects, 7, {});
+
+    expect(issues).toHaveLength(4);
+
+    // Verify requests overlapped (parallel execution)
+    // With sequential execution, each 50ms request would total 200ms+
+    // With parallel execution, they should overlap significantly
+    const firstStart = Math.min(...requestTimes.map((r) => r.start));
+    const lastEnd = Math.max(...requestTimes.map((r) => r.end));
+    const totalDuration = lastEnd - firstStart;
+
+    // If parallel, should complete in ~50-100ms; if sequential, ~200ms+
+    expect(totalDuration).toBeLessThan(150);
+
+    vi.useFakeTimers({ now: new Date("2025-10-29T09:36:11Z") });
+  });
+
+  it("fetches multiple JQL queries in parallel with concurrency limit", async () => {
+    const requestTimes: { jql: string; start: number; end: number }[] = [];
+
+    server.use(
+      http.get(
+        "https://test-org.atlassian.net/rest/api/3/search",
+        async ({ request }) => {
+          const url = new URL(request.url);
+          const jql = url.searchParams.get("jql") || "";
+
+          const start = Date.now();
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          const end = Date.now();
+
+          requestTimes.push({ jql, start, end });
+
+          return HttpResponse.json({
+            issues: [
+              {
+                key: "TEST-1",
+                id: "10001",
+                fields: {
+                  summary: "Test issue",
+                  project: { key: "TEST", name: "Test Project" },
+                  status: { name: "Done", statusCategory: { key: "done" } },
+                  updated: "2025-10-22T10:00:00.000+0000",
+                  labels: [],
+                  security: undefined,
+                },
+              },
+            ],
+            maxResults: 100,
+            startAt: 0,
+            total: 1,
+          });
+        },
+      ),
+    );
+
+    vi.useRealTimers();
+
+    const client = new JiraClient(env);
+    const jqlQueries = [
+      "assignee = user1",
+      "assignee = user2",
+      "assignee = user3",
+      "assignee = user4",
+    ];
+    const issues = await client.fetchIssuesByJQL(jqlQueries, {});
+
+    expect(issues).toHaveLength(4);
+
+    // Verify parallel execution
+    const firstStart = Math.min(...requestTimes.map((r) => r.start));
+    const lastEnd = Math.max(...requestTimes.map((r) => r.end));
+    const totalDuration = lastEnd - firstStart;
+
+    expect(totalDuration).toBeLessThan(150);
+
+    vi.useFakeTimers({ now: new Date("2025-10-29T09:36:11Z") });
+  });
+
   it("handles pagination correctly", async () => {
     let callCount = 0;
 

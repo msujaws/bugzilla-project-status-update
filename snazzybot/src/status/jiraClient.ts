@@ -171,7 +171,7 @@ export class JiraClient {
   }
 
   /**
-   * Fetch issues by project names
+   * Fetch issues by project names with parallel execution
    */
   async fetchIssuesByProjects(
     projects: string[],
@@ -181,17 +181,25 @@ export class JiraClient {
     if (projects.length === 0) return [];
 
     const results: JiraIssue[] = [];
-    for (const project of projects) {
-      const jql = this.generateProjectJQL(project, sinceDays);
-      const issues = await this.searchByJQL(jql, hooks);
-      results.push(...issues);
-    }
+    const CONCURRENCY = 8;
+    let cursor = 0;
 
+    const worker = async () => {
+      while (cursor < projects.length) {
+        const index = cursor++;
+        const project = projects[index];
+        const jql = this.generateProjectJQL(project, sinceDays);
+        const issues = await this.searchByJQL(jql, hooks);
+        results.push(...issues);
+      }
+    };
+
+    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
     return results;
   }
 
   /**
-   * Fetch issues by explicit JQL queries
+   * Fetch issues by explicit JQL queries with parallel execution
    */
   async fetchIssuesByJQL(
     jqlQueries: string[],
@@ -200,11 +208,19 @@ export class JiraClient {
     if (jqlQueries.length === 0) return [];
 
     const results: JiraIssue[] = [];
-    for (const jql of jqlQueries) {
-      const issues = await this.searchByJQL(jql, hooks);
-      results.push(...issues);
-    }
+    const CONCURRENCY = 8;
+    let cursor = 0;
 
+    const worker = async () => {
+      while (cursor < jqlQueries.length) {
+        const index = cursor++;
+        const jql = jqlQueries[index];
+        const issues = await this.searchByJQL(jql, hooks);
+        results.push(...issues);
+      }
+    };
+
+    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
     return results;
   }
 
