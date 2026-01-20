@@ -150,7 +150,8 @@ export class BugzillaClient {
         component: component || undefined,
         status: ["RESOLVED", "VERIFIED", "CLOSED"],
         resolution: "FIXED",
-        last_change_time: sinceISO,
+        chfield: "resolution",
+        chfieldfrom: sinceISO,
         include_fields: BUG_FIELDS.join(","),
       });
       results.push(...bugs);
@@ -180,7 +181,8 @@ export class BugzillaClient {
         resolution: "FIXED",
         whiteboard: tag,
         whiteboard_type: "substring",
-        last_change_time: sinceISO,
+        chfield: "resolution",
+        chfieldfrom: sinceISO,
         include_fields: BUG_FIELDS.join(","),
       });
       results.push(...bugs);
@@ -198,7 +200,8 @@ export class BugzillaClient {
       assigned_to: emails,
       status: ["RESOLVED", "VERIFIED", "CLOSED"],
       resolution: "FIXED",
-      last_change_time: sinceISO,
+      chfield: "resolution",
+      chfieldfrom: sinceISO,
       include_fields: BUG_FIELDS.join(","),
     });
     return bugs;
