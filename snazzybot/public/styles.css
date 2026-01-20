@@ -363,12 +363,13 @@ button:disabled {
   color: #b9c3ff;
 }
 
+/* Accessibility: Use higher contrast colors for log messages (WCAG AA 4.5:1 minimum) */
 .log .warn {
-  color: var(--warn);
+  color: #ffd666; /* Brighter gold for ~9:1 contrast on dark background */
 }
 
 .log .error {
-  color: var(--err);
+  color: #ff9a9a; /* Lighter red for ~5.9:1 contrast on dark background */
 }
 
 details {
