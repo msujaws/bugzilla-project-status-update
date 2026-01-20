@@ -25,6 +25,11 @@ export const isRestrictedBug = (groups?: string[]): boolean => {
   );
 };
 
+export const isUnassignedBug = (assignedTo?: string): boolean => {
+  if (!assignedTo) return true;
+  return assignedTo === "nobody@mozilla.org";
+};
+
 export const qualifiesBugSnapshot = (bug: Bug, sinceISO?: string): boolean => {
   const statusOk = RESOLVED_BUG_STATUSES.has(bug.status);
   const resolutionOk = bug.resolution === "FIXED";
@@ -34,15 +39,18 @@ export const qualifiesBugSnapshot = (bug: Bug, sinceISO?: string): boolean => {
 
 export const partitionRestrictedBugs = (bugs: Bug[]) => {
   const restricted: Bug[] = [];
+  const unassigned: Bug[] = [];
   const unrestricted: Bug[] = [];
   for (const bug of bugs) {
     if (isRestrictedBug(bug.groups)) {
       restricted.push(bug);
+    } else if (isUnassignedBug(bug.assigned_to)) {
+      unassigned.push(bug);
     } else {
       unrestricted.push(bug);
     }
   }
-  return { restricted, unrestricted };
+  return { restricted, unassigned, unrestricted };
 };
 
 export const qualifiesJiraIssue = (

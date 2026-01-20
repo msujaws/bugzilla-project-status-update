@@ -48,6 +48,7 @@ export const handlers = [
       groups: [],
       depends_on: [],
       blocks: [],
+      assigned_to: "dev@example.com",
     };
 
     if (assigned.length > 0) {

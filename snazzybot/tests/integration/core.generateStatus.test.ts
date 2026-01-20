@@ -133,6 +133,7 @@ describe("core integration (with MSW mocks)", () => {
                 groups: [],
                 depends_on: [],
                 blocks: [],
+                assigned_to: "dev@example.com",
               },
               {
                 id: 1_987_803,
@@ -145,6 +146,7 @@ describe("core integration (with MSW mocks)", () => {
                 groups: [],
                 depends_on: [],
                 blocks: [],
+                assigned_to: "dev@example.com",
               },
             ],
           });
@@ -162,6 +164,7 @@ describe("core integration (with MSW mocks)", () => {
               groups: [],
               depends_on: [],
               blocks: [],
+              assigned_to: "dev@example.com",
             },
           ],
         });
@@ -248,6 +251,7 @@ describe("core integration (with MSW mocks)", () => {
             groups: [],
             depends_on: [],
             blocks: [],
+            assigned_to: "dev@example.com",
           })),
         });
       }),

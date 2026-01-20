@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   filterGithubActivity,
   filterJiraIssues,
+  isUnassignedBug,
+  partitionRestrictedBugs,
   qualifiesBugSnapshot,
 } from "../../src/status/qualification.ts";
 import type { GitHubActivity } from "../../src/status/githubTypes.ts";
@@ -153,5 +155,77 @@ describe("qualification helpers", () => {
     expect(qualifiesBugSnapshot(bug, sinceISO)).toBe(true);
     expect(qualifiesBugSnapshot(staleBug, sinceISO)).toBe(false);
     expect(qualifiesBugSnapshot(openBug, sinceISO)).toBe(false);
+  });
+
+  describe("isUnassignedBug", () => {
+    it("returns true for bugs assigned to nobody@mozilla.org", () => {
+      expect(isUnassignedBug("nobody@mozilla.org")).toBe(true);
+    });
+
+    it("returns false for bugs with a real assignee", () => {
+      expect(isUnassignedBug("developer@mozilla.com")).toBe(false);
+    });
+
+    it("returns true for undefined assignee", () => {
+      expect(isUnassignedBug()).toBe(true);
+    });
+
+    it("returns true for empty string assignee", () => {
+      expect(isUnassignedBug("")).toBe(true);
+    });
+  });
+
+  describe("partitionRestrictedBugs", () => {
+    it("excludes bugs assigned to nobody@mozilla.org", () => {
+      const bugs: Bug[] = [
+        {
+          id: 1,
+          summary: "Assigned bug",
+          product: "Core",
+          component: "Widget",
+          status: "RESOLVED",
+          resolution: "FIXED",
+          last_change_time: "2025-10-21T12:00:00Z",
+          assigned_to: "developer@mozilla.com",
+          groups: [],
+        },
+        {
+          id: 2,
+          summary: "Unassigned bug",
+          product: "Core",
+          component: "Widget",
+          status: "RESOLVED",
+          resolution: "FIXED",
+          last_change_time: "2025-10-21T12:00:00Z",
+          assigned_to: "nobody@mozilla.org",
+          groups: [],
+        },
+      ];
+
+      const result = partitionRestrictedBugs(bugs);
+
+      expect(result.unrestricted.map((b) => b.id)).toEqual([1]);
+      expect(result.unassigned.map((b) => b.id)).toEqual([2]);
+    });
+
+    it("handles bugs without assigned_to field", () => {
+      const bugs: Bug[] = [
+        {
+          id: 1,
+          summary: "No assignee field",
+          product: "Core",
+          component: "Widget",
+          status: "RESOLVED",
+          resolution: "FIXED",
+          last_change_time: "2025-10-21T12:00:00Z",
+          groups: [],
+        },
+      ];
+
+      const result = partitionRestrictedBugs(bugs);
+
+      expect(result.unrestricted).toEqual([]);
+      expect(result.unassigned.map((b) => b.id)).toEqual([1]);
+    });
   });
 });
