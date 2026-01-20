@@ -307,9 +307,11 @@
           ></div>
 
           <!-- rendered output -->
+          <!-- sandbox attribute restricts iframe capabilities for defense-in-depth security -->
           <iframe
             id="resultFrame"
             title="SnazzyBot result"
+            sandbox="allow-same-origin"
             style="
               width: 100%;
               height: 320px;
