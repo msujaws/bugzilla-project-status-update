@@ -221,6 +221,14 @@ function resetTabTitle() {
 
 function markResultsComplete() {
   document.title = `Results ready - ${defaultTitle}`;
+  // Announce to screen readers (function defined later, safe due to hoisting)
+  const announcer = document.getElementById("progress-announcer");
+  if (announcer) {
+    announcer.textContent = "";
+    setTimeout(() => {
+      announcer.textContent = "Analysis complete. Results are ready.";
+    }, 50);
+  }
 }
 
 window.addEventListener("focus", resetTabTitle);
@@ -345,6 +353,19 @@ function ensurePhase(name, label) {
   return host;
 }
 
+// Announce status changes to screen readers
+function announceToScreenReader(message) {
+  const announcer = $("progress-announcer");
+  if (announcer) {
+    // Clear and set to trigger announcement even if same message
+    announcer.textContent = "";
+    // Small delay to ensure the clear is processed
+    setTimeout(() => {
+      announcer.textContent = message;
+    }, 50);
+  }
+}
+
 function setPhaseText(name, txt) {
   const slug = slugify(name);
   const t = $(`title-${slug}`);
@@ -377,6 +398,8 @@ function completePhase(name) {
     bar.style.width = "100%";
     bar.dataset.completed = "true";
   }
+  // Announce phase completion to screen readers
+  announceToScreenReader(`${name} phase completed`);
 }
 
 // Logging -------------------------------------------------------------------
@@ -562,6 +585,9 @@ function resetUIBeforeRun() {
 
   // Start rotating facts instead of showing "Waiting for results..."
   factsRotator.start();
+
+  // Announce process start to screen readers
+  announceToScreenReader("SnazzyBot analysis started");
 }
 
 async function postStatusJSON(payload) {
