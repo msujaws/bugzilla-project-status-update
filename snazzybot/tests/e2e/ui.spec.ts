@@ -225,7 +225,9 @@ test.describe("SnazzyBot UI fixtures", () => {
     await page.selectOption("#debug", "true");
     await page.getByRole("button", { name: "Run SnazzyBot" }).click();
 
-    await expect(page.locator("#out")).toContainText("ERROR: Server exploded");
+    await expect(page.locator("#error-alert")).toContainText(
+      "ERROR: Server exploded",
+    );
     await expect(page.locator("#copy")).toBeDisabled();
     await expect(page.locator("#copy-rendered")).toBeDisabled();
   });
@@ -249,7 +251,7 @@ test.describe("SnazzyBot UI fixtures", () => {
     await page.fill("#components", "DevTools");
     await page.getByRole("button", { name: "Run SnazzyBot" }).click();
 
-    await expect(page.locator("#out")).toContainText(
+    await expect(page.locator("#error-alert")).toContainText(
       "ERROR: Bugzilla unavailable",
     );
   });

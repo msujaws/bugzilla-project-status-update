@@ -520,12 +520,28 @@ let lastHTML = "";
 let currentVoice = "normal";
 
 // Helpers shared by both runners -------------------------------------------
+function showErrorAlert(message) {
+  const errorAlert = $("error-alert");
+  if (errorAlert) {
+    errorAlert.textContent = message;
+    errorAlert.style.display = "block";
+  }
+}
+
+function hideErrorAlert() {
+  const errorAlert = $("error-alert");
+  if (errorAlert) {
+    errorAlert.textContent = "";
+    errorAlert.style.display = "none";
+  }
+}
+
 function resetUIBeforeRun() {
   const out = $("out");
   resetTabTitle();
+  hideErrorAlert();
   if (out) {
     out.textContent = "";
-    out.style.display = "none";
   }
   const logHost = $("log");
   if (logHost) logHost.textContent = "";
@@ -679,17 +695,13 @@ async function runSnazzyStream(body) {
     if (buf) flushLine(buf);
   } catch (error) {
     console.error(error);
-    const out = $("out");
-    if (out) {
-      out.style.display = "block";
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === "string"
-            ? error
-            : "";
-      out.textContent = `ERROR: ${message || "Unknown error"}`;
-    }
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : "";
+    showErrorAlert(`ERROR: ${message || "Unknown error"}`);
     setActionsEnabled(Boolean(lastMarkdown));
     if (spin) spin.style.display = "none";
   } finally {
@@ -799,22 +811,18 @@ async function runSnazzyPaged(body) {
     completePhase("openai");
     setActionsEnabled(Boolean(lastMarkdown));
     spin.style.display = "none";
-    if (out) out.style.display = "none";
     burstEmojis(currentVoice);
     markResultsComplete();
   } catch (error) {
     console.error(error);
     setActionsEnabled(Boolean(lastMarkdown));
-    if (out) {
-      out.style.display = "block";
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === "string"
-            ? error
-            : "";
-      out.textContent = `ERROR: ${message || "Unknown error"}`;
-    }
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : "";
+    showErrorAlert(`ERROR: ${message || "Unknown error"}`);
     if (body.includePatchContext !== false) {
       setPhaseIndeterminate("patch-context");
     }

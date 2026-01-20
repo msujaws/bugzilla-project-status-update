@@ -284,10 +284,14 @@
             </button>
           </div>
           <!-- keep a hidden textual backup for accessibility / copy as markdown -->
+          <div id="out" class="out sr-only" aria-live="polite"></div>
+
+          <!-- error messages - role="alert" ensures screen reader announcement -->
           <div
-            id="out"
-            class="out"
-            aria-live="polite"
+            id="error-alert"
+            class="error-alert"
+            role="alert"
+            aria-live="assertive"
             style="display: none"
           ></div>
 
