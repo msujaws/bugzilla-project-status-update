@@ -190,6 +190,9 @@ export class SavedSearches {
     const div = document.createElement("div");
     div.className = "saved-search";
     div.dataset.id = search.id;
+    // Make focusable and indicate it's interactive for accessibility
+    div.setAttribute("tabindex", "0");
+    div.setAttribute("role", "button");
 
     // Show undo state if this search is pending deletion
     if (this.pendingDelete?.id === search.id) {
@@ -259,6 +262,18 @@ export class SavedSearches {
       deleteBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         this.deleteWithUndo(search.id);
+      });
+
+      // Keyboard accessibility: handle Enter and Space
+      div.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault(); // Prevent scrolling on space
+          if (e.metaKey || e.ctrlKey) {
+            this.openInNewTabAndExecute(search.id);
+          } else {
+            this.loadSearch(search.id);
+          }
+        }
       });
 
       div.addEventListener("click", (e) => {

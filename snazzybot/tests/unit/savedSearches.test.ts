@@ -496,4 +496,71 @@ describe("SavedSearches Class", () => {
 
     vi.useRealTimers();
   });
+
+  describe("keyboard accessibility", () => {
+    it("makes search items focusable with tabindex", () => {
+      saveSearch({ name: "Test Search", params: {} });
+
+      new SavedSearches(container, mockCallbacks);
+      const searchEl = container.querySelector(".saved-search");
+
+      expect(searchEl.getAttribute("tabindex")).toBe("0");
+    });
+
+    it("adds button role to search items for screen readers", () => {
+      saveSearch({ name: "Test Search", params: {} });
+
+      new SavedSearches(container, mockCallbacks);
+      const searchEl = container.querySelector(".saved-search");
+
+      expect(searchEl.getAttribute("role")).toBe("button");
+    });
+
+    it("loads search when Enter key is pressed", () => {
+      const params = { components: "Firefox:General", days: 14 };
+      saveSearch({ name: "Keyboard Test", params });
+
+      new SavedSearches(container, mockCallbacks);
+      const searchEl = container.querySelector(".saved-search");
+
+      const enterEvent = new dom.window.KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+      });
+      searchEl.dispatchEvent(enterEvent);
+
+      expect(mockCallbacks.onLoad).toHaveBeenCalledWith(params);
+    });
+
+    it("loads search when Space key is pressed", () => {
+      const params = { components: "DevTools", days: 7 };
+      saveSearch({ name: "Space Test", params });
+
+      new SavedSearches(container, mockCallbacks);
+      const searchEl = container.querySelector(".saved-search");
+
+      const spaceEvent = new dom.window.KeyboardEvent("keydown", {
+        key: " ",
+        bubbles: true,
+      });
+      searchEl.dispatchEvent(spaceEvent);
+
+      expect(mockCallbacks.onLoad).toHaveBeenCalledWith(params);
+    });
+
+    it("does not load search for other keys", () => {
+      saveSearch({ name: "Key Test", params: { days: 7 } });
+
+      new SavedSearches(container, mockCallbacks);
+      const searchEl = container.querySelector(".saved-search");
+
+      const tabEvent = new dom.window.KeyboardEvent("keydown", {
+        key: "Tab",
+        bubbles: true,
+      });
+      searchEl.dispatchEvent(tabEvent);
+
+      expect(mockCallbacks.onLoad).not.toHaveBeenCalled();
+    });
+  });
 });
