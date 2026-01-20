@@ -111,4 +111,105 @@ describe("functions/api/status.ts", () => {
     expect(lines.at(-1)?.kind).toBe("done");
     await mf.dispose();
   });
+
+  describe("input validation", () => {
+    it("rejects arrays exceeding max length", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          // MAX_ARRAY_LENGTH is 100, so 101 should fail
+          components: Array.from({ length: 101 }, (_, i) => `component-${i}`),
+          days: 7,
+        }),
+      });
+      expect(r.status).toBe(400);
+      const j = await r.json();
+      expect(j.error).toMatch(/array exceeds maximum/i);
+      await mf.dispose();
+    });
+
+    it("rejects strings exceeding max length", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          // MAX_STRING_LENGTH is 500, so 501 chars should fail
+          components: ["a".repeat(501)],
+          days: 7,
+        }),
+      });
+      expect(r.status).toBe(400);
+      const j = await r.json();
+      expect(j.error).toMatch(/string exceeds maximum/i);
+      await mf.dispose();
+    });
+
+    it("rejects days outside valid range", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          components: ["Firefox"],
+          days: 366, // MAX_DAYS is 365
+        }),
+      });
+      expect(r.status).toBe(400);
+      const j = await r.json();
+      expect(j.error).toMatch(/days must be between/i);
+      await mf.dispose();
+    });
+
+    it("rejects pageSize outside valid range", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "page",
+          components: ["Firefox"],
+          pageSize: 1001, // MAX_PAGE_SIZE is 1000
+        }),
+      });
+      expect(r.status).toBe(400);
+      const j = await r.json();
+      expect(j.error).toMatch(/pageSize must be between/i);
+      await mf.dispose();
+    });
+
+    it("rejects invalid mode values", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "invalid-mode",
+          components: ["Firefox"],
+        }),
+      });
+      expect(r.status).toBe(400);
+      const j = await r.json();
+      expect(j.error).toMatch(/invalid mode/i);
+      await mf.dispose();
+    });
+
+    it("accepts valid input within limits", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          components: ["Firefox", "DevTools"],
+          days: 30,
+          mode: "oneshot",
+        }),
+      });
+      // Should not return 400 validation error
+      expect(r.status).not.toBe(400);
+      await mf.dispose();
+    });
+  });
 });

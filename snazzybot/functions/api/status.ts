@@ -19,6 +19,18 @@ type Env = {
 // Rate limit: 30 requests per minute per IP
 const STATUS_RATE_LIMIT = { maxRequests: 30, windowMs: 60_000 };
 
+// Input validation limits
+const MAX_ARRAY_LENGTH = 100;
+const MAX_STRING_LENGTH = 500;
+const MIN_DAYS = 1;
+const MAX_DAYS = 365;
+const MIN_PAGE_SIZE = 1;
+const MAX_PAGE_SIZE = 1000;
+const VALID_MODES = ["discover", "page", "finalize", "oneshot"] as const;
+const VALID_FORMATS = ["md", "html"] as const;
+const VALID_VOICES = ["normal", "casual", "formal"] as const;
+const VALID_AUDIENCES = ["technical", "executive", "general"] as const;
+
 const CONTENT_SECURITY_POLICY =
   "default-src 'self' blob:; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com; img-src 'self' https: data:; font-src 'self' data:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
@@ -58,6 +70,122 @@ const createSafeErrorResponse = (
   };
 };
 
+/**
+ * Create a 400 Bad Request response for validation errors.
+ */
+const validationErrorResponse = (message: string) => {
+  return new Response(JSON.stringify({ error: message }), {
+    status: 400,
+    headers: withSecurityHeaders({
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    }),
+  });
+};
+
+/**
+ * Validate array fields - check length and item string lengths.
+ */
+const validateArrayField = (
+  arr: unknown,
+  fieldName: string,
+): string | undefined => {
+  if (!Array.isArray(arr)) return undefined;
+
+  if (arr.length > MAX_ARRAY_LENGTH) {
+    return `${fieldName} array exceeds maximum length of ${MAX_ARRAY_LENGTH}`;
+  }
+
+  for (const item of arr) {
+    if (typeof item === "string" && item.length > MAX_STRING_LENGTH) {
+      return `${fieldName} string exceeds maximum length of ${MAX_STRING_LENGTH} characters`;
+    }
+  }
+
+  return undefined;
+};
+
+/**
+ * Validate all input parameters.
+ * Returns an error message string if validation fails, undefined if valid.
+ */
+const validateInput = (body: Record<string, unknown>): string | undefined => {
+  // Validate array fields
+  const arrayFields = [
+    "components",
+    "metabugs",
+    "whiteboards",
+    "assignees",
+    "githubRepos",
+    "ids",
+  ] as const;
+
+  for (const field of arrayFields) {
+    const error = validateArrayField(body[field], field);
+    if (error) return error;
+  }
+
+  // Validate days
+  const days = body.days;
+  if (days !== undefined) {
+    const daysNum = Number(days);
+    if (Number.isNaN(daysNum) || daysNum < MIN_DAYS || daysNum > MAX_DAYS) {
+      return `days must be between ${MIN_DAYS} and ${MAX_DAYS}`;
+    }
+  }
+
+  // Validate pageSize
+  const pageSize = body.pageSize;
+  if (pageSize !== undefined) {
+    const pageSizeNum = Number(pageSize);
+    if (
+      Number.isNaN(pageSizeNum) ||
+      pageSizeNum < MIN_PAGE_SIZE ||
+      pageSizeNum > MAX_PAGE_SIZE
+    ) {
+      return `pageSize must be between ${MIN_PAGE_SIZE} and ${MAX_PAGE_SIZE}`;
+    }
+  }
+
+  // Validate mode
+  const mode = body.mode;
+  if (
+    mode !== undefined &&
+    !VALID_MODES.includes(mode as (typeof VALID_MODES)[number])
+  ) {
+    return `Invalid mode. Must be one of: ${VALID_MODES.join(", ")}`;
+  }
+
+  // Validate format
+  const format = body.format;
+  if (
+    format !== undefined &&
+    !VALID_FORMATS.includes(format as (typeof VALID_FORMATS)[number])
+  ) {
+    return `Invalid format. Must be one of: ${VALID_FORMATS.join(", ")}`;
+  }
+
+  // Validate voice
+  const voice = body.voice;
+  if (
+    voice !== undefined &&
+    !VALID_VOICES.includes(voice as (typeof VALID_VOICES)[number])
+  ) {
+    return `Invalid voice. Must be one of: ${VALID_VOICES.join(", ")}`;
+  }
+
+  // Validate audience
+  const audience = body.audience;
+  if (
+    audience !== undefined &&
+    !VALID_AUDIENCES.includes(audience as (typeof VALID_AUDIENCES)[number])
+  ) {
+    return `Invalid audience. Must be one of: ${VALID_AUDIENCES.join(", ")}`;
+  }
+
+  return undefined;
+};
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // Apply rate limiting
   const clientIP = getClientIP(request);
@@ -86,7 +214,17 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     );
   }
 
-  const body = await request.json().catch(() => ({}));
+  const body = (await request.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+
+  // Validate input before processing
+  const validationError = validateInput(body);
+  if (validationError) {
+    return validationErrorResponse(validationError);
+  }
+
   const {
     components = [],
     metabugs = [],
@@ -108,7 +246,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     pageSize = 35,
     // only for finalize
     ids = [],
-  } = body || {};
+  } = body;
 
   const url = new URL(request.url);
   const accept = request.headers.get("accept") || "";
