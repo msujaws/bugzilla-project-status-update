@@ -8,8 +8,9 @@
   --gold-2: #ffb400;
   --accent: #7aa2ff;
   --ok: #2ecc71;
-  --warn: #ffb347;
-  --err: #ff6b6b;
+  /* Accessibility: Use higher contrast colors for WCAG AA 4.5:1 minimum */
+  --warn: #ffd666; /* Brighter gold for ~9:1 contrast on dark background */
+  --err: #ff9a9a; /* Lighter red for ~5.9:1 contrast on dark background */
   --radius: 16px;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
@@ -363,13 +364,12 @@ button:disabled {
   color: #b9c3ff;
 }
 
-/* Accessibility: Use higher contrast colors for log messages (WCAG AA 4.5:1 minimum) */
 .log .warn {
-  color: #ffd666; /* Brighter gold for ~9:1 contrast on dark background */
+  color: var(--warn);
 }
 
 .log .error {
-  color: #ff9a9a; /* Lighter red for ~5.9:1 contrast on dark background */
+  color: var(--err);
 }
 
 details {

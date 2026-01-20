@@ -112,6 +112,12 @@ All code must be written using Test-Driven Development (TDD):
 2. Write the minimum code to make the test pass
 3. Refactor as needed while keeping tests green
 
+## CSS Conventions
+
+- Use CSS custom properties (variables) defined in `:root` instead of hardcoding colors
+- When updating colors, modify the custom property values rather than overriding with inline values
+- Example: use `color: var(--warn)` not `color: #ffd666`
+
 ## Git Conventions
 
 Do not include `Co-Authored-By` lines in commit messages.
