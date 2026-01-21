@@ -256,6 +256,123 @@ describe("functions/api/status.ts", () => {
       await mf.dispose();
     });
 
+    it("rejects invalid audience values", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          audience: "executive", // not a valid audience
+          whiteboards: ["[fx-vpn]"],
+        }),
+      });
+      expect(r.status).toBe(400);
+      const j = await r.json();
+      expect(j.error).toMatch(/invalid audience/i);
+      await mf.dispose();
+    });
+
+    it("rejects invalid voice values", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          voice: "formal", // not a valid voice
+          whiteboards: ["[fx-vpn]"],
+        }),
+      });
+      expect(r.status).toBe(400);
+      const j = await r.json();
+      expect(j.error).toMatch(/invalid voice/i);
+      await mf.dispose();
+    });
+
+    it("rejects invalid format values", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          format: "pdf", // not a valid format
+          whiteboards: ["[fx-vpn]"],
+        }),
+      });
+      expect(r.status).toBe(400);
+      const j = await r.json();
+      expect(j.error).toMatch(/invalid format/i);
+      await mf.dispose();
+    });
+
+    // These tests ensure API validation stays in sync with frontend options
+    it.each(["technical", "product", "leadership"])(
+      "accepts valid audience value: %s",
+      async (audience) => {
+        const mf = await makeMiniflare({}, { forceFallback: true });
+        const r = await mf.dispatchFetch("http://local/api/status", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            audience,
+            whiteboards: ["[fx-vpn]"],
+          }),
+        });
+        expect(r.status).not.toBe(400);
+        await mf.dispose();
+      },
+    );
+
+    it.each(["normal", "pirate", "snazzy-robot"])(
+      "accepts valid voice value: %s",
+      async (voice) => {
+        const mf = await makeMiniflare({}, { forceFallback: true });
+        const r = await mf.dispatchFetch("http://local/api/status", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            voice,
+            whiteboards: ["[fx-vpn]"],
+          }),
+        });
+        expect(r.status).not.toBe(400);
+        await mf.dispose();
+      },
+    );
+
+    it.each(["md", "html"])(
+      "accepts valid format value: %s",
+      async (format) => {
+        const mf = await makeMiniflare({}, { forceFallback: true });
+        const r = await mf.dispatchFetch("http://local/api/status", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            format,
+            whiteboards: ["[fx-vpn]"],
+          }),
+        });
+        expect(r.status).not.toBe(400);
+        await mf.dispose();
+      },
+    );
+
+    it.each(["discover", "page", "finalize", "oneshot"])(
+      "accepts valid mode value: %s",
+      async (mode) => {
+        const mf = await makeMiniflare({}, { forceFallback: true });
+        const r = await mf.dispatchFetch("http://local/api/status", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            mode,
+            whiteboards: ["[fx-vpn]"],
+          }),
+        });
+        expect(r.status).not.toBe(400);
+        await mf.dispose();
+      },
+    );
+
     it("accepts valid input within limits", async () => {
       const mf = await makeMiniflare({}, { forceFallback: true });
       const r = await mf.dispatchFetch("http://local/api/status", {

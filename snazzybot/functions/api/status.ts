@@ -28,8 +28,8 @@ const MIN_PAGE_SIZE = 1;
 const MAX_PAGE_SIZE = 1000;
 const VALID_MODES = ["discover", "page", "finalize", "oneshot"] as const;
 const VALID_FORMATS = ["md", "html"] as const;
-const VALID_VOICES = ["normal", "casual", "formal"] as const;
-const VALID_AUDIENCES = ["technical", "executive", "general"] as const;
+const VALID_VOICES = ["normal", "pirate", "snazzy-robot"] as const;
+const VALID_AUDIENCES = ["technical", "product", "leadership"] as const;
 
 const CONTENT_SECURITY_POLICY =
   "default-src 'self' blob:; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com; img-src 'self' https: data:; font-src 'self' data:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
