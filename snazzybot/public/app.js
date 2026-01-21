@@ -553,6 +553,77 @@ let lastHTML = "";
 let currentVoice = "normal";
 
 // Helpers shared by both runners -------------------------------------------
+
+/**
+ * Get a user-friendly error message with helpful suggestions
+ * @param {string} message - The raw error message
+ * @returns {string} A formatted, user-friendly error message
+ */
+function getFriendlyErrorMessage(message) {
+  const lowerMsg = (message || "").toLowerCase();
+
+  // 524: Cloudflare timeout (origin didn't respond in time)
+  if (lowerMsg.includes("524") || lowerMsg.includes("a timeout occurred")) {
+    return (
+      "The server took too long to respond (error 524). " +
+      "This can happen when processing many bugs or complex queries. " +
+      "Please try again — it often works on the second attempt."
+    );
+  }
+
+  // 504: Gateway timeout
+  if (lowerMsg.includes("504") || lowerMsg.includes("gateway timeout")) {
+    return (
+      "The request timed out (error 504). " +
+      "Try reducing the date range or number of components, then try again."
+    );
+  }
+
+  // 408: Request timeout
+  if (lowerMsg.includes("408") || lowerMsg.includes("request timeout")) {
+    return (
+      "The request timed out (error 408). " +
+      "Please check your connection and try again."
+    );
+  }
+
+  // 429: Rate limited
+  if (lowerMsg.includes("429") || lowerMsg.includes("too many requests")) {
+    return (
+      "Too many requests (error 429). " +
+      "Please wait a moment before trying again."
+    );
+  }
+
+  // 503: Service unavailable
+  if (lowerMsg.includes("503") || lowerMsg.includes("service unavailable")) {
+    return (
+      "The service is temporarily unavailable (error 503). " +
+      "Please try again in a few moments."
+    );
+  }
+
+  // Network errors
+  if (
+    lowerMsg.includes("failed to fetch") ||
+    lowerMsg.includes("network") ||
+    lowerMsg.includes("offline")
+  ) {
+    return (
+      "Network error: Could not connect to the server. " +
+      "Please check your internet connection and try again."
+    );
+  }
+
+  // Generic server errors (5xx)
+  if (/\b5\d{2}\b/.test(message)) {
+    return `Server error (${message}). Please try again.`;
+  }
+
+  // Return original message if no specific handling
+  return message || "Unknown error";
+}
+
 function showErrorAlert(message) {
   const errorAlert = $("error-alert");
   if (errorAlert) {
@@ -736,13 +807,13 @@ async function runSnazzyStream(body) {
     if (buf) flushLine(buf);
   } catch (error) {
     console.error(error);
-    const message =
+    const rawMessage =
       error instanceof Error
         ? error.message
         : typeof error === "string"
           ? error
           : "";
-    showErrorAlert(`ERROR: ${message || "Unknown error"}`);
+    showErrorAlert(getFriendlyErrorMessage(rawMessage));
     setActionsEnabled(Boolean(lastMarkdown));
     if (spin) spin.style.display = "none";
   } finally {
@@ -856,13 +927,13 @@ async function runSnazzyPaged(body) {
   } catch (error) {
     console.error(error);
     setActionsEnabled(Boolean(lastMarkdown));
-    const message =
+    const rawMessage =
       error instanceof Error
         ? error.message
         : typeof error === "string"
           ? error
           : "";
-    showErrorAlert(`ERROR: ${message || "Unknown error"}`);
+    showErrorAlert(getFriendlyErrorMessage(rawMessage));
     if (body.includePatchContext !== false) {
       setPhaseIndeterminate("patch-context");
     }
