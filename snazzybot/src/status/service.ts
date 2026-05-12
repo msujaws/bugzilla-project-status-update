@@ -167,7 +167,7 @@ export async function generateStatus(
   const includePatchContext = params.includePatchContext !== false;
   const isDebug = !!params.debug;
   const debugLog = debugLogger(isDebug, hooks);
-  const client = new BugzillaClient(env);
+  const client = new BugzillaClient(env, hooks);
 
   // Initialize Jira client if credentials are provided
   let jiraClient: JiraClient | undefined;
@@ -243,6 +243,10 @@ export async function generateStatus(
   const { snapshots } = await runRecipe(recipe, context, {
     phaseNames: STEP_PHASE_CONFIG,
     onPhase: (phaseName, meta) => hooks.phase?.(phaseName, meta),
+    onError: (snapshot, error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      hooks.warn?.(`[step "${snapshot.name}" failed] ${message}`);
+    },
   });
 
   if (!context.output || !context.html) {
@@ -270,7 +274,7 @@ export async function discoverCandidates(
   env: EnvLike,
   hooks: ProgressHooks = defaultHooks,
 ): Promise<{ sinceISO: string; candidates: Bug[] }> {
-  const client = new BugzillaClient(env);
+  const client = new BugzillaClient(env, hooks);
   const days = params.days ?? 8;
   const sinceISO = isoDaysAgo(days);
   const components = params.components ?? [];
@@ -321,7 +325,7 @@ export async function qualifyHistoryPage(
     detail?: string;
   }>;
 }> {
-  const client = new BugzillaClient(env);
+  const client = new BugzillaClient(env, hooks);
   const normalizedCursor = Number.isFinite(cursor) ? Math.trunc(cursor) : 0;
   const normalizedPageSize = Math.max(
     1,

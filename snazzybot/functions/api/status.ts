@@ -57,16 +57,49 @@ const generateErrorId = (): string => {
 const createSafeErrorResponse = (
   error: unknown,
   context: string,
+  extra?: Record<string, unknown>,
 ): { message: string; errorId: string } => {
   const errorId = generateErrorId();
 
-  // Log full error details server-side for debugging
-  console.error(`[${context}] Error ${errorId}:`, error);
+  // Log full error details server-side for debugging. Use a structured payload
+  // so that the Pages logs include the stack trace and the caller-provided
+  // context (mode, params summary, etc.) — these are what the dev needs to map
+  // an Error ID back to a real failure.
+  console.error(`[${context}] Error ${errorId}:`, {
+    errorId,
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+    ...extra,
+  });
 
   // Return generic message to client - don't expose internal error details
   return {
     message: `An error occurred while processing your request. Error ID: ${errorId}`,
     errorId,
+  };
+};
+
+const arrLen = (v: unknown) => (Array.isArray(v) ? v.length : 0);
+
+/**
+ * Summarize the request body for logs without leaking large arrays or secrets.
+ */
+const summarizeRequest = (body: Record<string, unknown>) => {
+  return {
+    mode: body.mode ?? "oneshot",
+    days: body.days,
+    cursor: body.cursor,
+    pageSize: body.pageSize,
+    components: arrLen(body.components),
+    metabugs: arrLen(body.metabugs),
+    whiteboards: arrLen(body.whiteboards),
+    assignees: arrLen(body.assignees),
+    githubRepos: arrLen(body.githubRepos),
+    ids: arrLen(body.ids),
+    includePatchContext: body.includePatchContext,
+    includeGithubActivity: body.includeGithubActivity,
+    debug: body.debug,
+    skipCache: body.skipCache,
   };
 };
 
@@ -261,9 +294,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     unknown
   >;
 
+  const requestSummary = summarizeRequest(body);
+  console.log("[status-api] request received", requestSummary);
+
   // Validate input before processing
   const validationError = validateInput(body);
   if (validationError) {
+    console.warn("[status-api] validation failed", {
+      ...requestSummary,
+      reason: validationError,
+    });
     return validationErrorResponse(validationError);
   }
 
@@ -357,7 +397,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           },
         );
       } catch (error: unknown) {
-        const safeError = createSafeErrorResponse(error, "status-api");
+        const safeError = createSafeErrorResponse(
+          error,
+          "status-api",
+          requestSummary,
+        );
         return new Response(
           JSON.stringify({
             error: safeError.message,
@@ -405,7 +449,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           },
         );
       } catch (error: unknown) {
-        const safeError = createSafeErrorResponse(error, "status-api");
+        const safeError = createSafeErrorResponse(
+          error,
+          "status-api",
+          requestSummary,
+        );
         return new Response(
           JSON.stringify({
             error: safeError.message,
@@ -435,7 +483,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           }),
         });
       } catch (error: unknown) {
-        const safeError = createSafeErrorResponse(error, "status-api");
+        const safeError = createSafeErrorResponse(
+          error,
+          "status-api",
+          requestSummary,
+        );
         return new Response(
           JSON.stringify({
             error: safeError.message,
@@ -505,6 +557,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       };
 
       write({ kind: "start", msg: "Starting snazzybot…" });
+      hooks.info(`[request] ${JSON.stringify(requestSummary)}`);
 
       const { output, html, stats } = await generateStatus(
         params,
@@ -513,7 +566,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       );
       write({ kind: "done", output, html, stats });
     } catch (error: unknown) {
-      const safeError = createSafeErrorResponse(error, "status-api-stream");
+      const safeError = createSafeErrorResponse(
+        error,
+        "status-api-stream",
+        requestSummary,
+      );
+      // Surface the underlying error message in the Run Log too, so debug=yes
+      // users see the actual upstream failure (URL, status, body) alongside
+      // the generic error event. Truncate to keep individual lines reasonable.
+      const detail = error instanceof Error ? error.message : String(error);
+      write({
+        kind: "warn",
+        msg: `[error ${safeError.errorId}] ${detail.slice(0, 1000)}`,
+      });
       write({
         kind: "error",
         msg: safeError.message,

@@ -179,4 +179,62 @@ describe("BugzillaClient", () => {
       expect(capturedUrls[0].toString()).not.toContain("test-api-key");
     });
   });
+
+  describe("error logging", () => {
+    it("logs URL, status, and response body when Bugzilla returns a non-OK response", async () => {
+      fetchSpy.mockRestore();
+      fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response("Error in input stream", {
+          status: 400,
+          headers: { "content-type": "text/plain" },
+        }),
+      );
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const client = new BugzillaClient(mockEnv);
+      await expect(
+        client.fetchBugsByWhiteboards(["[test]"], "2026-01-01", emptyHooks),
+      ).rejects.toThrow(/Bugzilla 400/);
+
+      expect(errorSpy).toHaveBeenCalled();
+      const logCall = errorSpy.mock.calls.find((call) =>
+        String(call[0] || "").includes("[bugzilla]"),
+      );
+      expect(logCall, "expected a [bugzilla] log entry").toBeDefined();
+      const logged = JSON.stringify(logCall);
+      expect(logged).toContain("400");
+      expect(logged).toContain("Error in input stream");
+      expect(logged).toContain("/rest/bug");
+      expect(logged).not.toContain("test-api-key");
+
+      errorSpy.mockRestore();
+    });
+
+    it("forwards Bugzilla failures to hooks.warn so they reach the Run Log", async () => {
+      fetchSpy.mockRestore();
+      fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response("Error in input stream", {
+          status: 400,
+          headers: { "content-type": "text/plain" },
+        }),
+      );
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const warnings: string[] = [];
+      const hooks: ProgressHooks = { warn: (msg) => warnings.push(msg) };
+
+      const client = new BugzillaClient(mockEnv, hooks);
+      await expect(
+        client.fetchBugsByWhiteboards(["[test]"], "2026-01-01", emptyHooks),
+      ).rejects.toThrow();
+
+      expect(warnings.length).toBeGreaterThan(0);
+      const combined = warnings.join("\n");
+      expect(combined).toContain("[bugzilla] 400");
+      expect(combined).toContain("/rest/bug");
+      expect(combined).toContain("Error in input stream");
+      expect(combined).not.toContain("test-api-key");
+
+      errorSpy.mockRestore();
+    });
+  });
 });

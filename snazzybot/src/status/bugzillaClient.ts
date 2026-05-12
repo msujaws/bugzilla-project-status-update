@@ -30,10 +30,15 @@ type BugQueryParams = Record<string, string | number | string[] | undefined>;
 export class BugzillaClient {
   private readonly host: string;
   private readonly bypass: boolean;
+  private readonly clientHooks: ProgressHooks;
 
-  constructor(private readonly env: EnvLike) {
+  constructor(
+    private readonly env: EnvLike,
+    hooks: ProgressHooks = {},
+  ) {
     this.host = env.BUGZILLA_HOST || "https://bugzilla.mozilla.org";
     this.bypass = !!env.SNAZZY_SKIP_CACHE;
+    this.clientHooks = hooks;
   }
 
   private makeUrl(path: string, params: BugQueryParams = {}) {
@@ -70,7 +75,21 @@ export class BugzillaClient {
       },
     });
     if (!response.ok) {
-      throw new Error(`Bugzilla ${response.status}: ${await response.text()}`);
+      const body = await response.text();
+      const bodySnippet = body.slice(0, 500);
+      // URL is safe to log: API key is in header, not query string.
+      const path = `${url.pathname}${url.search}`;
+      console.error("[bugzilla] request failed", {
+        url: url.toString(),
+        status: response.status,
+        statusText: response.statusText,
+        body: bodySnippet,
+      });
+      this.clientHooks.warn?.(
+        `[bugzilla] ${response.status} ${response.statusText || ""}`.trim() +
+          ` at ${path} — ${bodySnippet}`,
+      );
+      throw new Error(`Bugzilla ${response.status} at ${path}: ${body}`);
     }
     const json = (await response.json()) as T;
 
@@ -249,6 +268,11 @@ export class BugzillaClient {
             out.push(payload.bugs[0]);
           }
         } catch (error) {
+          console.error("[bugzilla] history fetch failed", {
+            bugId: id,
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+          });
           hooks.warn?.(`Skipping history for #${id} (${describeError(error)})`);
         } finally {
           handled++;

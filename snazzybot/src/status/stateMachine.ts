@@ -21,6 +21,12 @@ export interface RunOptions<Name extends string, Context> {
   phaseNames?: Partial<Record<Name, string>>;
   /** Optional callback to emit phase notifications */
   onPhase?: (phaseName: string, meta?: Record<string, unknown>) => void;
+  /** Optional callback fired when a step throws, before the error is re-thrown */
+  onError?: (
+    snapshot: StepSnapshot<Name>,
+    error: unknown,
+    context: Context,
+  ) => void;
 }
 
 export interface RunResult<Name extends string, Context> {
@@ -71,12 +77,20 @@ export async function runRecipe<Name extends string, Context>(
       snapshot.status = "failed";
       snapshot.error = error;
 
+      console.error("[recipe] step failed", {
+        step: step.name,
+        phase: phaseName,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
       // Emit phase failure notification
       if (phaseName && options.onPhase) {
         options.onPhase(phaseName, { complete: true, failed: true });
       }
 
       options.onTransition?.({ ...snapshot }, context);
+      options.onError?.({ ...snapshot }, error, context);
       throw error;
     }
   }

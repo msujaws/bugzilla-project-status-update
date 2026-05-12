@@ -106,6 +106,37 @@ describe("state machine utility", () => {
     ]);
   });
 
+  it("invokes onError with the failing snapshot and error before throwing", async () => {
+    type StepName = "step-a";
+    type Ctx = { traces: string[] };
+    const context: Ctx = { traces: [] };
+    const recordedFailures: Array<{ step: string; message: string }> = [];
+
+    const steps: RecipeStep<StepName, Ctx>[] = [
+      {
+        name: "step-a",
+        run: () => {
+          throw new Error("boom-boom");
+        },
+      },
+    ];
+
+    await expect(
+      runRecipe(steps, context, {
+        onError: (snapshot, error) => {
+          recordedFailures.push({
+            step: snapshot.name,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        },
+      }),
+    ).rejects.toThrow("boom-boom");
+
+    expect(recordedFailures).toEqual([
+      { step: "step-a", message: "boom-boom" },
+    ]);
+  });
+
   it("emits phases for steps with configured phase names", async () => {
     type StepName = "step-a" | "step-b" | "step-c";
     const context = { value: 0 };
