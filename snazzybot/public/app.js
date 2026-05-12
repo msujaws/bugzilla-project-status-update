@@ -858,7 +858,10 @@ async function runSnazzyPaged(body) {
     // 2) Page through histories
     const qualified = new Set();
     let cursor = 0;
-    const step = Math.min(35, Math.max(20, Math.ceil(40))); // default ~35 per page
+    // Cloudflare Workers Free caps each invocation at 50 subrequests. Each
+    // page call uses 1 candidate fetch + N history fetches + ~N cache writes,
+    // so pageSize=20 keeps us safely under 50 (≈42) with margin for retries.
+    const step = 20;
     ensurePhase("histories", "histories");
     while (cursor != undefined && cursor < total) {
       spin.textContent = `⏳ Histories ${cursor + 1}-${Math.min(cursor + step, total)} of ${total}`;

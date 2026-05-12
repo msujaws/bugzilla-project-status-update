@@ -45,7 +45,7 @@
       {
         "request": {
           "cursor": 0,
-          "pageSize": 35
+          "pageSize": 20
         },
         "response": {
           "qualifiedIds": [1976518, 1980185, 1976546],
