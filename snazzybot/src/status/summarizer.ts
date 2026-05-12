@@ -2,6 +2,7 @@ import type { CommitPatch } from "../patch.ts";
 import type { Bug, EnvLike, ProgressHooks } from "./types.ts";
 import type { GitHubContributor } from "./githubTypes.ts";
 import type { JiraIssue } from "./jiraTypes.ts";
+import { SUB_OPERATION_PHASES } from "./phases.ts";
 
 type VoiceOption = "normal" | "pirate" | "snazzy-robot";
 type AudienceOption = "technical" | "product" | "leadership";
@@ -252,8 +253,13 @@ export async function summarizeWithOpenAI(
     batches.push(bugs.slice(index, index + OPENAI_BATCH_SIZE));
   }
 
+  // Re-announce the OpenAI phase with the batch count so the client switches
+  // the progress bar from indeterminate to determinate (N/M completed).
+  hooks?.phase?.(SUB_OPERATION_PHASES.OPENAI, { total: batches.length });
+
   const results: SummarizerResult[] = Array.from({ length: batches.length });
   let cursor = 0;
+  let completed = 0;
 
   const worker = async () => {
     while (cursor < batches.length) {
@@ -290,6 +296,9 @@ export async function summarizeWithOpenAI(
             : undefined,
         },
       );
+
+      completed++;
+      hooks?.progress?.(SUB_OPERATION_PHASES.OPENAI, completed, batches.length);
     }
   };
 

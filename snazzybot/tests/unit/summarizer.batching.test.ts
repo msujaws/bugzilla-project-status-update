@@ -112,6 +112,83 @@ describe("summarizeWithOpenAI batching", () => {
     expect(batchInfos[2]).toMatch(/batch 3\/3/);
   });
 
+  it("emits a determinate phase event and a progress event for every batch", async () => {
+    const phaseEvents: Array<{
+      name: string;
+      meta?: Record<string, unknown>;
+    }> = [];
+    const progressEvents: Array<{
+      name: string;
+      current: number;
+      total?: number;
+    }> = [];
+    const hooks: ProgressHooks = {
+      phase: (name, meta) => phaseEvents.push({ name, meta }),
+      progress: (name, current, total) =>
+        progressEvents.push({ name, current, total }),
+    };
+
+    const bugs = Array.from({ length: 12 }, (_, i) => makeBug(i + 1));
+    await summarizeWithOpenAI(
+      env,
+      "gpt-5-mini",
+      bugs,
+      7,
+      "normal",
+      "technical",
+      { hooks },
+    );
+
+    // At least one phase event whose meta.total matches the batch count, so the
+    // client switches the OpenAI progress bar to determinate.
+    const determinatePhase = phaseEvents.find(
+      (event) => event.meta && event.meta.total === 3,
+    );
+    expect(
+      determinatePhase,
+      "expected a phase event with total=3",
+    ).toBeDefined();
+    expect(determinatePhase?.name).toMatch(/AI summary|openai/i);
+
+    // One progress event per completed batch, counting up to total.
+    const phaseName = determinatePhase!.name;
+    const matching = progressEvents.filter((event) => event.name === phaseName);
+    expect(matching).toHaveLength(3);
+    expect(matching.map((event) => event.current).toSorted()).toEqual([
+      1, 2, 3,
+    ]);
+    for (const event of matching) {
+      expect(event.total).toBe(3);
+    }
+  });
+
+  it("does not emit determinate progress when bugs fit a single batch", async () => {
+    const phaseEvents: Array<{
+      name: string;
+      meta?: Record<string, unknown>;
+    }> = [];
+    const progressEvents: unknown[] = [];
+    const hooks: ProgressHooks = {
+      phase: (name, meta) => phaseEvents.push({ name, meta }),
+      progress: (name, current, total) =>
+        progressEvents.push({ name, current, total }),
+    };
+
+    const bugs = Array.from({ length: 4 }, (_, i) => makeBug(i + 1));
+    await summarizeWithOpenAI(
+      env,
+      "gpt-5-mini",
+      bugs,
+      7,
+      "normal",
+      "technical",
+      { hooks },
+    );
+
+    expect(phaseEvents.some((event) => event.meta?.total)).toBe(false);
+    expect(progressEvents).toHaveLength(0);
+  });
+
   it("each batch only sees its own bug ids in the user prompt", async () => {
     const bugs = Array.from({ length: 12 }, (_, i) => makeBug(i + 1));
     await summarizeWithOpenAI(
