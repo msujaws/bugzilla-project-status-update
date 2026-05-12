@@ -666,17 +666,30 @@ function resetUIBeforeRun() {
   announceToScreenReader("SnazzyBot analysis started");
 }
 
+function drainServerLogs(data) {
+  if (!data || !Array.isArray(data.logs)) return;
+  for (const entry of data.logs) {
+    if (!entry || typeof entry.msg !== "string") continue;
+    const kind = entry.kind === "warn" ? "warn" : "info";
+    log(kind, entry.msg);
+  }
+}
+
 async function postStatusJSON(payload) {
   const res = await fetch("/api/status", {
     method: "POST",
     headers: { "content-type": "application/json", Accept: "application/json" },
     body: JSON.stringify(payload),
   });
+  const data = await res.json().catch(() => ({}));
+  // Drain server-collected hook events into the Run Log on both success and
+  // error paths so debug=no users see the same diagnostic context as
+  // debug=yes streaming users.
+  drainServerLogs(data);
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
     throw new Error(data.error || res.statusText || `HTTP ${res.status}`);
   }
-  return res.json();
+  return data;
 }
 
 // Streaming runner (NDJSON) -------------------------------------------------

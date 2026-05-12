@@ -81,6 +81,30 @@ const createSafeErrorResponse = (
 
 const arrLen = (v: unknown) => (Array.isArray(v) ? v.length : 0);
 
+type RunLogEntry = { kind: "info" | "warn"; msg: string };
+
+/**
+ * Build a ProgressHooks instance that captures info/warn events into a buffer.
+ * Used by non-streaming endpoints so the JSON response can carry the same
+ * Run Log content that streaming clients see via NDJSON.
+ */
+const makeCollectingHooks = () => {
+  const logs: RunLogEntry[] = [];
+  return {
+    logs,
+    hooks: {
+      info: (msg: string) => {
+        logs.push({ kind: "info", msg });
+      },
+      warn: (msg: string) => {
+        logs.push({ kind: "warn", msg });
+      },
+      phase: () => {},
+      progress: () => {},
+    },
+  };
+};
+
 /**
  * Summarize the request body for logs without leaking large arrays or secrets.
  */
@@ -371,10 +395,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!wantsStream) {
     // ---- Paging protocol ----
     if (mode === "discover") {
+      const { hooks: collectingHooks, logs } = makeCollectingHooks();
       try {
         const { sinceISO, candidates } = await discoverCandidates(
           params,
           envConfig,
+          collectingHooks,
         );
         return new Response(
           JSON.stringify({
@@ -387,6 +413,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
               product: b.product,
               component: b.component,
             })),
+            logs,
           }),
           {
             status: 200,
@@ -406,6 +433,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           JSON.stringify({
             error: safeError.message,
             errorId: safeError.errorId,
+            logs,
           }),
           {
             status: 500,
@@ -418,10 +446,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       }
     }
     if (mode === "page") {
+      const { hooks: collectingHooks, logs } = makeCollectingHooks();
       try {
         const { sinceISO, candidates } = await discoverCandidates(
           params,
           envConfig,
+          collectingHooks,
         );
         const { qualifiedIds, nextCursor, total, results } =
           await qualifyHistoryPage(
@@ -430,16 +460,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
             candidates,
             Number(cursor) || 0,
             Number(pageSize) || 35,
-            {
-              info: (msg: string) => debug && console.log("[INFO]", msg),
-              warn: (msg: string) => console.warn("[WARN]", msg),
-              phase: () => {},
-              progress: () => {},
-            },
+            collectingHooks,
             !!debug,
           );
         return new Response(
-          JSON.stringify({ qualifiedIds, nextCursor, total, results }),
+          JSON.stringify({ qualifiedIds, nextCursor, total, results, logs }),
           {
             status: 200,
             headers: withSecurityHeaders({
@@ -458,6 +483,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           JSON.stringify({
             error: safeError.message,
             errorId: safeError.errorId,
+            logs,
           }),
           {
             status: 500,
@@ -470,12 +496,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       }
     }
     if (mode === "finalize") {
+      const { hooks: collectingHooks, logs } = makeCollectingHooks();
       try {
         const { output, html, stats } = await generateStatus(
           { ...params, ids },
           envConfig,
+          collectingHooks,
         );
-        return new Response(JSON.stringify({ output, html, stats }), {
+        return new Response(JSON.stringify({ output, html, stats, logs }), {
           status: 200,
           headers: withSecurityHeaders({
             "content-type": "application/json; charset=utf-8",
@@ -492,6 +520,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
           JSON.stringify({
             error: safeError.message,
             errorId: safeError.errorId,
+            logs,
           }),
           {
             status: 500,
@@ -504,31 +533,43 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       }
     }
 
-    // ---- Legacy one-shot (unchanged) ----
-    try {
-      const { output, html, stats } = await generateStatus(params, envConfig);
-      return new Response(JSON.stringify({ output, html, stats }), {
-        status: 200,
-        headers: withSecurityHeaders({
-          "content-type": "application/json; charset=utf-8",
-          "cache-control": "no-store",
-        }),
-      });
-    } catch (error: unknown) {
-      const safeError = createSafeErrorResponse(error, "status-api");
-      return new Response(
-        JSON.stringify({
-          error: safeError.message,
-          errorId: safeError.errorId,
-        }),
-        {
-          status: 500,
+    // ---- Legacy one-shot ----
+    {
+      const { hooks: collectingHooks, logs } = makeCollectingHooks();
+      try {
+        const { output, html, stats } = await generateStatus(
+          params,
+          envConfig,
+          collectingHooks,
+        );
+        return new Response(JSON.stringify({ output, html, stats, logs }), {
+          status: 200,
           headers: withSecurityHeaders({
             "content-type": "application/json; charset=utf-8",
             "cache-control": "no-store",
           }),
-        },
-      );
+        });
+      } catch (error: unknown) {
+        const safeError = createSafeErrorResponse(
+          error,
+          "status-api",
+          requestSummary,
+        );
+        return new Response(
+          JSON.stringify({
+            error: safeError.message,
+            errorId: safeError.errorId,
+            logs,
+          }),
+          {
+            status: 500,
+            headers: withSecurityHeaders({
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "no-store",
+            }),
+          },
+        );
+      }
     }
   }
 

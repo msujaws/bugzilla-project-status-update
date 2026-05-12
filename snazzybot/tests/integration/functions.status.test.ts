@@ -87,6 +87,84 @@ describe("functions/api/status.ts", () => {
     await mf.dispose();
   });
 
+  describe("non-streaming logs (debug=no Run Log support)", () => {
+    it("oneshot response includes server hook events as logs[]", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          days: 8,
+          format: "md",
+          whiteboards: ["[fx-vpn]"],
+        }),
+      });
+      const j = await r.json();
+      expect(Array.isArray(j.logs)).toBe(true);
+      expect(j.logs.length).toBeGreaterThan(0);
+      const kinds = new Set(j.logs.map((l: { kind: string }) => l.kind));
+      // window context info plus other progress lines
+      expect(kinds.has("info")).toBe(true);
+      const allMessages = j.logs.map((l: { msg: string }) => l.msg).join("\n");
+      expect(allMessages).toMatch(/Window: last 8 days/);
+      await mf.dispose();
+    });
+
+    it("discover response includes logs[]", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "discover",
+          days: 8,
+          whiteboards: ["[fx-vpn]"],
+        }),
+      });
+      const j = await r.json();
+      expect(Array.isArray(j.logs)).toBe(true);
+      expect(
+        j.logs.some((l: { msg: string }) => /Bugzilla Candidates/.test(l.msg)),
+      ).toBe(true);
+      await mf.dispose();
+    });
+
+    it("page response includes logs[]", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "page",
+          cursor: 0,
+          pageSize: 35,
+          days: 8,
+          whiteboards: ["[fx-vpn]"],
+        }),
+      });
+      const j = await r.json();
+      expect(Array.isArray(j.logs)).toBe(true);
+      await mf.dispose();
+    });
+
+    it("finalize response includes logs[]", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "finalize",
+          ids: [1_987_802],
+          format: "md",
+          whiteboards: ["[fx-vpn]"],
+        }),
+      });
+      const j = await r.json();
+      expect(Array.isArray(j.logs)).toBe(true);
+      await mf.dispose();
+    });
+  });
+
   it("streaming NDJSON emits start → phase/progress → done", async () => {
     const mf = await makeMiniflare({}, { forceFallback: true });
     const r = await mf.dispatchFetch("http://local/api/status?stream=1", {
