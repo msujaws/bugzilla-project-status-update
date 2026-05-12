@@ -36,9 +36,13 @@ export async function loadPatchContextsForBugs(
 
   hooks.phase?.(SUB_OPERATION_PHASES.PATCH_CONTEXT, { total });
   let completed = 0;
+  let cursor = 0;
+  const CONCURRENCY = 8;
 
-  await Promise.all(
-    uniqueBugs.map(async (bug) => {
+  const worker = async () => {
+    while (cursor < uniqueBugs.length) {
+      const index = cursor++;
+      const bug = uniqueBugs[index];
       try {
         const patches = await loadPatchContext(env, bug.id);
         if (patches.length > 0) {
@@ -63,7 +67,11 @@ export async function loadPatchContextsForBugs(
         completed++;
         hooks.progress?.(SUB_OPERATION_PHASES.PATCH_CONTEXT, completed, total);
       }
-    }),
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, uniqueBugs.length) }, worker),
   );
 
   if (debugLog) {
