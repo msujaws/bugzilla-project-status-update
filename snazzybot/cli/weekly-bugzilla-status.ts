@@ -28,7 +28,7 @@ const argv = yargs(hideBin(process.argv))
     desc: "Bugzilla assignee email(s)",
   })
   .option("days", { type: "number", default: 8 })
-  .option("model", { type: "string", default: "gpt-5" })
+  .option("model", { type: "string", default: "gpt-5-mini" })
   .option("format", { choices: ["md", "html"] as const, default: "md" })
   .option("debug", { type: "boolean", default: false })
   .option("no-cache", {

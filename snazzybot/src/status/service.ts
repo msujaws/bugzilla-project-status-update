@@ -45,7 +45,7 @@ const defaultAudience = (idsProvided: boolean, audience?: AudienceOption) => {
 
 const defaultVoice = (voice?: VoiceOption): VoiceOption => voice ?? "normal";
 
-const defaultModel = (model?: string) => model ?? "gpt-5";
+const defaultModel = (model?: string) => model ?? "gpt-5-mini";
 
 const debugLogger = (enabled: boolean, hooks: ProgressHooks): DebugLog => {
   return (message, options) => {

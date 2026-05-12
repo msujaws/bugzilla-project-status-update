@@ -464,21 +464,38 @@ Return JSON:
     }
   }
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${env.OPENAI_API_KEY}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
-  });
+  // Cloudflare Pages Functions return 524 to the client once the edge has
+  // waited ~100s for any response from the origin. Bound the OpenAI call so we
+  // surface a clean timeout error inside the worker rather than getting
+  // silently terminated by the platform.
+  const OPENAI_TIMEOUT_MS = 75_000;
+
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+      signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(
+        `OpenAI request timed out after ${OPENAI_TIMEOUT_MS / 1000}s (model=${model}, bugs=${bugs.length})`,
+      );
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     throw new Error(`OpenAI ${response.status}: ${await response.text()}`);

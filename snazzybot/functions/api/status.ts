@@ -337,7 +337,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     whiteboards = [],
     days = 8,
     format = "md",
-    model = "gpt-5",
+    model = "gpt-5-mini",
     debug = false,
     assignees = [],
     voice = "normal",
