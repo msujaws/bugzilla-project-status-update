@@ -1,5 +1,5 @@
 import type { CommitPatch } from "../patch.ts";
-import type { Bug, EnvLike } from "./types.ts";
+import type { Bug, EnvLike, ProgressHooks } from "./types.ts";
 import type { GitHubContributor } from "./githubTypes.ts";
 import type { JiraIssue } from "./jiraTypes.ts";
 
@@ -12,7 +12,15 @@ type SummarizeOptions = {
   singleAssignee?: boolean;
   githubContributors?: Map<string, GitHubContributor>;
   jiraIssues?: JiraIssue[];
+  hooks?: ProgressHooks;
 };
+
+// Each OpenAI call grows linearly with the bug count in the prompt and slows
+// to the point of exceeding Cloudflare Pages' ~100s edge response budget once
+// we hit ~10+ bugs. Splitting the work into small parallel batches keeps each
+// individual call well inside that budget and lets us emit per-batch progress.
+const OPENAI_BATCH_SIZE = 5;
+const OPENAI_BATCH_CONCURRENCY = 3;
 
 const technicalAudienceHint = `
 Audience: engineers. Include specific technical details where valuable (file/feature areas, prefs/flags, APIs, perf metrics, platform scopes). Assume context; keep acronyms if common. Avoid business framing.
@@ -223,6 +231,85 @@ export function cleanBugzillaUsername(
 }
 
 export async function summarizeWithOpenAI(
+  env: EnvLike,
+  model: string,
+  bugs: Bug[],
+  days: number,
+  voice: VoiceOption,
+  audience: AudienceOption,
+  options: SummarizeOptions = {},
+): Promise<SummarizerResult> {
+  const hooks = options.hooks;
+
+  // Short runs: send everything in one call (preserves the existing single
+  // coherent summary). Anything larger gets split into parallel batches.
+  if (bugs.length <= OPENAI_BATCH_SIZE) {
+    return summarizeBatch(env, model, bugs, days, voice, audience, options);
+  }
+
+  const batches: Bug[][] = [];
+  for (let index = 0; index < bugs.length; index += OPENAI_BATCH_SIZE) {
+    batches.push(bugs.slice(index, index + OPENAI_BATCH_SIZE));
+  }
+
+  const results: SummarizerResult[] = Array.from({ length: batches.length });
+  let cursor = 0;
+
+  const worker = async () => {
+    while (cursor < batches.length) {
+      const index = cursor++;
+      const batch = batches[index];
+      hooks?.info?.(
+        `Summarizing batch ${index + 1}/${batches.length} (${batch.length} bug${batch.length === 1 ? "" : "s"})…`,
+      );
+
+      const batchIds = new Set(batch.map((bug) => bug.id));
+      const filteredPatches = options.patchContextByBug
+        ? new Map(
+            [...options.patchContextByBug].filter(([id]) => batchIds.has(id)),
+          )
+        : undefined;
+
+      // Jira issues and GitHub activity aren't keyed per-bug, so only attach
+      // them to the first batch — otherwise the model would emit duplicate
+      // sections in every batch's summary.
+      const isFirstBatch = index === 0;
+      results[index] = await summarizeBatch(
+        env,
+        model,
+        batch,
+        days,
+        voice,
+        audience,
+        {
+          ...options,
+          patchContextByBug: filteredPatches,
+          jiraIssues: isFirstBatch ? options.jiraIssues : [],
+          githubContributors: isFirstBatch
+            ? options.githubContributors
+            : undefined,
+        },
+      );
+    }
+  };
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(OPENAI_BATCH_CONCURRENCY, batches.length) },
+      worker,
+    ),
+  );
+
+  const assessments = results.flatMap((result) => result.assessments);
+  const summary_md = results
+    .map((result) => result.summary_md)
+    .filter((md): md is string => typeof md === "string" && md.length > 0)
+    .join("\n\n");
+
+  return { assessments, summary_md };
+}
+
+async function summarizeBatch(
   env: EnvLike,
   model: string,
   bugs: Bug[],
@@ -489,7 +576,13 @@ Return JSON:
       signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
     });
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
+    // AbortSignal.timeout() throws DOMException with name "TimeoutError" per
+    // spec, while a manual controller.abort() throws "AbortError". Treat both
+    // as a timeout from the caller's perspective.
+    if (
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError")
+    ) {
       throw new Error(
         `OpenAI request timed out after ${OPENAI_TIMEOUT_MS / 1000}s (model=${model}, bugs=${bugs.length})`,
       );

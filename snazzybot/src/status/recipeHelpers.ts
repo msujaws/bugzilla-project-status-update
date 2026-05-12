@@ -185,6 +185,7 @@ export const summarizeWithOpenAIAndTrack = async (
       singleAssignee: ctx.assignees.length === 1,
       githubContributors: ctx.githubContributors,
       jiraIssues: ctx.finalJiraIssues,
+      hooks: ctx.hooks,
     },
   );
 };

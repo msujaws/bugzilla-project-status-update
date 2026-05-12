@@ -57,7 +57,29 @@ describe("summarizeWithOpenAI timeout", () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it("translates an AbortError into a human-readable timeout error", async () => {
+  it("translates a TimeoutError (from AbortSignal.timeout) into a human-readable timeout error", async () => {
+    fetchSpy.mockRestore();
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+      // AbortSignal.timeout() throws DOMException with name "TimeoutError"
+      // (per the WHATWG spec) — not "AbortError" like manual abort().
+      const error = new Error("The operation was aborted due to timeout");
+      error.name = "TimeoutError";
+      return Promise.reject(error);
+    });
+
+    await expect(
+      summarizeWithOpenAI(
+        env,
+        "gpt-5-mini",
+        [sampleBug],
+        7,
+        "normal",
+        "technical",
+      ),
+    ).rejects.toThrow(/OpenAI request timed out/i);
+  });
+
+  it("also recognizes manual AbortError as a timeout", async () => {
     fetchSpy.mockRestore();
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       const error = new Error("The operation was aborted");
