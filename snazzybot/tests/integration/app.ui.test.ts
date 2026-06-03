@@ -86,7 +86,16 @@ beforeEach(() => {
           total: 1,
         });
       }
-      if (mode === "finalize" || mode === "oneshot") {
+      if (mode === "summarize") {
+        const ids = Array.isArray(body.ids) ? body.ids : [];
+        return HttpResponse.json({
+          summaryFragment: "Hello",
+          assessments: [],
+          nextCursor: undefined,
+          total: ids.length,
+        });
+      }
+      if (mode === "assemble" || mode === "finalize" || mode === "oneshot") {
         return HttpResponse.json({
           output: "Hello\n\n[View bugs in Bugzilla](https://x)",
         });

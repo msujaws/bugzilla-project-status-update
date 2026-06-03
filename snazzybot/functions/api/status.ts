@@ -3,6 +3,8 @@ import {
   generateStatus,
   discoverCandidates,
   qualifyHistoryPage,
+  summarizeBugPage,
+  assembleSummary,
 } from "../../src/core";
 import {
   checkRateLimit,
@@ -26,7 +28,20 @@ const MIN_DAYS = 1;
 const MAX_DAYS = 365;
 const MIN_PAGE_SIZE = 1;
 const MAX_PAGE_SIZE = 1000;
-const VALID_MODES = ["discover", "page", "finalize", "oneshot"] as const;
+const VALID_MODES = [
+  "discover",
+  "page",
+  "summarize",
+  "assemble",
+  "finalize",
+  "oneshot",
+] as const;
+
+// Bound the assemble request body: accumulated fragments are markdown blobs and
+// assessments are small objects, but cap them so a malformed client can't post
+// an unbounded payload.
+const MAX_SUMMARY_FRAGMENTS = 100;
+const MAX_FRAGMENT_LENGTH = 20_000;
 const VALID_FORMATS = ["md", "html"] as const;
 const VALID_VOICES = ["normal", "pirate", "snazzy-robot"] as const;
 const VALID_AUDIENCES = ["technical", "product", "leadership"] as const;
@@ -120,6 +135,8 @@ const summarizeRequest = (body: Record<string, unknown>) => {
     assignees: arrLen(body.assignees),
     githubRepos: arrLen(body.githubRepos),
     ids: arrLen(body.ids),
+    summaryFragments: arrLen(body.summaryFragments),
+    assessments: arrLen(body.assessments),
     includePatchContext: body.includePatchContext,
     includeGithubActivity: body.includeGithubActivity,
     debug: body.debug,
@@ -201,6 +218,33 @@ const validateInput = (body: Record<string, unknown>): string | undefined => {
       pageSizeNum > MAX_PAGE_SIZE
     ) {
       return `pageSize must be between ${MIN_PAGE_SIZE} and ${MAX_PAGE_SIZE}`;
+    }
+  }
+
+  // Validate summarize/assemble payloads
+  const { summaryFragments, assessments } = body;
+  if (summaryFragments !== undefined) {
+    if (!Array.isArray(summaryFragments)) {
+      return "summaryFragments must be an array";
+    }
+    if (summaryFragments.length > MAX_SUMMARY_FRAGMENTS) {
+      return `summaryFragments array exceeds maximum length of ${MAX_SUMMARY_FRAGMENTS}`;
+    }
+    for (const fragment of summaryFragments) {
+      if (typeof fragment !== "string") {
+        return "summaryFragments must contain only strings";
+      }
+      if (fragment.length > MAX_FRAGMENT_LENGTH) {
+        return `summaryFragments string exceeds maximum length of ${MAX_FRAGMENT_LENGTH} characters`;
+      }
+    }
+  }
+  if (assessments !== undefined) {
+    if (!Array.isArray(assessments)) {
+      return "assessments must be an array";
+    }
+    if (assessments.length > MAX_ARRAY_LENGTH * 5) {
+      return `assessments array exceeds maximum length of ${MAX_ARRAY_LENGTH * 5}`;
     }
   }
 
@@ -352,6 +396,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     pageSize = 35,
     // only for finalize
     ids = [],
+    // only for summarize/assemble
+    summaryFragments = [],
+    assessments = [],
+    trimmedCount = 0,
+    candidatesTotal,
   } = body;
 
   const url = new URL(request.url);
@@ -473,6 +522,102 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
             }),
           },
         );
+      } catch (error: unknown) {
+        const safeError = createSafeErrorResponse(
+          error,
+          "status-api",
+          requestSummary,
+        );
+        return new Response(
+          JSON.stringify({
+            error: safeError.message,
+            errorId: safeError.errorId,
+            logs,
+          }),
+          {
+            status: 500,
+            headers: withSecurityHeaders({
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "no-store",
+            }),
+          },
+        );
+      }
+    }
+    if (mode === "summarize") {
+      const { hooks: collectingHooks, logs } = makeCollectingHooks();
+      try {
+        const { summaryFragment, assessments, nextCursor, total, githubStats } =
+          await summarizeBugPage(
+            params,
+            envConfig,
+            ids as number[],
+            Number(cursor) || 0,
+            Number(pageSize) || 8,
+            collectingHooks,
+            !!debug,
+          );
+        return new Response(
+          JSON.stringify({
+            summaryFragment,
+            assessments,
+            nextCursor,
+            total,
+            githubStats,
+            logs,
+          }),
+          {
+            status: 200,
+            headers: withSecurityHeaders({
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "no-store",
+            }),
+          },
+        );
+      } catch (error: unknown) {
+        const safeError = createSafeErrorResponse(
+          error,
+          "status-api",
+          requestSummary,
+        );
+        return new Response(
+          JSON.stringify({
+            error: safeError.message,
+            errorId: safeError.errorId,
+            logs,
+          }),
+          {
+            status: 500,
+            headers: withSecurityHeaders({
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "no-store",
+            }),
+          },
+        );
+      }
+    }
+    if (mode === "assemble") {
+      // assembleSummary is pure formatting and emits no hook events, but we
+      // still return a logs[] array for response-shape parity with the other
+      // non-streaming modes.
+      const { logs } = makeCollectingHooks();
+      try {
+        const { output, html, stats } = assembleSummary(
+          params,
+          envConfig,
+          ids as number[],
+          summaryFragments as string[],
+          assessments as Parameters<typeof assembleSummary>[4],
+          Number(trimmedCount) || 0,
+          candidatesTotal === undefined ? undefined : Number(candidatesTotal),
+        );
+        return new Response(JSON.stringify({ output, html, stats, logs }), {
+          status: 200,
+          headers: withSecurityHeaders({
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "no-store",
+          }),
+        });
       } catch (error: unknown) {
         const safeError = createSafeErrorResponse(
           error,

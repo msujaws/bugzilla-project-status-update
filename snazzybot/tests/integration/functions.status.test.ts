@@ -87,6 +87,67 @@ describe("functions/api/status.ts", () => {
     await mf.dispose();
   });
 
+  it("paging protocol: discover → page → summarize(loop) → assemble", async () => {
+    const mf = await makeMiniflare({}, { forceFallback: true });
+
+    const page = await mf.dispatchFetch("http://local/api/status", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "page",
+        cursor: 0,
+        pageSize: 35,
+        days: 8,
+        whiteboards: ["[fx-vpn]"],
+      }),
+    });
+    const p = await page.json();
+    expect(p.qualifiedIds.length).toBeGreaterThan(0);
+
+    // Loop summarize until nextCursor is undefined, accumulating fragments.
+    const summaryFragments: string[] = [];
+    const assessments: unknown[] = [];
+    let cursor: number | undefined = 0;
+    let guard = 0;
+    while (cursor !== undefined && guard++ < 50) {
+      const chunk = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "summarize",
+          ids: p.qualifiedIds,
+          cursor,
+          pageSize: 8,
+          days: 8,
+          whiteboards: ["[fx-vpn]"],
+        }),
+      });
+      const c = await chunk.json();
+      if (c.summaryFragment) summaryFragments.push(c.summaryFragment);
+      for (const a of c.assessments || []) assessments.push(a);
+      cursor = c.nextCursor;
+    }
+    expect(summaryFragments.length).toBeGreaterThan(0);
+
+    const assemble = await mf.dispatchFetch("http://local/api/status", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "assemble",
+        ids: p.qualifiedIds,
+        summaryFragments,
+        assessments,
+        trimmedCount: 0,
+        candidatesTotal: p.qualifiedIds.length,
+        format: "md",
+        whiteboards: ["[fx-vpn]"],
+      }),
+    });
+    const a = await assemble.json();
+    expect(a.output).toMatch(/View bugs in Bugzilla/);
+    await mf.dispose();
+  });
+
   describe("non-streaming logs (debug=no Run Log support)", () => {
     it("oneshot response includes server hook events as logs[]", async () => {
       const mf = await makeMiniflare({}, { forceFallback: true });
@@ -144,6 +205,47 @@ describe("functions/api/status.ts", () => {
       });
       const j = await r.json();
       expect(Array.isArray(j.logs)).toBe(true);
+      await mf.dispose();
+    });
+
+    it("summarize response includes logs[] and a fragment", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "summarize",
+          ids: [1_987_802],
+          cursor: 0,
+          pageSize: 8,
+          whiteboards: ["[fx-vpn]"],
+        }),
+      });
+      const j = await r.json();
+      expect(Array.isArray(j.logs)).toBe(true);
+      expect(j.total).toBe(1);
+      expect(j.nextCursor).toBeUndefined();
+      expect(typeof j.summaryFragment).toBe("string");
+      await mf.dispose();
+    });
+
+    it("assemble response includes logs[] and output", async () => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "assemble",
+          ids: [1_987_802],
+          summaryFragments: ["A summary fragment."],
+          assessments: [],
+          format: "md",
+          whiteboards: ["[fx-vpn]"],
+        }),
+      });
+      const j = await r.json();
+      expect(Array.isArray(j.logs)).toBe(true);
+      expect(j.output).toMatch(/View bugs in Bugzilla/);
       await mf.dispose();
     });
 
@@ -434,22 +536,26 @@ describe("functions/api/status.ts", () => {
       },
     );
 
-    it.each(["discover", "page", "finalize", "oneshot"])(
-      "accepts valid mode value: %s",
-      async (mode) => {
-        const mf = await makeMiniflare({}, { forceFallback: true });
-        const r = await mf.dispatchFetch("http://local/api/status", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            mode,
-            whiteboards: ["[fx-vpn]"],
-          }),
-        });
-        expect(r.status).not.toBe(400);
-        await mf.dispose();
-      },
-    );
+    it.each([
+      "discover",
+      "page",
+      "summarize",
+      "assemble",
+      "finalize",
+      "oneshot",
+    ])("accepts valid mode value: %s", async (mode) => {
+      const mf = await makeMiniflare({}, { forceFallback: true });
+      const r = await mf.dispatchFetch("http://local/api/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          whiteboards: ["[fx-vpn]"],
+        }),
+      });
+      expect(r.status).not.toBe(400);
+      await mf.dispose();
+    });
 
     it("accepts valid input within limits", async () => {
       const mf = await makeMiniflare({}, { forceFallback: true });

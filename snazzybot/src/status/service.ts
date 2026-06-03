@@ -26,8 +26,18 @@ import {
   logWindowStep,
   summarizeOpenAiStep,
 } from "./steps/index.ts";
-import { logWindowContext } from "./recipeHelpers.ts";
+import {
+  logWindowContext,
+  formatSummaryOutput,
+  extractDemoSuggestions,
+} from "./recipeHelpers.ts";
+import { loadPatchContextsForBugs } from "./patchStage.ts";
+import { collectGithubContributors } from "./githubStage.ts";
+import { summarizeWithOpenAI, type SummarizerResult } from "./summarizer.ts";
+import { buildBuglistURL } from "./output.ts";
+import { escapeHtml } from "./markdown.ts";
 import { STEP_PHASE_CONFIG } from "./phases.ts";
+import type { GitHubContributor } from "./githubTypes.ts";
 import type {
   Bug,
   DebugLog,
@@ -391,6 +401,188 @@ export async function qualifyHistoryPage(
     nextCursor,
     total: candidates.length,
     results,
+  };
+}
+
+/**
+ * Summarize one bounded slice of pre-qualified bug ids.
+ *
+ * This is the summarization analogue of {@link qualifyHistoryPage}: instead of
+ * running the entire OpenAI pipeline for every qualified bug in a single
+ * request (which blows Cloudflare's ~100s edge budget and the Free-tier
+ * subrequest cap once a user has many bugs), the client loops over the full
+ * `ids` array in small pages. Each call fetches bug details + patch context for
+ * its slice and runs OpenAI on just that slice, returning a partial summary
+ * fragment. The caller accumulates the fragments and finishes with
+ * {@link assembleSummary}.
+ *
+ * GitHub/Jira context describes the report as a whole, so it is only gathered
+ * and attached on the first chunk (`cursor === 0`) to avoid duplicate sections
+ * and repeated GitHub subrequests.
+ */
+export async function summarizeBugPage(
+  params: GenerateParams,
+  env: EnvLike,
+  ids: number[],
+  cursor: number,
+  pageSize: number,
+  hooks: ProgressHooks = defaultHooks,
+  debug = false,
+): Promise<{
+  summaryFragment: string;
+  assessments: SummarizerResult["assessments"];
+  nextCursor: number | undefined;
+  total: number;
+  githubStats?: StatusStats["github"];
+}> {
+  const normalizedCursor = Number.isFinite(cursor) ? Math.trunc(cursor) : 0;
+  const normalizedPageSize = Math.max(
+    1,
+    Number.isFinite(pageSize) ? Math.trunc(pageSize) : 1,
+  );
+  const start = Math.max(0, normalizedCursor);
+  const end = Math.min(ids.length, start + normalizedPageSize);
+  const idsSlice = ids.slice(start, end);
+  const nextCursor = end < ids.length ? end : undefined;
+
+  if (idsSlice.length === 0) {
+    return {
+      summaryFragment: "",
+      assessments: [],
+      nextCursor: undefined,
+      total: ids.length,
+    };
+  }
+
+  const client = new BugzillaClient(env, hooks);
+  const debugLog = debugLogger(debug, hooks);
+  const days = params.days ?? 8;
+  const sinceISO = isoDaysAgo(days);
+  const model = defaultModel(params.model);
+  const voice = defaultVoice(params.voice);
+  const audience = defaultAudience(ids.length > 0, params.audience);
+  const assignees = (params.assignees ?? [])
+    .map((email) => email?.trim())
+    .filter(Boolean) as string[];
+  const includePatchContext = params.includePatchContext !== false;
+
+  hooks.info?.(
+    `Summarizing pre-qualified bugs ${start + 1}-${end} of ${ids.length}…`,
+  );
+  const bugs = await client.fetchBugsByIds(idsSlice);
+
+  const patchContext = await loadPatchContextsForBugs(env, bugs, hooks, {
+    includePatchContext,
+    debugLog,
+  });
+
+  const isFirstChunk = start === 0;
+  let githubContributors: Map<string, GitHubContributor> | undefined;
+  let githubStats: StatusStats["github"] | undefined;
+  if (isFirstChunk) {
+    const gh = await collectGithubContributors(
+      env,
+      {
+        githubRepos: params.githubRepos ?? [],
+        emailMapping: params.emailMapping ?? {},
+        sinceISO,
+        includeGithubActivity: params.includeGithubActivity === true,
+      },
+      hooks,
+      debugLog,
+    );
+    githubContributors = gh.contributors.size > 0 ? gh.contributors : undefined;
+    githubStats = gh.stats;
+  }
+
+  const result = await summarizeWithOpenAI(
+    env,
+    model,
+    bugs,
+    days,
+    voice,
+    audience,
+    {
+      patchContextByBug: patchContext,
+      groupByAssignee: assignees.length > 0,
+      singleAssignee: assignees.length === 1,
+      githubContributors,
+      jiraIssues: [],
+      hooks,
+    },
+  );
+
+  return {
+    summaryFragment: result.summary_md ?? "",
+    assessments: result.assessments ?? [],
+    nextCursor,
+    total: ids.length,
+    githubStats,
+  };
+}
+
+/**
+ * Assemble the final report from summary fragments accumulated across
+ * {@link summarizeBugPage} calls. Pure formatting — issues no subrequests — so
+ * it always returns well inside Cloudflare's edge budget. Mirrors
+ * `formatOutputStep`.
+ */
+export function assembleSummary(
+  params: GenerateParams,
+  env: EnvLike,
+  ids: number[],
+  summaryFragments: string[],
+  assessments: SummarizerResult["assessments"],
+  trimmedCount: number,
+  candidatesTotal?: number,
+): { output: string; html: string; stats: StatusStats } {
+  const summary_md = (summaryFragments ?? [])
+    .filter((md): md is string => typeof md === "string" && md.length > 0)
+    .join("\n\n");
+  const demo = extractDemoSuggestions(assessments ?? []);
+  const assignees = (params.assignees ?? [])
+    .map((email) => email?.trim())
+    .filter(Boolean) as string[];
+  const link = buildBuglistURL({
+    sinceISO: isoDaysAgo(params.days ?? 8),
+    whiteboards: params.whiteboards ?? [],
+    ids,
+    components: params.components ?? [],
+    assignees,
+    host: env.BUGZILLA_HOST,
+  });
+
+  const stats: StatusStats = {
+    bugzilla: {
+      candidates: candidatesTotal ?? ids.length,
+      qualified: ids.length,
+    },
+  };
+
+  // Nothing qualified → mirror handleEmptyStep's "no changes" message rather
+  // than emitting a bare buglist link.
+  if (summary_md.length === 0) {
+    const days = params.days ?? 8;
+    const markdownBody = `_No user-impacting changes in the last ${days} days._\n\n[View bugs in Bugzilla](${link})`;
+    const htmlBody = `<p><em>No user-impacting changes in the last ${days} days.</em></p><p><a href="${escapeHtml(link)}">View bugs in Bugzilla</a></p>`;
+    return {
+      output: params.format === "html" ? htmlBody : markdownBody,
+      html: htmlBody,
+      stats,
+    };
+  }
+
+  const { markdown, html } = formatSummaryOutput({
+    summaryMd: summary_md,
+    demo,
+    trimmedCount: trimmedCount ?? 0,
+    link,
+  });
+
+  return {
+    output: params.format === "html" ? html : markdown,
+    html,
+    stats,
   };
 }
 

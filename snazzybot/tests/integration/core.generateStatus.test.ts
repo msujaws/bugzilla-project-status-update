@@ -229,7 +229,7 @@ describe("core integration (with MSW mocks)", () => {
   });
 
   it("adds trimming note when exceeding MAX_BUGS_FOR_OPENAI", async () => {
-    const ids = Array.from({ length: 65 }, (_, i) => 1000 + i);
+    const ids = Array.from({ length: 205 }, (_, i) => 1000 + i);
     server.resetHandlers();
     server.use(
       http.get("https://bugzilla.mozilla.org/rest/bug", ({ request }) => {
@@ -292,7 +292,7 @@ describe("core integration (with MSW mocks)", () => {
       env,
     );
     expect(res.output).toMatch(/omitted from the AI summary/);
-    expect(res.ids.length).toBe(65);
+    expect(res.ids.length).toBe(205);
   });
 
   it("collects bugs by assignee email addresses", async () => {
