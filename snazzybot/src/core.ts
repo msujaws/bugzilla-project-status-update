@@ -2,6 +2,8 @@ export {
   generateStatus,
   discoverCandidates,
   qualifyHistoryPage,
+  summarizeBugPage,
+  assembleSummary,
   buildBuglistURL,
   isRestricted,
 } from "./status/service.ts";

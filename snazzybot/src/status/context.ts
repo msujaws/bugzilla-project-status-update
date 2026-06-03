@@ -15,7 +15,11 @@ import type {
 import type { GitHubActivity, GitHubContributor } from "./githubTypes.ts";
 import type { JiraIssue, JiraIssueHistory } from "./jiraTypes.ts";
 
-export const MAX_BUGS_FOR_OPENAI = 60;
+// Guardrail for the legacy single-request paths (oneshot/finalize/streaming/CLI)
+// that run the whole pipeline in one request. The paginated web flow
+// (summarizeBugPage) bounds each request itself and is NOT subject to this cap,
+// so it summarizes every qualified bug.
+export const MAX_BUGS_FOR_OPENAI = 200;
 
 export type AudienceOption = "technical" | "product" | "leadership";
 export type VoiceOption = "normal" | "pirate" | "snazzy-robot";

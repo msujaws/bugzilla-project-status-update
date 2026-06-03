@@ -123,6 +123,22 @@ const setupPagedFixture = async (page: Page, fixture: PagedFixture) => {
       expect(body.pageSize).toBe(next.request.pageSize);
       return respondJson(route, next.response);
     }
+    if (body?.mode === "summarize") {
+      // Fixtures are small (≤ a handful of bugs), so summarize the whole slice
+      // in one chunk. The rendered output comes from the assemble response, so
+      // the fragment content here is immaterial.
+      const ids = Array.isArray(body.ids) ? body.ids : [];
+      return respondJson(route, {
+        summaryFragment: "fixture fragment",
+        assessments: [],
+        nextCursor: undefined,
+        total: ids.length,
+        logs: [],
+      });
+    }
+    if (body?.mode === "assemble") {
+      return respondJson(route, fixture.responses.finalize);
+    }
     if (body?.mode === "finalize") {
       return respondJson(route, fixture.responses.finalize);
     }
