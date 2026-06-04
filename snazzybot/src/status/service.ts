@@ -244,6 +244,7 @@ export async function generateStatus(
     patchContext: new Map(),
     githubRepos: params.githubRepos ?? [],
     emailMapping: params.emailMapping ?? {},
+    githubUsernames: params.githubUsernames ?? [],
     githubActivity: [],
     githubContributors: new Map(),
     ids: [],
@@ -485,6 +486,7 @@ export async function summarizeBugPage(
       {
         githubRepos: params.githubRepos ?? [],
         emailMapping: params.emailMapping ?? {},
+        githubUsernames: params.githubUsernames ?? [],
         sinceISO,
         includeGithubActivity: params.includeGithubActivity === true,
       },

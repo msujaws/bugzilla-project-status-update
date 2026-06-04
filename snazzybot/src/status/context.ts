@@ -76,6 +76,7 @@ export interface StatusContext {
   patchContext: Map<number, CommitPatch[]>;
   githubRepos: string[];
   emailMapping: Record<string, string>;
+  githubUsernames: string[];
   githubActivity: GitHubActivity[];
   githubContributors: Map<string, GitHubContributor>;
   githubStats?: {

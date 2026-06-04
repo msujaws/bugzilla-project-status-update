@@ -390,6 +390,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     includePatchContext = true,
     githubRepos = [],
     emailMapping = {},
+    githubUsernames = [],
     includeGithubActivity = false,
     mode = "oneshot", // "discover" | "page" | "finalize" | "oneshot" (legacy)
     cursor = 0,
@@ -438,6 +439,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     includePatchContext,
     githubRepos,
     emailMapping,
+    githubUsernames,
     includeGithubActivity,
   } as const;
 

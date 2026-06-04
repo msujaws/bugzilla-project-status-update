@@ -198,6 +198,94 @@ describe("GitHub integration (with MSW mocks)", () => {
     );
   });
 
+  it("restricts GitHub-only runs to the listed usernames", async () => {
+    let capturedOpenAi: unknown;
+
+    server.use(
+      // Author-aware commits endpoint: honors the ?author= filter the client
+      // sends so the test mirrors GitHub's server-side behavior.
+      http.get(
+        "https://api.github.com/repos/mozilla/firefox/commits",
+        ({ request }) => {
+          const author = new URL(request.url).searchParams.get("author");
+          const all = [
+            {
+              sha: "abc123",
+              login: "alicedev",
+              name: "Alice",
+              email: "alice@mozilla.org",
+              message: "Alice commit",
+            },
+            {
+              sha: "def456",
+              login: "bobdev",
+              name: "Bob",
+              email: "bob@mozilla.org",
+              message: "Bob commit",
+            },
+          ];
+          const selected = author ? all.filter((c) => c.login === author) : all;
+          return HttpResponse.json(
+            selected.map((c) => ({
+              sha: c.sha,
+              commit: {
+                message: c.message,
+                author: {
+                  name: c.name,
+                  email: c.email,
+                  date: "2025-10-22T10:00:00Z",
+                },
+              },
+              author: { login: c.login },
+              html_url: `https://github.com/mozilla/firefox/commit/${c.sha}`,
+            })),
+          );
+        },
+      ),
+      http.get("https://api.github.com/repos/mozilla/firefox/pulls", () =>
+        HttpResponse.json([]),
+      ),
+      http.post(
+        "https://api.openai.com/v1/chat/completions",
+        async ({ request }) => {
+          capturedOpenAi = await request.json();
+          return HttpResponse.json({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    assessments: [],
+                    summary_md: "## @alicedev\n- Alice commit.",
+                  }),
+                },
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    await generateStatus(
+      {
+        ids: [],
+        days: 8,
+        githubRepos: ["mozilla/firefox"],
+        githubUsernames: ["alicedev"],
+        includeGithubActivity: true,
+      },
+      env,
+    );
+
+    const payload = capturedOpenAi as
+      | { messages?: Array<{ content: string }> }
+      | undefined;
+    const content = payload?.messages?.[1]?.content ?? "";
+    expect(content).toContain("@alicedev");
+    expect(content).toContain("Alice commit");
+    expect(content).not.toContain("@bobdev");
+    expect(content).not.toContain("Bob commit");
+  });
+
   it("maps GitHub activity to Bugzilla emails correctly", async () => {
     let capturedOpenAi: unknown;
 

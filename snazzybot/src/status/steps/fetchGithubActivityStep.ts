@@ -13,6 +13,7 @@ export const fetchGithubActivityStep: RecipeStep<
       {
         githubRepos: ctx.githubRepos,
         emailMapping: ctx.emailMapping,
+        githubUsernames: ctx.githubUsernames,
         sinceISO: ctx.sinceISO,
         includeGithubActivity: ctx.params.includeGithubActivity === true,
       },
