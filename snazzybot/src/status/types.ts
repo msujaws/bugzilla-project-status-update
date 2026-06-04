@@ -15,6 +15,9 @@ export type GenerateParams = {
   includePatchContext?: boolean;
   githubRepos?: string[];
   emailMapping?: Record<string, string>;
+  // When non-empty, GitHub activity is restricted to these GitHub usernames
+  // (case-insensitive). Empty/omitted means "include every contributor".
+  githubUsernames?: string[];
   includeGithubActivity?: boolean;
   jiraJql?: string[];
   jiraProjects?: string[];

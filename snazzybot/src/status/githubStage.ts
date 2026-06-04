@@ -30,18 +30,31 @@ export async function collectGithubContributors(
   options: {
     githubRepos: string[];
     emailMapping: Record<string, string>;
+    githubUsernames?: string[];
     sinceISO: string;
     includeGithubActivity: boolean;
   },
   hooks: ProgressHooks,
   debugLog?: DebugLog,
 ): Promise<GithubContributorResult> {
-  const { githubRepos, emailMapping, sinceISO, includeGithubActivity } =
-    options;
+  const {
+    githubRepos,
+    emailMapping,
+    githubUsernames = [],
+    sinceISO,
+    includeGithubActivity,
+  } = options;
 
   if (!includeGithubActivity || githubRepos.length === 0) {
     return emptyResult();
   }
+
+  // When usernames are provided, restrict activity to just those people. Stored
+  // lowercased so matching against commit/PR authors is case-insensitive.
+  const usernameFilter =
+    githubUsernames.length > 0
+      ? new Set(githubUsernames.map((u) => u.trim().toLowerCase()))
+      : undefined;
 
   if (!env.GITHUB_API_KEY) {
     hooks.warn?.("GitHub API key not provided; skipping GitHub activity");
@@ -106,6 +119,9 @@ export async function collectGithubContributors(
   for (const activity of filteredActivities) {
     for (const commit of activity.commits) {
       const username = commit.author;
+      if (usernameFilter && !usernameFilter.has(username.toLowerCase())) {
+        continue;
+      }
       if (!contributors.has(username)) {
         const bugzillaEmail =
           reverseEmailMapping.get(username.toLowerCase()) ||
@@ -126,6 +142,9 @@ export async function collectGithubContributors(
 
     for (const pr of activity.pullRequests) {
       const username = pr.author;
+      if (usernameFilter && !usernameFilter.has(username.toLowerCase())) {
+        continue;
+      }
       if (!contributors.has(username)) {
         const bugzillaEmail = reverseEmailMapping.get(username.toLowerCase());
 
