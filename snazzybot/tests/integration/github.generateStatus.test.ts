@@ -289,6 +289,82 @@ describe("GitHub integration (with MSW mocks)", () => {
     expect(content).toContain("one Markdown h2 section per GitHub contributor");
   });
 
+  it("summarizes a username-only run with no repos via GitHub search", async () => {
+    let capturedOpenAi: unknown;
+    let commitQuery = "";
+
+    server.resetHandlers();
+    server.use(
+      http.get("https://api.github.com/search/commits", ({ request }) => {
+        commitQuery = new URL(request.url).searchParams.get("q") ?? "";
+        return HttpResponse.json({
+          total_count: 1,
+          items: [
+            {
+              sha: "abc123",
+              commit: {
+                message: "Cross-repo fix",
+                author: {
+                  name: "Alice",
+                  email: "alice@mozilla.org",
+                  date: "2025-10-22T10:00:00Z",
+                },
+              },
+              author: { login: "alicedev" },
+              html_url: "https://github.com/mozilla/firefox/commit/abc123",
+              repository: { full_name: "mozilla/firefox" },
+            },
+          ],
+        });
+      }),
+      http.get("https://api.github.com/search/issues", () =>
+        HttpResponse.json({ total_count: 0, items: [] }),
+      ),
+      http.post(
+        "https://api.openai.com/v1/chat/completions",
+        async ({ request }) => {
+          capturedOpenAi = await request.json();
+          return HttpResponse.json({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    assessments: [],
+                    summary_md: "## @alicedev\n- Cross-repo fix.",
+                  }),
+                },
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const { output, ids } = await generateStatus(
+      {
+        ids: [],
+        days: 8,
+        githubRepos: [],
+        githubUsernames: ["alicedev"],
+        githubOrgs: ["mozilla"],
+        includeGithubActivity: true,
+      },
+      { ...env, SNAZZY_SKIP_CACHE: "true" },
+    );
+
+    expect(commitQuery).toContain("author:alicedev");
+    expect(commitQuery).toContain("org:mozilla");
+    expect(ids).toEqual([]);
+    expect(output).toContain("@alicedev");
+
+    const payload = capturedOpenAi as
+      | { messages?: Array<{ content: string }> }
+      | undefined;
+    const content = payload?.messages?.[1]?.content ?? "";
+    expect(content).toContain("@alicedev");
+    expect(content).toContain("Cross-repo fix");
+  });
+
   it("maps GitHub activity to Bugzilla emails correctly", async () => {
     let capturedOpenAi: unknown;
 

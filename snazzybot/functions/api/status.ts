@@ -391,6 +391,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     githubRepos = [],
     emailMapping = {},
     githubUsernames = [],
+    githubOrgs = [],
     includeGithubActivity = false,
     mode = "oneshot", // "discover" | "page" | "finalize" | "oneshot" (legacy)
     cursor = 0,
@@ -440,6 +441,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     githubRepos,
     emailMapping,
     githubUsernames,
+    githubOrgs,
     includeGithubActivity,
   } as const;
 

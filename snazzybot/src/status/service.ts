@@ -69,8 +69,9 @@ const debugLogger = (enabled: boolean, hooks: ProgressHooks): DebugLog => {
 function createStatusRecipe(
   context: StatusContext,
 ): RecipeStep<StatusStepName, StatusContext>[] {
-  const hasGithubRepo =
-    context.githubRepos.length > 0 &&
+  // GitHub activity runs from either explicit repos or usernames-to-search.
+  const hasGithubActivity =
+    (context.githubRepos.length > 0 || context.githubUsernames.length > 0) &&
     context.params.includeGithubActivity !== false;
   const hasBugzillaQueries =
     context.components.length > 0 ||
@@ -89,7 +90,7 @@ function createStatusRecipe(
       limitOpenAiStep,
     ];
     if (hasPatchContext) recipe.push(loadPatchContextStep);
-    if (hasGithubRepo) recipe.push(fetchGithubActivityStep);
+    if (hasGithubActivity) recipe.push(fetchGithubActivityStep);
     recipe.push(handleEmptyStep);
     if (hasOpenAI) recipe.push(summarizeOpenAiStep);
     recipe.push(formatOutputStep);
@@ -107,7 +108,7 @@ function createStatusRecipe(
       filterJiraByHistoryStep,
     );
   }
-  if (hasGithubRepo) recipe.push(fetchGithubActivityStep);
+  if (hasGithubActivity) recipe.push(fetchGithubActivityStep);
   recipe.push(handleEmptyStep, limitOpenAiStep);
   if (hasPatchContext) recipe.push(loadPatchContextStep);
   if (hasOpenAI) recipe.push(summarizeOpenAiStep);
@@ -133,7 +134,8 @@ const buildStatusStats = (ctx: StatusContext): StatusStats => {
     ctx.assignees.length > 0;
   const hasJira = ctx.jiraProjects.length > 0 || ctx.jiraJql.length > 0;
   const hasGithub =
-    ctx.githubRepos.length > 0 && ctx.params.includeGithubActivity !== false;
+    (ctx.githubRepos.length > 0 || ctx.githubUsernames.length > 0) &&
+    ctx.params.includeGithubActivity !== false;
 
   const stats: StatusStats = {};
 
@@ -488,6 +490,7 @@ export async function summarizeBugPage(
         githubRepos: params.githubRepos ?? [],
         emailMapping: params.emailMapping ?? {},
         githubUsernames: params.githubUsernames ?? [],
+        githubOrgs: params.githubOrgs ?? [],
         sinceISO,
         includeGithubActivity: params.includeGithubActivity === true,
       },
