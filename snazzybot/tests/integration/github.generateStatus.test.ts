@@ -284,6 +284,9 @@ describe("GitHub integration (with MSW mocks)", () => {
     expect(content).toContain("Alice commit");
     expect(content).not.toContain("@bobdev");
     expect(content).not.toContain("Bob commit");
+    // The prompt should instruct per-contributor grouping.
+    expect(content).toContain("Group the GitHub activity by contributor");
+    expect(content).toContain("one Markdown h2 section per GitHub contributor");
   });
 
   it("maps GitHub activity to Bugzilla emails correctly", async () => {

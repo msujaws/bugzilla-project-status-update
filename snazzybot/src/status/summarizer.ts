@@ -556,7 +556,7 @@ Return JSON:
 
     if (githubSummary.length > 0) {
       user += `\n\nGitHub Activity:\n${githubSummary.join("\n\n")}`;
-      user += `\n\nIntegrate GitHub activity into the summary. When a GitHub user has a mapped Bugzilla email, merge their GitHub contributions with their Bugzilla work in the summary. For GitHub-only contributors (no mapped Bugzilla email), include their contributions in a separate section or mention them separately.`;
+      user += `\n\nGroup the GitHub activity by contributor: emit one Markdown h2 section per GitHub contributor with a heading of \`## @username\` (use the exact username shown above). Under each heading, summarize what that person contributed over the window as bullet points—lead with their merged pull requests, then notable commits—and include the provided GitHub URLs as inline Markdown links. Do not invent activity that is not listed. When a contributor has a mapped Bugzilla email, fold their Bugzilla work into that same contributor section rather than repeating it elsewhere.`;
     }
   }
 
