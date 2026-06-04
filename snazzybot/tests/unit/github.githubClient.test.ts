@@ -445,6 +445,107 @@ describe("GitHubClient", () => {
     expect(prDetailRequests).toEqual([1]);
   });
 
+  describe("searchUserActivity (cross-repo author search)", () => {
+    it("maps commits and PRs from search, grouped by repo, scoped to orgs", async () => {
+      const since = "2025-10-21T00:00:00Z";
+      let commitQuery = "";
+      let issueQuery = "";
+
+      server.use(
+        http.get("https://api.github.com/search/commits", ({ request }) => {
+          commitQuery = new URL(request.url).searchParams.get("q") ?? "";
+          return HttpResponse.json({
+            total_count: 1,
+            items: [
+              {
+                sha: "abc123",
+                commit: {
+                  message: "Cross-repo commit",
+                  author: {
+                    name: "Alice",
+                    email: "alice@mozilla.org",
+                    date: "2025-10-22T10:00:00Z",
+                  },
+                },
+                author: { login: "alicedev" },
+                html_url: "https://github.com/mozilla/firefox/commit/abc123",
+                repository: { full_name: "mozilla/firefox" },
+              },
+            ],
+          });
+        }),
+        http.get("https://api.github.com/search/issues", ({ request }) => {
+          issueQuery = new URL(request.url).searchParams.get("q") ?? "";
+          return HttpResponse.json({
+            total_count: 1,
+            items: [
+              {
+                number: 42,
+                title: "Cross-repo PR",
+                user: { login: "alicedev" },
+                html_url: "https://github.com/Pocket/admin-api/pull/42",
+                state: "closed",
+                closed_at: "2025-10-23T10:00:00Z",
+                pull_request: { merged_at: "2025-10-23T10:00:00Z" },
+                repository_url: "https://api.github.com/repos/Pocket/admin-api",
+              },
+            ],
+          });
+        }),
+      );
+
+      const client = new GitHubClient(env);
+      const activities = await client.searchUserActivity(["alicedev"], since, [
+        "mozilla",
+      ]);
+
+      // Query shape
+      expect(commitQuery).toContain("author:alicedev");
+      expect(commitQuery).toContain("org:mozilla");
+      expect(commitQuery).toContain("author-date:>=2025-10-21T00:00:00Z");
+      expect(issueQuery).toContain("author:alicedev");
+      expect(issueQuery).toContain("type:pr");
+      expect(issueQuery).toContain("org:mozilla");
+
+      // Grouped by repo
+      const byRepo = new Map(activities.map((a) => [a.repo, a]));
+      expect(byRepo.get("mozilla/firefox")?.commits[0]).toMatchObject({
+        sha: "abc123",
+        author: "alicedev",
+        message: "Cross-repo commit",
+        url: "https://github.com/mozilla/firefox/commit/abc123",
+      });
+      const pr = byRepo.get("Pocket/admin-api")?.pullRequests[0];
+      expect(pr).toMatchObject({
+        number: 42,
+        title: "Cross-repo PR",
+        author: "alicedev",
+        state: "merged",
+      });
+    });
+
+    it("omits the org qualifier when no orgs are provided", async () => {
+      const since = "2025-10-21T00:00:00Z";
+      let commitQuery = "";
+
+      server.use(
+        http.get("https://api.github.com/search/commits", ({ request }) => {
+          commitQuery = new URL(request.url).searchParams.get("q") ?? "";
+          return HttpResponse.json({ total_count: 0, items: [] });
+        }),
+        http.get("https://api.github.com/search/issues", () =>
+          HttpResponse.json({ total_count: 0, items: [] }),
+        ),
+      );
+
+      const client = new GitHubClient(env);
+      await client.searchUserActivity(["alicedev"], since);
+
+      expect(commitQuery).toContain("author:alicedev");
+      expect(commitQuery).not.toContain("org:");
+    });
+  });
+
   it("handles PR details fetch errors gracefully", async () => {
     const repo = "mozilla/firefox";
     const since = "2025-10-21T00:00:00Z";

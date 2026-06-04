@@ -65,3 +65,34 @@ export type GitHubRawPullRequestDetails = {
   additions?: number;
   deletions?: number;
 };
+
+// Search API response shapes (/search/commits and /search/issues). These differ
+// from the per-repo endpoints: results are wrapped in { total_count, items }
+// and each item carries its own repository reference.
+export type GitHubRawSearchCommit = GitHubRawCommit & {
+  repository?: { full_name: string } | null;
+};
+
+export type GitHubRawSearchCommitResponse = {
+  total_count: number;
+  items: GitHubRawSearchCommit[];
+};
+
+export type GitHubRawSearchIssue = {
+  number: number;
+  title: string;
+  user: { login: string } | null;
+  html_url: string;
+  state: string;
+  closed_at?: string | null;
+  // Present only for pull requests; an issue-search match without this is a
+  // plain issue and is ignored.
+  pull_request?: { merged_at?: string | null } | null;
+  // e.g. "https://api.github.com/repos/owner/name"
+  repository_url: string;
+};
+
+export type GitHubRawSearchIssueResponse = {
+  total_count: number;
+  items: GitHubRawSearchIssue[];
+};
