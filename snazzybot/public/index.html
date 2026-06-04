@@ -134,19 +134,17 @@
             <label class="filter-label filter-label--spaced" for="github-repos"
               >GitHub Repos
               <span class="hint"
-                >one per line: owner/repo (e.g., mozilla/firefox). Fill this in
-                (and leave the Bugzilla fields empty) to run a GitHub-only
+                >one per line: owner/repo (e.g., mozilla/firefox). Leave empty
+                and add usernames below to search a person across GitHub
+                instead. Leave the Bugzilla fields empty for a GitHub-only
                 report.</span
               ></label
             >
-            <label class="filter-label filter-label--spaced" for="email-mapping"
-              >GitHub Users / Email Mapping
+            <label class="filter-label filter-label--spaced" for="github-orgs"
+              >Organizations
               <span class="hint"
-                >one per line. A bare GitHub username (e.g.
-                <code>octocat</code>) includes that person. Optionally map a
-                Bugzilla email with <code>email -> github_username</code> to
-                merge their Bugzilla + GitHub work. Leave empty to include every
-                contributor.</span
+                >optional: limit a username search to these GitHub orgs (one per
+                line, e.g. mozilla). Blank searches all of GitHub.</span
               ></label
             >
             <textarea
@@ -155,9 +153,29 @@
               placeholder="mozilla-services/merino-py&#10;Pocket/content-monorepo"
             ></textarea>
             <textarea
+              id="github-orgs"
+              rows="3"
+              placeholder="mozilla&#10;Pocket&#10;mozilla-services"
+            ></textarea>
+            <label
+              class="filter-label filter-label--spaced"
+              for="email-mapping"
+              style="grid-column: 1 / -1"
+              >GitHub Users / Email Mapping
+              <span class="hint"
+                >one per line. A bare GitHub username (e.g.
+                <code>octocat</code>) includes that person; commit search covers
+                public repos' default branches. Optionally map a Bugzilla email
+                with <code>email -> github_username</code> to merge their
+                Bugzilla + GitHub work. Leave empty to include every
+                contributor.</span
+              ></label
+            >
+            <textarea
               id="email-mapping"
               rows="3"
               placeholder="octocat&#10;dev@mozilla.org -> githubuser"
+              style="grid-column: 1 / -1"
             ></textarea>
           </div>
 

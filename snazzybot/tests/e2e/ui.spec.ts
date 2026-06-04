@@ -252,6 +252,51 @@ test.describe("SnazzyBot UI fixtures", () => {
     expect(finalizeBody?.githubUsernames).toContain("alicedev");
   });
 
+  test("Username-only run (no repos) searches GitHub, optionally org-scoped", async ({
+    page,
+  }) => {
+    let finalizeBody: Record<string, unknown> | undefined;
+    await page.route("**/api/status", async (route) => {
+      const body = route.request().postDataJSON();
+      if (body?.mode === "discover") {
+        return respondJson(route, {
+          sinceISO: "2025-01-01T00:00:00Z",
+          total: 0,
+          candidates: [],
+          logs: [],
+        });
+      }
+      if (body?.mode === "finalize") {
+        finalizeBody = body;
+        return respondJson(route, {
+          output: "## @octocat\n- Cross-repo work.",
+          html: "<h2>@octocat</h2>\n<ul><li>Cross-repo work.</li></ul>",
+          stats: {},
+          logs: [],
+        });
+      }
+      throw new Error(`Unexpected mode ${body?.mode}`);
+    });
+
+    await page.goto("/");
+    // No repos — just a username and an org scope.
+    await page.fill("#email-mapping", "octocat");
+    await page.fill("#github-orgs", "mozilla");
+    await page.fill("#days", "7");
+    await page.getByRole("button", { name: "Run SnazzyBot" }).click();
+
+    const frame = page.frameLocator("#resultFrame");
+    await expect(frame.locator("body")).toContainText("@octocat");
+    await expect(page.locator("#copy")).toBeEnabled();
+
+    // GitHub activity must be enabled by the username alone, with no repos and
+    // the org forwarded to scope the search.
+    expect(finalizeBody?.includeGithubActivity).toBe(true);
+    expect(finalizeBody?.githubRepos).toEqual([]);
+    expect(finalizeBody?.githubUsernames).toContain("octocat");
+    expect(finalizeBody?.githubOrgs).toContain("mozilla");
+  });
+
   test("[fx-vpn] paged run renders three valid candidates", async ({
     page,
   }) => {

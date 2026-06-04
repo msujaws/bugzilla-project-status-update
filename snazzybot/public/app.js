@@ -1066,6 +1066,7 @@ if (runButton) {
     const whiteboards = parseLines($("whiteboards")?.value || "");
     const assignees = parseLines($("assignees")?.value || "");
     const githubRepos = parseLines($("github-repos")?.value || "");
+    const githubOrgs = parseLines($("github-orgs")?.value || "");
     const { emailMapping, githubUsernames } = parseEmailMapping(
       $("email-mapping")?.value || "",
     );
@@ -1076,7 +1077,10 @@ if (runButton) {
     const skipCache = $("cache")?.value === "false";
     const includePatchContext =
       ($("patch-context")?.value || "include") !== "omit";
-    const includeGithubActivity = githubRepos.length > 0;
+    // GitHub activity runs from named repos OR a username search (orgs only
+    // scope that search — they don't trigger it on their own).
+    const includeGithubActivity =
+      githubRepos.length > 0 || githubUsernames.length > 0;
 
     const sp = new URLSearchParams();
     // Store raw textarea strings; they're newline-safe in params.
@@ -1113,6 +1117,7 @@ if (runButton) {
       githubRepos,
       emailMapping,
       githubUsernames,
+      githubOrgs,
       includeGithubActivity,
     };
     // If Debug = Yes, use streaming (shows live logs + progress)
@@ -1131,6 +1136,7 @@ function getCurrentFormParams() {
     metabugs: $("metabugs")?.value || "",
     assignees: $("assignees")?.value || "",
     githubRepos: $("github-repos")?.value || "",
+    githubOrgs: $("github-orgs")?.value || "",
     emailMapping: $("email-mapping")?.value || "",
     days: Number($("days")?.value) || 7,
     voice: $("voice")?.value || "normal",
@@ -1154,6 +1160,8 @@ function hydrateFromURL() {
     setFieldValue("assignees", sp.get("assignees") || "");
   if (sp.has("github-repos"))
     setFieldValue("github-repos", sp.get("github-repos") || "");
+  if (sp.has("github-orgs"))
+    setFieldValue("github-orgs", sp.get("github-orgs") || "");
   if (sp.has("email-mapping"))
     setFieldValue("email-mapping", sp.get("email-mapping") || "");
   if (sp.has("days")) setFieldValue("days", sp.get("days") || "7");
@@ -1194,6 +1202,7 @@ const savedSearches = new SavedSearches(savedSearchesContainer, {
     setFieldValue("metabugs", params.metabugs || "");
     setFieldValue("assignees", params.assignees || "");
     setFieldValue("github-repos", params.githubRepos || "");
+    setFieldValue("github-orgs", params.githubOrgs || "");
     setFieldValue("email-mapping", params.emailMapping || "");
     setFieldValue("days", String(params.days || 7));
     setFieldValue("voice", params.voice || "normal");
