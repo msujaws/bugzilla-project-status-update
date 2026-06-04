@@ -206,6 +206,49 @@ test.describe("SnazzyBot UI fixtures", () => {
     await expect(frame.locator("body")).toContainText("View bugs in Bugzilla");
   });
 
+  test("GitHub-only run (no Bugzilla queries) summarizes contributor activity", async ({
+    page,
+  }) => {
+    let finalizeBody: Record<string, unknown> | undefined;
+    await page.route("**/api/status", async (route) => {
+      const body = route.request().postDataJSON();
+      if (body?.mode === "discover") {
+        // No Bugzilla queries → zero candidates.
+        return respondJson(route, {
+          sinceISO: "2025-01-01T00:00:00Z",
+          total: 0,
+          candidates: [],
+          logs: [],
+        });
+      }
+      if (body?.mode === "finalize") {
+        finalizeBody = body;
+        return respondJson(route, {
+          output: "## @alicedev\n- Shipped a fix.",
+          html: "<h2>@alicedev</h2>\n<ul><li>Shipped a fix.</li></ul>",
+          stats: {},
+          logs: [],
+        });
+      }
+      throw new Error(`Unexpected mode ${body?.mode}`);
+    });
+
+    await page.goto("/");
+    await page.fill("#github-repos", "mozilla/firefox");
+    await page.fill("#days", "7");
+    await page.getByRole("button", { name: "Run SnazzyBot" }).click();
+
+    const frame = page.frameLocator("#resultFrame");
+    await expect(frame.locator("body")).toContainText("@alicedev");
+    await expect(frame.locator("body")).toContainText("Shipped a fix.");
+    await expect(page.locator("#copy")).toBeEnabled();
+
+    // The run must reach the finalize path (not the "no changes" assemble stub)
+    // with GitHub activity enabled.
+    expect(finalizeBody?.includeGithubActivity).toBe(true);
+    expect(finalizeBody?.githubRepos).toContain("mozilla/firefox");
+  });
+
   test("[fx-vpn] paged run renders three valid candidates", async ({
     page,
   }) => {

@@ -894,71 +894,88 @@ async function runSnazzyPaged(body) {
 
     // 3) Summarize qualified bugs in bounded pages, then assemble.
     const qualifiedIds = [...qualified];
-    const includePatchContext = body.includePatchContext !== false;
-    if (includePatchContext) {
-      spin.textContent = "⏳ Preparing patch context…";
-      ensurePhase("patch-context", "patch-context");
-      setPhaseIndeterminate("patch-context");
-    }
 
-    // Each summarize request handles a bounded slice (bug details + patch
-    // context + OpenAI for just that slice), keeping every request well under
-    // Cloudflare's ~100s edge budget and the Free-tier 50-subrequest cap. The
-    // client loops over all qualified bugs, so nothing is silently dropped no
-    // matter how many a user has fixed.
-    const summaryFragments = [];
-    const allAssessments = [];
-    const summarizeStep = 8;
-    ensurePhase("openai", "openai");
-    if (qualifiedIds.length > 0) {
+    let final;
+    if (qualifiedIds.length === 0 && body.includeGithubActivity) {
+      // GitHub-only run (or no qualified bugs but GitHub was requested). The
+      // paged summarize/assemble loop is keyed off qualified Bugzilla bugs, so
+      // it would emit a "no user-impacting changes" stub and never summarize
+      // GitHub activity. Fall back to a single finalize request, which runs the
+      // full recipe server-side (fetch GitHub activity → summarize → format).
+      spin.textContent = "⏳ Summarizing GitHub activity…";
+      ensurePhase("openai", "openai");
+      setPhaseIndeterminate("openai");
+      final = await postStatusJSON({
+        ...body,
+        mode: "finalize",
+        ids: [],
+      });
+    } else {
+      const includePatchContext = body.includePatchContext !== false;
+      if (includePatchContext) {
+        spin.textContent = "⏳ Preparing patch context…";
+        ensurePhase("patch-context", "patch-context");
+        setPhaseIndeterminate("patch-context");
+      }
+
+      // Each summarize request handles a bounded slice (bug details + patch
+      // context + OpenAI for just that slice), keeping every request well under
+      // Cloudflare's ~100s edge budget and the Free-tier 50-subrequest cap. The
+      // client loops over all qualified bugs, so nothing is silently dropped no
+      // matter how many a user has fixed.
+      const summaryFragments = [];
+      const allAssessments = [];
+      const summarizeStep = 8;
+      ensurePhase("openai", "openai");
       setPhasePct("openai", 0, qualifiedIds.length);
       setPhaseText("openai", `openai: 0/${qualifiedIds.length}`);
-    } else {
-      setPhaseIndeterminate("openai");
-    }
-    let summarizeCursor = 0;
-    while (
-      summarizeCursor != undefined &&
-      summarizeCursor < qualifiedIds.length
-    ) {
-      const end = Math.min(
-        summarizeCursor + summarizeStep,
-        qualifiedIds.length,
-      );
-      spin.textContent = `⏳ Summarizing ${summarizeCursor + 1}-${end} of ${qualifiedIds.length}`;
-      const chunk = await postStatusJSON({
-        ...body,
-        mode: "summarize",
-        ids: qualifiedIds,
-        cursor: summarizeCursor,
-        pageSize: summarizeStep,
-      });
-      if (typeof chunk.summaryFragment === "string" && chunk.summaryFragment) {
-        summaryFragments.push(chunk.summaryFragment);
+      let summarizeCursor = 0;
+      while (
+        summarizeCursor != undefined &&
+        summarizeCursor < qualifiedIds.length
+      ) {
+        const end = Math.min(
+          summarizeCursor + summarizeStep,
+          qualifiedIds.length,
+        );
+        spin.textContent = `⏳ Summarizing ${summarizeCursor + 1}-${end} of ${qualifiedIds.length}`;
+        const chunk = await postStatusJSON({
+          ...body,
+          mode: "summarize",
+          ids: qualifiedIds,
+          cursor: summarizeCursor,
+          pageSize: summarizeStep,
+        });
+        if (
+          typeof chunk.summaryFragment === "string" &&
+          chunk.summaryFragment
+        ) {
+          summaryFragments.push(chunk.summaryFragment);
+        }
+        for (const assessment of chunk.assessments || []) {
+          allAssessments.push(assessment);
+        }
+        setPhasePct("openai", end, qualifiedIds.length);
+        setPhaseText("openai", `openai: ${end}/${qualifiedIds.length}`);
+        summarizeCursor = chunk.nextCursor;
       }
-      for (const assessment of chunk.assessments || []) {
-        allAssessments.push(assessment);
+      if (includePatchContext) {
+        completePhase("patch-context");
+        setPhaseText("patch-context", "patch-context: done");
       }
-      setPhasePct("openai", end, qualifiedIds.length);
-      setPhaseText("openai", `openai: ${end}/${qualifiedIds.length}`);
-      summarizeCursor = chunk.nextCursor;
-    }
-    if (includePatchContext) {
-      completePhase("patch-context");
-      setPhaseText("patch-context", "patch-context: done");
-    }
 
-    // 4) Assemble the final report (formatting only — issues no upstream calls).
-    spin.textContent = "⏳ Finishing…";
-    const final = await postStatusJSON({
-      ...body,
-      mode: "assemble",
-      ids: qualifiedIds,
-      summaryFragments,
-      assessments: allAssessments,
-      trimmedCount: 0,
-      candidatesTotal: total,
-    });
+      // 4) Assemble the final report (formatting only — no upstream calls).
+      spin.textContent = "⏳ Finishing…";
+      final = await postStatusJSON({
+        ...body,
+        mode: "assemble",
+        ids: qualifiedIds,
+        summaryFragments,
+        assessments: allAssessments,
+        trimmedCount: 0,
+        candidatesTotal: total,
+      });
+    }
     logStats(final.stats);
     lastMarkdown = typeof final.output === "string" ? final.output.trim() : "";
     if (typeof final.html === "string" && final.html) {
