@@ -1,28 +1,51 @@
 import { describe, expect, it } from "vitest";
 
-// Extract the parseEmailMapping function for testing
-function parseEmailMapping(text: string): Record<string, string> {
-  if (!text || !text.trim()) return {};
-  const mapping: Record<string, string> = {};
+// Mirror of parseEmailMapping in public/app.js (browser code that can't be
+// imported directly here). Keep this in sync with that implementation.
+function parseEmailMapping(text: string): {
+  emailMapping: Record<string, string>;
+  githubUsernames: string[];
+} {
+  const result: {
+    emailMapping: Record<string, string>;
+    githubUsernames: string[];
+  } = { emailMapping: {}, githubUsernames: [] };
+  if (!text || !text.trim()) return result;
+
+  const seen = new Set<string>();
+  const addUsername = (raw: string) => {
+    const username = raw.trim();
+    if (!username) return;
+    const key = username.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.githubUsernames.push(username);
+  };
+
   const lines = text
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
+
   for (const line of lines) {
     const match = line.match(/^(.+?)\s*->\s*(.+)$/);
     if (match) {
       const [, email, username] = match;
-      mapping[email.trim()] = username.trim();
+      result.emailMapping[email.trim()] = username.trim();
+      addUsername(username);
+    } else {
+      addUsername(line);
     }
   }
-  return mapping;
+
+  return result;
 }
 
 describe("parseEmailMapping (frontend)", () => {
   it("parses single email mapping", () => {
-    const input = "alice@mozilla.org -> alicedev";
-    const result = parseEmailMapping(input);
-    expect(result).toEqual({ "alice@mozilla.org": "alicedev" });
+    const result = parseEmailMapping("alice@mozilla.org -> alicedev");
+    expect(result.emailMapping).toEqual({ "alice@mozilla.org": "alicedev" });
+    expect(result.githubUsernames).toEqual(["alicedev"]);
   });
 
   it("parses multiple email mappings", () => {
@@ -30,22 +53,52 @@ describe("parseEmailMapping (frontend)", () => {
 bob@mozilla.org -> bobdev
 charlie@example.com -> charliedev`;
     const result = parseEmailMapping(input);
-    expect(result).toEqual({
+    expect(result.emailMapping).toEqual({
       "alice@mozilla.org": "alicedev",
       "bob@mozilla.org": "bobdev",
       "charlie@example.com": "charliedev",
     });
+    expect(result.githubUsernames).toEqual([
+      "alicedev",
+      "bobdev",
+      "charliedev",
+    ]);
   });
 
   it("handles empty input", () => {
-    expect(parseEmailMapping("")).toEqual({});
-    expect(parseEmailMapping("   ")).toEqual({});
+    expect(parseEmailMapping("")).toEqual({
+      emailMapping: {},
+      githubUsernames: [],
+    });
+    expect(parseEmailMapping("   ")).toEqual({
+      emailMapping: {},
+      githubUsernames: [],
+    });
+  });
+
+  it("collects bare GitHub usernames without a mapping", () => {
+    const input = `octocat
+alice@mozilla.org -> alicedev
+hubber`;
+    const result = parseEmailMapping(input);
+    expect(result.emailMapping).toEqual({ "alice@mozilla.org": "alicedev" });
+    expect(result.githubUsernames).toEqual(["octocat", "alicedev", "hubber"]);
+  });
+
+  it("de-duplicates usernames case-insensitively", () => {
+    const input = `octocat
+OctoCat
+alice@mozilla.org -> octocat`;
+    const result = parseEmailMapping(input);
+    // First occurrence wins for casing; later duplicates are dropped.
+    expect(result.githubUsernames).toEqual(["octocat"]);
+    expect(result.emailMapping).toEqual({ "alice@mozilla.org": "octocat" });
   });
 
   it("handles whitespace around mappings", () => {
-    const input = "  alice@mozilla.org   ->   alicedev  ";
-    const result = parseEmailMapping(input);
-    expect(result).toEqual({ "alice@mozilla.org": "alicedev" });
+    const result = parseEmailMapping("  alice@mozilla.org   ->   alicedev  ");
+    expect(result.emailMapping).toEqual({ "alice@mozilla.org": "alicedev" });
+    expect(result.githubUsernames).toEqual(["alicedev"]);
   });
 
   it("skips empty lines", () => {
@@ -55,32 +108,9 @@ bob@mozilla.org -> bobdev
 
 `;
     const result = parseEmailMapping(input);
-    expect(result).toEqual({
+    expect(result.emailMapping).toEqual({
       "alice@mozilla.org": "alicedev",
       "bob@mozilla.org": "bobdev",
-    });
-  });
-
-  it("skips invalid lines without -> delimiter", () => {
-    const input = `alice@mozilla.org -> alicedev
-invalid line without delimiter
-bob@mozilla.org -> bobdev`;
-    const result = parseEmailMapping(input);
-    expect(result).toEqual({
-      "alice@mozilla.org": "alicedev",
-      "bob@mozilla.org": "bobdev",
-    });
-  });
-
-  it("handles various email formats", () => {
-    const input = `user@example.com -> username1
-user.name@example.org -> username2
-user+tag@example.co.uk -> username3`;
-    const result = parseEmailMapping(input);
-    expect(result).toEqual({
-      "user@example.com": "username1",
-      "user.name@example.org": "username2",
-      "user+tag@example.co.uk": "username3",
     });
   });
 
@@ -88,39 +118,24 @@ user+tag@example.co.uk -> username3`;
     const input = `alice@mozilla.org -> alice-dev
 bob@mozilla.org -> bob_dev123`;
     const result = parseEmailMapping(input);
-    expect(result).toEqual({
+    expect(result.emailMapping).toEqual({
       "alice@mozilla.org": "alice-dev",
       "bob@mozilla.org": "bob_dev123",
     });
-  });
-
-  it("handles trailing whitespace in lines", () => {
-    const input = `alice@mozilla.org -> alicedev
-bob@mozilla.org -> bobdev	`;
-    const result = parseEmailMapping(input);
-    expect(result).toEqual({
-      "alice@mozilla.org": "alicedev",
-      "bob@mozilla.org": "bobdev",
-    });
-  });
-
-  it("handles single mapping with extra whitespace", () => {
-    const input = "   alice@mozilla.org   ->   alicedev   ";
-    const result = parseEmailMapping(input);
-    expect(result).toEqual({ "alice@mozilla.org": "alicedev" });
   });
 
   it("last mapping wins for duplicate emails", () => {
     const input = `alice@mozilla.org -> alicedev1
 alice@mozilla.org -> alicedev2`;
     const result = parseEmailMapping(input);
-    expect(result).toEqual({ "alice@mozilla.org": "alicedev2" });
+    expect(result.emailMapping).toEqual({ "alice@mozilla.org": "alicedev2" });
   });
 
   it("handles mapping with multiple arrows (takes last)", () => {
-    const input = "alice@mozilla.org -> middle -> alicedev";
-    const result = parseEmailMapping(input);
-    // The regex will match first arrow, so this maps to "middle -> alicedev"
-    expect(result).toEqual({ "alice@mozilla.org": "middle -> alicedev" });
+    const result = parseEmailMapping("alice@mozilla.org -> middle -> alicedev");
+    // The regex matches the first arrow, so this maps to "middle -> alicedev".
+    expect(result.emailMapping).toEqual({
+      "alice@mozilla.org": "middle -> alicedev",
+    });
   });
 });

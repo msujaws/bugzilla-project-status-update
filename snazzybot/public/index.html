@@ -134,24 +134,30 @@
             <label class="filter-label filter-label--spaced" for="github-repos"
               >GitHub Repos
               <span class="hint"
-                >one per line: owner/repo (e.g., mozilla/firefox)</span
+                >one per line: owner/repo (e.g., mozilla/firefox). Fill this in
+                (and leave the Bugzilla fields empty) to run a GitHub-only
+                report.</span
               ></label
             >
             <label class="filter-label filter-label--spaced" for="email-mapping"
-              >Email Mapping
+              >GitHub Users / Email Mapping
               <span class="hint"
-                >bugzilla@email.com -> github_username</span
+                >one per line. A bare GitHub username (e.g.
+                <code>octocat</code>) includes that person. Optionally map a
+                Bugzilla email with <code>email -> github_username</code> to
+                merge their Bugzilla + GitHub work. Leave empty to include every
+                contributor.</span
               ></label
             >
             <textarea
               id="github-repos"
               rows="3"
-              placeholder="mozilla/firefox&#10;mozilla/devtools"
+              placeholder="mozilla-services/merino-py&#10;Pocket/content-monorepo"
             ></textarea>
             <textarea
               id="email-mapping"
               rows="3"
-              placeholder="dev@mozilla.org -> githubuser&#10;peer@mozilla.org -> anotheruser"
+              placeholder="octocat&#10;dev@mozilla.org -> githubuser"
             ></textarea>
           </div>
 

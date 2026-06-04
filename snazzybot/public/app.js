@@ -450,10 +450,27 @@ function parseLines(t) {
     .filter(Boolean);
 }
 
+// Parses the "GitHub Users / Email Mapping" textarea. Two line shapes are
+// accepted, one per line:
+//   - `email@example.com -> githubuser` maps a Bugzilla email to a GitHub
+//     username (merges that person's Bugzilla + GitHub work).
+//   - a bare `githubuser` simply includes that contributor.
+// Returns the email->username map plus the de-duped list of GitHub usernames to
+// restrict activity to (mapped usernames are included in the list too).
 function parseEmailMapping(text) {
-  if (!text || !text.trim()) return {};
+  const result = { emailMapping: {}, githubUsernames: [] };
+  if (!text || !text.trim()) return result;
 
-  const mapping = {};
+  const seen = new Set();
+  const addUsername = (raw) => {
+    const username = raw.trim();
+    if (!username) return;
+    const key = username.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.githubUsernames.push(username);
+  };
+
   const lines = text
     .split("\n")
     .map((l) => l.trim())
@@ -463,11 +480,14 @@ function parseEmailMapping(text) {
     const match = line.match(/^(.+?)\s*->\s*(.+)$/);
     if (match) {
       const [, email, username] = match;
-      mapping[email.trim()] = username.trim();
+      result.emailMapping[email.trim()] = username.trim();
+      addUsername(username);
+    } else {
+      addUsername(line);
     }
   }
 
-  return mapping;
+  return result;
 }
 
 function setActionsEnabled(enabled) {
@@ -1046,7 +1066,9 @@ if (runButton) {
     const whiteboards = parseLines($("whiteboards")?.value || "");
     const assignees = parseLines($("assignees")?.value || "");
     const githubRepos = parseLines($("github-repos")?.value || "");
-    const emailMapping = parseEmailMapping($("email-mapping")?.value || "");
+    const { emailMapping, githubUsernames } = parseEmailMapping(
+      $("email-mapping")?.value || "",
+    );
     const days = Number($("days")?.value) || 8;
     const voice = $("voice")?.value || "normal";
     const audience = $("audience")?.value || "technical";
@@ -1090,6 +1112,7 @@ if (runButton) {
       includePatchContext,
       githubRepos,
       emailMapping,
+      githubUsernames,
       includeGithubActivity,
     };
     // If Debug = Yes, use streaming (shows live logs + progress)

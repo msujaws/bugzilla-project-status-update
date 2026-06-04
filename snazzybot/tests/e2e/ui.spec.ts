@@ -235,6 +235,8 @@ test.describe("SnazzyBot UI fixtures", () => {
 
     await page.goto("/");
     await page.fill("#github-repos", "mozilla/firefox");
+    // A bare username in the mapping field restricts the run to that person.
+    await page.fill("#email-mapping", "alicedev");
     await page.fill("#days", "7");
     await page.getByRole("button", { name: "Run SnazzyBot" }).click();
 
@@ -244,9 +246,10 @@ test.describe("SnazzyBot UI fixtures", () => {
     await expect(page.locator("#copy")).toBeEnabled();
 
     // The run must reach the finalize path (not the "no changes" assemble stub)
-    // with GitHub activity enabled.
+    // with GitHub activity enabled and the bare username forwarded as a filter.
     expect(finalizeBody?.includeGithubActivity).toBe(true);
     expect(finalizeBody?.githubRepos).toContain("mozilla/firefox");
+    expect(finalizeBody?.githubUsernames).toContain("alicedev");
   });
 
   test("[fx-vpn] paged run renders three valid candidates", async ({
