@@ -107,6 +107,73 @@ describe("collectGithubContributors – githubUsernames filter", () => {
     expect(contributors.has("bobdev")).toBe(false);
   });
 
+  it("searches GitHub by username when no repos are provided", async () => {
+    let commitQuery = "";
+    server.use(
+      http.get("https://api.github.com/search/commits", ({ request }) => {
+        commitQuery = new URL(request.url).searchParams.get("q") ?? "";
+        return HttpResponse.json({
+          total_count: 1,
+          items: [
+            {
+              sha: "abc123",
+              commit: {
+                message: "Cross-repo commit",
+                author: {
+                  name: "Alice",
+                  email: "alice@mozilla.org",
+                  date: "2025-10-22T10:00:00Z",
+                },
+              },
+              author: { login: "alicedev" },
+              html_url: "https://github.com/mozilla/firefox/commit/abc123",
+              repository: { full_name: "mozilla/firefox" },
+            },
+          ],
+        });
+      }),
+      http.get("https://api.github.com/search/issues", () =>
+        HttpResponse.json({ total_count: 0, items: [] }),
+      ),
+    );
+
+    const { contributors } = await collectGithubContributors(
+      env,
+      {
+        githubRepos: [],
+        emailMapping: {},
+        githubUsernames: ["alicedev"],
+        githubOrgs: ["mozilla"],
+        sinceISO: "2025-10-21T00:00:00Z",
+        includeGithubActivity: true,
+      },
+      hooks,
+    );
+
+    expect(commitQuery).toContain("author:alicedev");
+    expect(commitQuery).toContain("org:mozilla");
+    expect(contributors.size).toBe(1);
+    expect(contributors.get("alicedev")?.commits[0].message).toBe(
+      "Cross-repo commit",
+    );
+  });
+
+  it("returns empty when neither repos nor usernames are provided", async () => {
+    const { contributors } = await collectGithubContributors(
+      env,
+      {
+        githubRepos: [],
+        emailMapping: {},
+        githubUsernames: [],
+        githubOrgs: [],
+        sinceISO: "2025-10-21T00:00:00Z",
+        includeGithubActivity: true,
+      },
+      hooks,
+    );
+    expect(contributors.size).toBe(0);
+  });
+
   it("matches usernames case-insensitively", async () => {
     server.use(
       mockFirefoxCommits(),

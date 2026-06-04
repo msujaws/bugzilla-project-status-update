@@ -18,6 +18,10 @@ export type GenerateParams = {
   // When non-empty, GitHub activity is restricted to these GitHub usernames
   // (case-insensitive). Empty/omitted means "include every contributor".
   githubUsernames?: string[];
+  // When githubRepos is empty, a username-only run searches GitHub by author.
+  // These org logins (optional) scope that search to `org:<org>`; empty means
+  // search all of GitHub.
+  githubOrgs?: string[];
   includeGithubActivity?: boolean;
   jiraJql?: string[];
   jiraProjects?: string[];

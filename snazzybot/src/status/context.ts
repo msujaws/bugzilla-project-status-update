@@ -77,6 +77,7 @@ export interface StatusContext {
   githubRepos: string[];
   emailMapping: Record<string, string>;
   githubUsernames: string[];
+  githubOrgs: string[];
   githubActivity: GitHubActivity[];
   githubContributors: Map<string, GitHubContributor>;
   githubStats?: {

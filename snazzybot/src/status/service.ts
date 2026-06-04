@@ -245,6 +245,7 @@ export async function generateStatus(
     githubRepos: params.githubRepos ?? [],
     emailMapping: params.emailMapping ?? {},
     githubUsernames: params.githubUsernames ?? [],
+    githubOrgs: params.githubOrgs ?? [],
     githubActivity: [],
     githubContributors: new Map(),
     ids: [],

@@ -31,6 +31,7 @@ export async function collectGithubContributors(
     githubRepos: string[];
     emailMapping: Record<string, string>;
     githubUsernames?: string[];
+    githubOrgs?: string[];
     sinceISO: string;
     includeGithubActivity: boolean;
   },
@@ -41,11 +42,17 @@ export async function collectGithubContributors(
     githubRepos,
     emailMapping,
     githubUsernames = [],
+    githubOrgs = [],
     sinceISO,
     includeGithubActivity,
   } = options;
 
-  if (!includeGithubActivity || githubRepos.length === 0) {
+  // Activity needs either explicit repos or usernames to search by. With
+  // neither there is nothing to fetch.
+  if (
+    !includeGithubActivity ||
+    (githubRepos.length === 0 && githubUsernames.length === 0)
+  ) {
     return emptyResult();
   }
 
@@ -64,17 +71,39 @@ export async function collectGithubContributors(
   const client = new GitHubClient(env);
   const activities = [];
 
-  for (const repo of githubRepos) {
+  if (githubRepos.length > 0) {
+    for (const repo of githubRepos) {
+      try {
+        hooks.info?.(`Fetching GitHub activity for ${repo}`);
+        const activity = await client.getRepoActivity(
+          repo,
+          sinceISO,
+          githubUsernames,
+        );
+        activities.push(activity);
+      } catch (error) {
+        hooks.warn?.(`Failed to fetch GitHub activity for ${repo}: ${error}`);
+      }
+    }
+  } else {
+    // No repos named: discover the listed people's activity across GitHub via
+    // the Search API, optionally scoped to the given orgs.
+    const scope =
+      githubOrgs.length > 0 ? ` in ${githubOrgs.join(", ")}` : " across GitHub";
     try {
-      hooks.info?.(`Fetching GitHub activity for ${repo}`);
-      const activity = await client.getRepoActivity(
-        repo,
-        sinceISO,
-        githubUsernames,
+      hooks.info?.(
+        `Searching GitHub for ${githubUsernames
+          .map((u) => `@${u}`)
+          .join(", ")}${scope}`,
       );
-      activities.push(activity);
+      const searched = await client.searchUserActivity(
+        githubUsernames,
+        sinceISO,
+        githubOrgs,
+      );
+      activities.push(...searched);
     } catch (error) {
-      hooks.warn?.(`Failed to fetch GitHub activity for ${repo}: ${error}`);
+      hooks.warn?.(`Failed to search GitHub activity: ${error}`);
     }
   }
 
