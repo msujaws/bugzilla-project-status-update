@@ -109,9 +109,13 @@ export class GitHubClient {
   private async fetchPaginatedCommits(
     repo: string,
     since: string,
+    author?: string,
   ): Promise<GitHubRawCommit[]> {
     const commits: GitHubRawCommit[] = [];
     let path = `/repos/${repo}/commits?since=${since}&per_page=100`;
+    if (author) {
+      path += `&author=${encodeURIComponent(author)}`;
+    }
 
     while (path && commits.length < MAX_COMMITS_PER_REPO) {
       const response = await fetch(`${this.baseUrl}${path}`, {
@@ -181,8 +185,32 @@ export class GitHubClient {
     return prs.slice(0, MAX_PRS_PER_REPO);
   }
 
-  async getRepoActivity(repo: string, since: string): Promise<GitHubActivity> {
-    const commitsData = await this.fetchPaginatedCommits(repo, since);
+  async getRepoActivity(
+    repo: string,
+    since: string,
+    authors?: string[],
+  ): Promise<GitHubActivity> {
+    // When specific authors are requested, query the commits API per author
+    // (`?author=`) so GitHub filters server-side. This keeps commit volume and
+    // subsequent per-PR detail fetches small on large repos — important under
+    // Cloudflare's Free-tier subrequest cap.
+    const filterAuthors = (authors ?? []).map((a) => a.trim()).filter(Boolean);
+    const authorFilter =
+      filterAuthors.length > 0
+        ? new Set(filterAuthors.map((a) => a.toLowerCase()))
+        : undefined;
+
+    let commitsData: GitHubRawCommit[];
+    if (filterAuthors.length > 0) {
+      const perAuthor = await Promise.all(
+        filterAuthors.map((author) =>
+          this.fetchPaginatedCommits(repo, since, author),
+        ),
+      );
+      commitsData = perAuthor.flat();
+    } else {
+      commitsData = await this.fetchPaginatedCommits(repo, since);
+    }
 
     const commits: GitHubCommit[] = commitsData.map((c: GitHubRawCommit) => ({
       sha: c.sha,
@@ -193,7 +221,12 @@ export class GitHubClient {
       url: c.html_url,
     }));
 
-    const prsData = await this.fetchPaginatedPRs(repo);
+    const allPrsData = await this.fetchPaginatedPRs(repo);
+    const prsData = authorFilter
+      ? allPrsData.filter((pr) =>
+          authorFilter.has((pr.user?.login ?? "").toLowerCase()),
+        )
+      : allPrsData;
 
     const pullRequests: GitHubPullRequest[] = [];
 

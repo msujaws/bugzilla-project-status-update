@@ -67,7 +67,11 @@ export async function collectGithubContributors(
   for (const repo of githubRepos) {
     try {
       hooks.info?.(`Fetching GitHub activity for ${repo}`);
-      const activity = await client.getRepoActivity(repo, sinceISO);
+      const activity = await client.getRepoActivity(
+        repo,
+        sinceISO,
+        githubUsernames,
+      );
       activities.push(activity);
     } catch (error) {
       hooks.warn?.(`Failed to fetch GitHub activity for ${repo}: ${error}`);

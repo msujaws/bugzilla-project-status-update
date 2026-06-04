@@ -350,6 +350,101 @@ describe("GitHubClient", () => {
     expect(userAgentChecked).toBe(true);
   });
 
+  it("fetches commits per author when authors are provided", async () => {
+    const repo = "mozilla/firefox";
+    const since = "2025-10-21T00:00:00Z";
+    const requestedAuthors: string[] = [];
+
+    server.use(
+      http.get(
+        "https://api.github.com/repos/mozilla/firefox/commits",
+        ({ request }) => {
+          const author = new URL(request.url).searchParams.get("author");
+          requestedAuthors.push(author ?? "");
+          return HttpResponse.json([
+            {
+              sha: `sha-${author}`,
+              commit: {
+                message: `Commit by ${author}`,
+                author: {
+                  name: author,
+                  email: `${author}@mozilla.org`,
+                  date: "2025-10-22T10:00:00Z",
+                },
+              },
+              author: { login: author },
+              html_url: `https://github.com/mozilla/firefox/commit/${author}`,
+            },
+          ]);
+        },
+      ),
+      http.get("https://api.github.com/repos/mozilla/firefox/pulls", () =>
+        HttpResponse.json([]),
+      ),
+    );
+
+    const client = new GitHubClient(env);
+    const activity = await client.getRepoActivity(repo, since, [
+      "alicedev",
+      "bobdev",
+    ]);
+
+    expect(requestedAuthors.toSorted()).toEqual(["alicedev", "bobdev"]);
+    expect(activity.commits.map((c) => c.author).toSorted()).toEqual([
+      "alicedev",
+      "bobdev",
+    ]);
+  });
+
+  it("filters pull requests to the provided authors", async () => {
+    const repo = "mozilla/firefox";
+    const since = "2025-10-21T00:00:00Z";
+    const prDetailRequests: number[] = [];
+
+    server.use(
+      http.get("https://api.github.com/repos/mozilla/firefox/commits", () =>
+        HttpResponse.json([]),
+      ),
+      http.get("https://api.github.com/repos/mozilla/firefox/pulls", () =>
+        HttpResponse.json([
+          {
+            number: 1,
+            title: "Alice PR",
+            user: { login: "alicedev" },
+            html_url: "https://github.com/mozilla/firefox/pull/1",
+            state: "closed",
+            merged_at: "2025-10-22T11:00:00Z",
+            closed_at: "2025-10-22T11:00:00Z",
+          },
+          {
+            number: 2,
+            title: "Bob PR",
+            user: { login: "bobdev" },
+            html_url: "https://github.com/mozilla/firefox/pull/2",
+            state: "closed",
+            merged_at: "2025-10-23T11:00:00Z",
+            closed_at: "2025-10-23T11:00:00Z",
+          },
+        ]),
+      ),
+      http.get(
+        "https://api.github.com/repos/mozilla/firefox/pulls/:num",
+        ({ params }) => {
+          prDetailRequests.push(Number(params.num));
+          return HttpResponse.json({ additions: 10, deletions: 1 });
+        },
+      ),
+    );
+
+    const client = new GitHubClient(env);
+    const activity = await client.getRepoActivity(repo, since, ["alicedev"]);
+
+    expect(activity.pullRequests).toHaveLength(1);
+    expect(activity.pullRequests[0].author).toBe("alicedev");
+    // PR details should only be fetched for the matching author's PR.
+    expect(prDetailRequests).toEqual([1]);
+  });
+
   it("handles PR details fetch errors gracefully", async () => {
     const repo = "mozilla/firefox";
     const since = "2025-10-21T00:00:00Z";
