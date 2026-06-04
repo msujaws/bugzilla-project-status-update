@@ -357,12 +357,19 @@ describe("GitHub integration (with MSW mocks)", () => {
     expect(ids).toEqual([]);
     expect(output).toContain("@alicedev");
 
+    // Footer points at GitHub, not Bugzilla, for a GitHub-only run (Bug 3).
+    expect(output).toContain("View work on GitHub");
+    expect(output).toContain("github.com/search");
+    expect(output).not.toContain("View bugs in Bugzilla");
+
     const payload = capturedOpenAi as
       | { messages?: Array<{ content: string }> }
       | undefined;
     const content = payload?.messages?.[1]?.content ?? "";
     expect(content).toContain("@alicedev");
     expect(content).toContain("Cross-repo fix");
+    // Prompt must not seed the misleading "no bugs" framing (Bug 2).
+    expect(content).not.toMatch(/no bugs or issues to summarize/i);
   });
 
   it("maps GitHub activity to Bugzilla emails correctly", async () => {

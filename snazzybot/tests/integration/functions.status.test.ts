@@ -292,6 +292,36 @@ describe("functions/api/status.ts", () => {
     await mf.dispose();
   });
 
+  it("streaming NDJSON serializes writes so all info/phase lines precede done", async () => {
+    // Regression guard for ordered, awaited stream writes. NOTE: miniflare
+    // buffers the whole body, so this asserts ordering, not real-time flush —
+    // the latter is verified manually via `npm run dev:pages`.
+    const mf = await makeMiniflare({}, { forceFallback: true });
+    const r = await mf.dispatchFetch("http://local/api/status?stream=1", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/x-ndjson",
+      },
+      body: JSON.stringify({ days: 8, whiteboards: ["[fx-vpn]"] }),
+    });
+    const text = await r.text();
+    const lines = text
+      .trim()
+      .split("\n")
+      .map((s) => JSON.parse(s));
+
+    const doneIndex = lines.findIndex((l) => l.kind === "done");
+    let lastNonDoneIndex = -1;
+    for (const [i, l] of lines.entries()) {
+      if (l.kind !== "done") lastNonDoneIndex = i;
+    }
+    expect(doneIndex).toBeGreaterThan(-1);
+    expect(lastNonDoneIndex).toBeLessThan(doneIndex);
+    expect(lines.at(-1)?.kind).toBe("done");
+    await mf.dispose();
+  });
+
   describe("CSRF protection", () => {
     it("allows requests without Origin header", async () => {
       const mf = await makeMiniflare({}, { forceFallback: true });

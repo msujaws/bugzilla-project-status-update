@@ -578,11 +578,13 @@ export function assembleSummary(
     };
   }
 
+  // Bugzilla-paginated path only (runs with bug ids); intentionally
+  // Bugzilla-only — GitHub-only runs use the streaming recipe/formatOutputStep.
   const { markdown, html } = formatSummaryOutput({
     summaryMd: summary_md,
     demo,
     trimmedCount: trimmedCount ?? 0,
-    link,
+    links: [{ label: "View bugs in Bugzilla", url: link }],
   });
 
   return {

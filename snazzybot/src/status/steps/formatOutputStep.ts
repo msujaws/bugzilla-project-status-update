@@ -1,5 +1,5 @@
 import {
-  buildBuglistLink,
+  buildFooterLinks,
   extractDemoSuggestions,
   formatSummaryOutput,
 } from "../recipeHelpers.ts";
@@ -15,14 +15,14 @@ export const formatOutputStep: RecipeStep<StatusStepName, StatusContext> = {
     }
 
     const demo = extractDemoSuggestions(ai.assessments || []);
-    const link = buildBuglistLink(ctx, ctx.ids);
-    ctx.buglistLink = link;
+    const links = buildFooterLinks(ctx, ctx.ids);
+    ctx.buglistLink = links[0]?.url ?? "";
 
     const { markdown, html } = formatSummaryOutput({
       summaryMd: ai.summary_md ?? "",
       demo,
       trimmedCount: ctx.trimmedCount,
-      link,
+      links,
     });
 
     ctx.html = html;

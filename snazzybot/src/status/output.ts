@@ -68,3 +68,23 @@ export function buildBuglistURL(args: {
   }
   return url.toString();
 }
+
+/**
+ * Build a github.com search URL for pull requests authored by the given
+ * user(s) within the report window, optionally scoped to orgs. Mirrors the
+ * `author:`/`org:` query style used by the GitHub Search API in githubStage.ts.
+ */
+export function buildGithubSearchURL(args: {
+  githubUsernames: string[];
+  githubOrgs?: string[];
+  sinceISO: string;
+}): string {
+  const terms = ["is:pr"];
+  for (const username of args.githubUsernames) terms.push(`author:${username}`);
+  for (const org of args.githubOrgs ?? []) terms.push(`org:${org}`);
+  if (args.sinceISO) terms.push(`created:>=${args.sinceISO}`);
+  const url = new URL("https://github.com/search");
+  url.searchParams.set("q", terms.join(" "));
+  url.searchParams.set("type", "pullrequests");
+  return url.toString();
+}

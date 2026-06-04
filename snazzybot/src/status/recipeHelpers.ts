@@ -1,5 +1,5 @@
 import { escapeHtml, markdownToHtml } from "./markdown.ts";
-import { buildBuglistURL } from "./output.ts";
+import { buildBuglistURL, buildGithubSearchURL } from "./output.ts";
 import { summarizeWithOpenAI } from "./summarizer.ts";
 import { SUB_OPERATION_PHASES } from "./phases.ts";
 import type { CandidateCollection } from "./candidateCollector.ts";
@@ -8,13 +8,25 @@ import type { StatusContext } from "./context.ts";
 
 const DEMO_SECTION_REGEX = /(^|\n)+#{0,3}\s*Demo suggestions[\s\S]*$/i;
 
+export type FooterLink = { label: string; url: string };
+
+const footerMarkdown = (links: FooterLink[]) =>
+  links.map((l) => `[${l.label}](${l.url})`).join(" · ");
+
+const footerHtml = (links: FooterLink[]) =>
+  `<p>` +
+  links
+    .map((l) => `<a href="${escapeHtml(l.url)}">${escapeHtml(l.label)}</a>`)
+    .join(" · ") +
+  `</p>`;
+
 export const formatSummaryOutput = (args: {
   summaryMd: string;
   demo: string[];
   trimmedCount: number;
-  link: string;
+  links: FooterLink[];
 }) => {
-  const { summaryMd, demo, trimmedCount, link } = args;
+  const { summaryMd, demo, trimmedCount, links } = args;
   let summary = (summaryMd || "").trim().replace(DEMO_SECTION_REGEX, "").trim();
 
   if (demo.length > 0) {
@@ -27,10 +39,8 @@ export const formatSummaryOutput = (args: {
     summary += `\n\n_Note: ${trimmedCount} additional ${noun} ${verb} omitted from the AI summary due to size limits._`;
   }
 
-  const markdown = `${summary}\n\n[View bugs in Bugzilla](${link})`;
-  const html =
-    markdownToHtml(summary) +
-    `\n<p><a href="${escapeHtml(link)}">View bugs in Bugzilla</a></p>`;
+  const markdown = `${summary}\n\n${footerMarkdown(links)}`;
+  const html = markdownToHtml(summary) + `\n${footerHtml(links)}`;
 
   return { markdown, html };
 };
@@ -138,12 +148,56 @@ export const buildBuglistLink = (ctx: StatusContext, ids: number[]) =>
     host: ctx.env.BUGZILLA_HOST,
   });
 
+/**
+ * Build the footer link(s) for a report based on which data sources the run
+ * drew from. Bugzilla-only → "View bugs in Bugzilla"; GitHub-only → "View work
+ * on GitHub"; mixed → both (in that order).
+ */
+export const buildFooterLinks = (
+  ctx: StatusContext,
+  ids: number[],
+): FooterLink[] => {
+  const hasBugzilla =
+    ctx.components.length > 0 ||
+    ctx.whiteboards.length > 0 ||
+    ctx.metabugs.length > 0 ||
+    ctx.assignees.length > 0 ||
+    ids.length > 0;
+  const hasGithub =
+    ctx.githubUsernames.length > 0 || ctx.githubRepos.length > 0;
+
+  const links: FooterLink[] = [];
+  if (hasBugzilla) {
+    links.push({
+      label: "View bugs in Bugzilla",
+      url: buildBuglistLink(ctx, ids),
+    });
+  }
+  if (hasGithub) {
+    links.push({
+      label: "View work on GitHub",
+      url: buildGithubSearchURL({
+        githubUsernames: ctx.githubUsernames,
+        githubOrgs: ctx.githubOrgs,
+        sinceISO: ctx.sinceISO,
+      }),
+    });
+  }
+  // Fallback: a run with no recognized source still gets a usable link.
+  if (links.length === 0) {
+    links.push({
+      label: "View bugs in Bugzilla",
+      url: buildBuglistLink(ctx, ids),
+    });
+  }
+  return links;
+};
+
 export const buildEmptySummary = (ctx: StatusContext) => {
-  const link = buildBuglistLink(ctx, []);
-  const markdownBody = `_No user-impacting changes in the last ${ctx.days} days._\n\n[View bugs in Bugzilla](${link})`;
-  const escapedLink = escapeHtml(link);
-  const htmlBody = `<p><em>No user-impacting changes in the last ${ctx.days} days.</em></p><p><a href="${escapedLink}">View bugs in Bugzilla</a></p>`;
-  return { link, markdownBody, htmlBody };
+  const links = buildFooterLinks(ctx, []);
+  const markdownBody = `_No user-impacting changes in the last ${ctx.days} days._\n\n${footerMarkdown(links)}`;
+  const htmlBody = `<p><em>No user-impacting changes in the last ${ctx.days} days.</em></p>${footerHtml(links)}`;
+  return { link: links[0]?.url ?? "", markdownBody, htmlBody };
 };
 
 export const extractDemoSuggestions = (

@@ -406,6 +406,7 @@ async function summarizeBatch(
 
   const hasBugs = bugs.length > 0;
   const hasJira = jiraIssues.length > 0;
+  const hasGithub = !!githubContributors && githubContributors.size > 0;
 
   const impactScoreRubric = `
 Impact Score Calibration (1-10):
@@ -457,6 +458,8 @@ Tasks:
 2) For issues with score >= 9, suggest a one-sentence demo idea.
 3) Write a concise Markdown summary emphasizing user impact only.
 4) Credit the assignee by name (use assignee.name; if missing or "Unassigned", skip attribution).`;
+  } else if (hasGithub) {
+    user += `The activity in this window consists of GitHub contributions only (no Bugzilla bugs or Jira issues). Write a Markdown summary describing that GitHub work as the main subject. Do NOT state that there are no bugs, no user-impacting bugs, no regressions, or that nothing happened — the GitHub work below IS the report.`;
   } else {
     user += `No bugs or issues to summarize.`;
   }

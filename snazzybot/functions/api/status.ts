@@ -727,8 +727,17 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const ts = new TransformStream();
   const writer = ts.writable.getWriter();
 
+  // Serialize writes through an awaited promise chain so each event is flushed
+  // in order rather than buffered behind the long OpenAI call. Without this,
+  // unawaited `writer.write()` calls let early log lines (e.g. GitHub
+  // candidates) sit buffered until the final large `done` write/close forces a
+  // flush, so they appear only after summarization finishes.
+  let writeChain: Promise<void> = Promise.resolve();
   const write = (obj: Record<string, unknown>) => {
-    void writer.write(enc.encode(JSON.stringify(obj) + "\n"));
+    writeChain = writeChain.then(() =>
+      writer.write(enc.encode(JSON.stringify(obj) + "\n")),
+    );
+    return writeChain;
   };
 
   (async () => {
@@ -775,6 +784,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         errorId: safeError.errorId,
       });
     } finally {
+      await writeChain.catch(() => {});
       await writer.close();
     }
   })();
